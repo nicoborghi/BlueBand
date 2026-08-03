@@ -1,0 +1,1685 @@
+"""Headless runs of the Streamlit pages: they must render without exceptions."""
+
+import re
+import shutil
+from pathlib import Path
+
+import pytest
+from streamlit.testing.v1 import AppTest
+
+from conftest import programme_path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture
+def app(tmp_path, monkeypatch, iscritti_path):
+    """The real CITA26 programme in a throwaway data directory."""
+    data = tmp_path / "competitions"
+    (data / "CITA26").mkdir(parents=True)
+    # copied under the name the assertions below use, wherever it came from
+    shutil.copy(programme_path(), data / "CITA26")
+    monkeypatch.setenv("COMMISSAIRE_TRACK_DATA", str(data))
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120)
+    at.run()
+    return at
+
+
+def _page(app, name):
+    """Open a page by name, whatever icon its label carries.
+
+    The sidebar picker is an `st.radio` styled into a nav (`ui/style.py`), so
+    every label is "🏁 Gare", "✓ Verifica", ... - matched here on the word.
+    """
+    picker = app.sidebar.radio[0]
+    return picker.set_value(
+        next(o for o in picker.options if o.endswith(name))).run()
+
+
+def test_app_starts_without_an_entry_list(app):
+    """With nothing imported the race page must explain what to do, not crash."""
+    assert not app.exception
+    # the competition is set in Impostazioni, not picked again on every page
+    assert not app.sidebar.selectbox
+    assert any("CAMPIONATI ITALIANI GIOVANILI SU PISTA 2026" in m.value
+               and "Velodromo delle Cascine" in m.value
+               for m in app.sidebar.markdown)
+    assert any("Importa l'elenco iscritti" in i.value for i in app.info)
+
+
+def test_the_app_carries_the_document_stylesheet(app):
+    """`st.html` throws away the <style> of what it renders.
+
+    Without print.css on the page itself every preview came out as a bare
+    browser table: no rule between one coppia and the next, no red second
+    rider, no column widths. It has to go in through st.markdown.
+    """
+    css = [m.value for m in app.markdown if ".cmsr table.data" in m.value]
+    assert len(css) == 1 and "group-start" in css[0]
+
+
+def test_verifica_page(app):
+    """Nothing imported: the page says where the import lives, and stops."""
+    _page(app, "Verifica")
+    assert not app.exception
+    assert any("Impostazioni" in i.value for i in app.info)
+    # the file is chosen there, not here
+    assert not any("File iscritti" in t.label for t in app.text_input)
+
+
+def test_decisioni_page_opens_on_a_big_empty_field(app):
+    """The secretary's log: it must work before anything has been imported."""
+    _page(app, "Decisioni")
+    assert not app.exception
+    box = app.text_area(key="dec_text")
+    assert box.value in ("", None) and box.label == "Decisione"
+    assert any("Nessuna decisione" in i.value for i in app.info)
+
+
+def test_a_decision_is_written_down_and_read_back(app):
+    _page(app, "Decisioni")
+
+    # nothing typed is not a decision
+    app.button(key="dec_save").click().run()
+    assert any("Scrivi la decisione" in e.value for e in app.error)
+
+    app.text_area(key="dec_text").set_value(
+        "Reclamo respinto: il sorpasso è regolare (3.2.026).").run()
+    app.button(key="dec_save").click().run()
+    assert not app.exception
+
+    from core import decisions as D
+    from core.store import open_competition
+
+    taken = D.load(open_competition("CITA26"))
+    assert len(taken) == 1 and taken[0].n == 1
+    assert taken[0].text.startswith("Reclamo respinto")
+    # and it is on the page, under the composer, which is empty again
+    assert app.text_area(key="dec_text").value in ("", None)
+    assert any("Reclamo respinto" in m.value for m in app.markdown)
+    assert any("Decisioni registrate (1)" in s.value for s in app.subheader)
+
+
+def test_a_quick_penalty_composes_the_line_and_sets_the_degree(app, iscritti_path):
+    """Athlete, provvedimento, UCI wording - appended where it stays editable."""
+    _import(app, iscritti_path)
+    _page(app, "Decisioni")
+
+    app.selectbox(key="dec_cat").set_value("AL").run()
+    app.text_input(key="dec_bibs").set_value("1").run()
+    app.selectbox(key="dec_reason").set_value("2").run()   # fascia azzurra
+    app.selectbox(key="dec_qclass").set_value("C").run()
+    app.button(key="dec_add").click().run()
+    assert not app.exception
+
+    line = app.text_area(key="dec_text").value
+    assert "RETROCESSIONE (C)" in line
+    assert line.endswith("per aver pedalato sulla fascia azzurra")
+    assert line.startswith("AL 1 ")          # named from the entry list
+    # the degree above the text follows the pick: it is the same statement
+    assert app.radio(key="dec_class").value == "C"
+
+
+def test_a_filed_decision_can_be_corrected_or_deleted(app):
+    from core import decisions as D
+    from core.store import open_competition
+
+    _page(app, "Decisioni")
+    app.text_area(key="dec_text").set_value("Ammonizione al dorsale 4.").run()
+    app.button(key="dec_save").click().run()
+
+    app.text_area(key="dec_edit_1").set_value("Ammonizione al dorsale 5.").run()
+    app.button(key="dec_upd_1").click().run()
+    assert not app.exception
+    store = open_competition("CITA26")
+    assert [d.text for d in D.load(store)] == ["Ammonizione al dorsale 5."]
+
+    app.button(key="dec_del_1").click().run()
+    assert not app.exception
+    assert D.load(store) == []
+    assert any("Nessuna decisione" in i.value for i in app.info)
+
+
+def test_changing_the_category_clears_an_event_it_does_not_contest(app):
+    """The specialità offered depend on the categoria above them.
+
+    Picked for the Allievi and then switched to the Esordienti, the keirin is
+    not a specialità of the new categoria: the picker comes back empty rather
+    than naming a race that does not exist (`state.sticky_select`).
+    """
+    from core.config import load_competition
+    from core.store import competitions_root
+
+    comp = load_competition(competitions_root() / "CITA26" / "programme.yaml")
+    # the keirin: gli Allievi lo corrono, gli Esordienti no
+    only_al = next(e for e in comp.events_for("AL")
+                   if e not in comp.events_for("ES"))
+
+    _page(app, "Decisioni")
+    app.selectbox(key="dec_cat").set_value("AL").run()
+    app.selectbox(key="dec_event").set_value(only_al).run()
+    assert app.selectbox(key="dec_event").value == only_al
+
+    app.selectbox(key="dec_cat").set_value("ES").run()
+    assert not app.exception
+    assert app.selectbox(key="dec_event").value == ""
+
+
+def test_the_puis_panel_opens_on_the_categories_in_gara(app):
+    _page(app, "Decisioni")
+    assert app.selectbox(key="dec_puis_col").value == "DA, AL, ED, ES"
+    app.text_input(key="dec_puis_q").set_value("casco").run()
+    assert not app.exception
+    assert any("PUIS aggiornato" in c.value for c in app.caption)
+
+
+def test_impostazioni_shows_the_competition_and_the_programme(app):
+    _page(app, "Impostazioni")
+    assert not app.exception
+    assert app.selectbox(key="set_competition").value == "CITA26"
+    labels = [m.label for m in app.metric]
+    assert "Comunicati previsti" in labels
+    assert app.metric[2].value == "138"
+    # the register table is not here any more: Documenti → Registro says the
+    # same and more, and prints it
+    assert not any("Registro" in e.label for e in app.expander)
+    assert app.selectbox(key="team_group").value == "region"
+
+
+def _import(app, iscritti_path):
+    """Import the entry list - a setting, so it is done in Impostazioni."""
+    _page(app, "Impostazioni")
+    app.text_input(key="entries_src").set_value(str(iscritti_path)).run()
+    app.button(key="entries_import").click().run()
+    return app
+
+
+def _documents(app, group):
+    """Documenti → one of its three groups.
+
+    Partenti and Stampa were two pages until the same two batches turned out to
+    live in both: they are groups of one page now, picked under the page radio.
+    """
+    _page(app, "Documenti")
+    app.sidebar.radio(key="doc_group").set_value(group).run()
+    return app
+
+
+def _open_race(app, iscritti_path, cat, event, round_key):
+    from core.models import race_id
+
+    _import(app, iscritti_path)
+    _page(app, "Gare")
+    app.selectbox(key="ga_cat").set_value(cat).run()
+    app.selectbox(key="ga_event").set_value(event).run()
+    app.selectbox(key="ga_round").set_value(round_key).run()
+    assert not app.exception
+    return race_id(cat, event, round_key)
+
+
+def _set_sprints(app, rid, text):
+    """Type every sprint at once, in the «Stringa» field under the fields."""
+    box = [t for t in app.text_input if t.key.startswith(f"spr_txt_{rid}_")]
+    assert box, f"no sprint string field for {rid}"
+    return box[0].set_value(text).run()
+
+
+def _sprint_fields(app, rid):
+    """The numbered sprint fields, in order."""
+    fields = [t for t in app.text_input
+              if t.key.startswith(f"spr_{rid}_") and t.key.split("_")[-1].isdigit()]
+    return sorted(fields, key=lambda t: int(t.key.split("_")[-1]))
+
+
+def test_gare_page_runs_a_race(app, iscritti_path):
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    assert any("partenti" in c.value for c in app.caption)
+
+    _set_sprints(app, rid, "1,2,3,4")
+    assert not app.exception
+    assert not app.error
+
+
+def test_gare_page_reports_bad_input(app, iscritti_path):
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    _set_sprints(app, rid, "1,2,tre")
+    assert not app.exception
+    assert any("dorsale valido" in w.value for w in app.warning)
+
+
+def test_gare_page_saves_and_reloads_a_race(app, iscritti_path):
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    _set_sprints(app, rid, "1,2,3,4")
+    [b for b in app.sidebar.button if "Salva" in b.label][0].click().run()
+    assert not app.exception
+
+    from core.store import open_competition
+    state = open_competition("CITA26").load_race(rid)
+    assert state is not None and state.payload["sprints"] == "1,2,3,4"
+
+
+def _race_state(comp, cat, event, round_key):
+    """The race as core sees it, to read its startlist and planned sprints."""
+    from core import entries as E
+    from core import race as R
+    from core.store import open_competition
+
+    store = open_competition("CITA26")
+    el, _ = E.effective_entries(store, comp)
+    return R.ensure_state(store, comp, cat, event, round_key, el)
+
+
+def test_sprint_fields_are_numbered(app, iscritti_path, comp):
+    """Which sprint a field is must be readable, not counted out in dashes."""
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    planned = _race_state(comp, "AL", "omnium", "Corsa a Punti").n_sprint
+    assert planned and planned > 1
+
+    fields = _sprint_fields(app, rid)
+    assert len(fields) == planned          # a field per planned sprint
+    assert [t.label for t in fields] == [f"{i + 1}º sprint"
+                                         for i in range(planned)]
+    nums = [m.value for m in app.sidebar.markdown if "cmsr-n" in m.value]
+    assert nums[0].endswith("1ª</div>")
+    # the last planned sprint is the one scoring 10-6-4-2
+    assert nums[planned - 1].endswith(f"{planned}ª (×2)</div>")
+    assert not [c for c in app.sidebar.caption if ":red" in c.value or "?" in c.value]
+
+
+def test_a_sprint_typed_in_its_own_field_is_kept(app, iscritti_path, comp):
+    """One field, one sprint: what goes in the third field is the third sprint."""
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    bibs = [int(b) for b in _race_state(comp, "AL", "omnium",
+                                        "Corsa a Punti").entrants[:4]]
+    order = ",".join(str(b) for b in bibs)
+    _sprint_fields(app, rid)[2].set_value(order).run()
+    assert not app.exception
+
+    # an empty sprint before a full one shifts the ones after it: said out loud
+    assert any("slittano" in c.value for c in app.sidebar.caption)
+    [b for b in app.sidebar.button if "Salva" in b.label][0].click().run()
+
+    from core.store import open_competition
+    state = open_competition("CITA26").load_race(rid)
+    assert state.payload["sprints"] == f"--{order}"
+
+
+def test_sprint_flags_a_bad_row(app, iscritti_path, comp):
+    """A wrong bib is called out under its own field, not only in the warnings."""
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    bibs = [int(b) for b in _race_state(comp, "AL", "omnium",
+                                        "Corsa a Punti").entrants[:4]]
+    good = ",".join(str(b) for b in bibs)
+    _set_sprints(app, rid, f"{good}-999,{bibs[0]},{bibs[1]}-{bibs[0]},due")
+    assert not app.exception
+
+    notes = [c.value for c in app.sidebar.caption if c.value.startswith(":red")]
+    assert notes == [":red[?999 <4]",   # not a starter, and only three finishers
+                     ":red[?]"]         # unreadable; the first sprint is clean
+
+
+def test_the_sprint_string_fills_the_fields(app, iscritti_path):
+    """Pasting a whole race fills the fields on the same run, without a rerun."""
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    _set_sprints(app, rid, "1,2,3,4-4,3,2,1")
+    assert [t.value for t in _sprint_fields(app, rid)][:2] == ["1,2,3,4",
+                                                               "4,3,2,1"]
+    # and the document radio has survived: the notation must not rerun the page
+    assert app.radio(key=f"doc_{rid}").value is not None
+
+
+def test_gare_page_handles_a_team_race(app, iscritti_path):
+    _open_race(app, iscritti_path, "AL", "ins_squadre", "Qualificazioni")
+    assert not app.exception
+    assert any("Tempi" in s.value for s in app.subheader)
+
+
+def test_heat_builder_composes_by_team(app, iscritti_path):
+    """Heats are picked as teams; the bibs of each side stay editable."""
+    rid = _open_race(app, iscritti_path, "AL", "ins_squadre", "Qualificazioni")
+    app.button(key=f"fill_{rid}").click().run()
+    assert not app.exception
+
+    note = [c.value for c in app.caption if c.value.startswith("Notazione")]
+    assert note and "-" in note[0] and "/" in note[0]
+
+    bibs = [t for t in app.text_input if t.key.startswith(f"hb_{rid}_")]
+    assert bibs and all("," in t.value for t in bibs)  # four riders a side
+
+    from core.parse import parse_heats
+    heats = parse_heats(note[0].split("`")[1])
+    assert len(heats) == 4 and all(len(h) == 2 for h in heats)  # 8 teams
+
+    # Salva sits in the sidebar, which is drawn before the grid: the composed
+    # heats must still be the ones that reach the disk
+    [b for b in app.sidebar.button if "Salva" in b.label][0].click().run()
+    from core.store import open_competition
+    state = open_competition("CITA26").load_race(rid)
+    assert parse_heats(state.payload["heats"]) == heats
+
+
+def test_individual_pursuit_pairs_the_field_and_seeds_the_finals(
+        app, iscritti_path):
+    """The inseguimento individuale is composed and seeded like the one a squadre.
+
+    Its grid opens on as many batterie as the field asks for, the odd rider
+    rides the 1ª alone, and the finals - once loaded - carry no button that
+    would overwrite them with the entry list.
+    """
+    from core.parse import parse_heats
+
+    rid = _open_race(app, iscritti_path, "AL", "ins_individuale",
+                     "Qualificazioni")
+    n = int(app.number_input(key=f"nh_{rid}").value)
+    entered = int(re.search(r"(\d+) partenti",
+                            " ".join(c.value for c in app.caption)).group(1))
+    assert n == -(-entered // 2)          # two a batteria, the odd one alone
+
+    app.button(key=f"fill_{rid}").click().run()
+    assert not app.exception
+    note = [c.value for c in app.caption if c.value.startswith("Notazione")][0]
+    heats = parse_heats(note.split("`")[1])
+    assert len(heats) == n
+    if entered % 2:
+        assert len(heats[0]) == 1     # whoever rides alone opens the round
+        assert not any("numero dispari" in w.value for w in app.warning)
+
+    # the finals are seeded from the qualification, never refilled from the
+    # entry list: no «Riempi» button there
+    fid = _open_race(app, iscritti_path, "AL", "ins_individuale", "Finali")
+    assert not app.exception
+    assert any("Composizione batterie" in e.label for e in app.expander)
+    assert not any(b.key == f"fill_{fid}" for b in app.button)
+
+
+def test_empty_finals_warn_and_stay_batterie(app, iscritti_path):
+    """Finali opened before *Carica finali*: a warning, and a heat grid.
+
+    A velocità a squadre qualifies one squadra at a time, so its qualifying
+    grid is an ordine di partenza - but the finals are two against two, seeded
+    or not, and the DA finals opened as a start order.
+    """
+    _open_race(app, iscritti_path, "DA", "vel_squadre", "Finali")
+    assert not app.exception
+    assert any("non ha ancora tempi salvati" in w.value for w in app.warning)
+    assert any("Composizione batterie" in e.label for e in app.expander)
+    assert not any("ordine di partenza" in e.label.lower()
+                   for e in app.expander)
+
+    # the qualifying round is where the start order is composed
+    _open_race(app, iscritti_path, "DA", "vel_squadre", "Qualificazioni")
+    assert not any("tempi salvati" in w.value for w in app.warning)
+    assert any("Composizione ordine di partenza" in e.label
+               for e in app.expander)
+
+
+def test_the_flying_200_is_a_start_order(app, iscritti_path):
+    """The 200 m lanciati are ridden one at a time, like a velocità a squadre."""
+    _open_race(app, iscritti_path, "AL", "velocita", "Qualificazioni")
+    assert not app.exception
+    assert any("Composizione ordine di partenza" in e.label
+               for e in app.expander)
+    assert any("tutti gli atleti" in (b.help or "") for b in app.button)
+
+
+def test_partenti_page_prints(app, iscritti_path):
+    _import(app, iscritti_path)
+    _documents(app, "Elenchi iscritti")
+    assert not app.exception
+    app.radio(key="pa_mode").set_value("Per specialità").run()
+    assert not app.exception
+    app.radio(key="pa_mode").set_value(
+        "Tutte le specialità di una categoria").run()
+    assert not app.exception
+
+
+def test_quick_print_writes_one_entry_list_per_category(app, iscritti_path):
+    _import(app, iscritti_path)
+    _documents(app, "Elenchi iscritti")
+    [b for b in app.button if "Stampa tutti gli iscritti" in b.label][0].click().run()
+    assert not app.exception
+
+    from core.store import open_competition
+    out = open_competition("CITA26").out_dir
+    names = sorted(p.name for p in out.iterdir() if "partenti" in p.name)
+    assert len(names) == 4  # ES, ED, AL, DA
+    assert all(n[:3].isdigit() for n in names)  # numbered from the register
+    assert all(n.split("_")[1][:2].isupper()
+               for n in names)  # NNN_CAT_partenti, category uppercase
+
+
+def test_import_then_edit_entry_list(app, iscritti_path):
+    # the entry file is a setting: it is chosen and reloaded in Impostazioni
+    _import(app, iscritti_path)
+    assert not app.exception
+    assert any("238" in s.value for s in app.success)
+
+    _page(app, "Verifica")
+    # the counters, the tabella specialità and the validation panel
+    assert [m.label for m in app.metric] == ["Atleti", "Verificati",
+                                             "Squadre", "Coppie"]
+    assert any("Tabella specialità" in s.value for s in app.subheader)
+    assert app.dataframe
+    assert any("da risolvere" in e.label for e in app.expander)
+
+    # filtering the grid by category and event must not blow up
+    app.selectbox(key="ver_event").set_value("Madison").run()
+    assert not app.exception
+    app.multiselect(key="ver_cats").set_value(["AL"]).run()
+    assert not app.exception
+
+    # before any tick, everyone is still to be verified and nobody is filtered out
+    app.selectbox(key="ver_state").set_value("Da verificare").run()
+    assert not app.exception
+    assert any("Segna verificati" in b.label for b in app.button)
+    app.selectbox(key="ver_state").set_value("Verificati").run()
+    assert not app.exception
+    assert any("Nessun atleta" in i.value for i in app.info)
+
+
+def test_bulk_verification_marks_the_filtered_riders(app, iscritti_path):
+    _import(app, iscritti_path)
+    _page(app, "Verifica")
+    app.multiselect(key="ver_cats").set_value(["ED"]).run()
+    [b for b in app.button if "Segna verificati" in b.label][0].click().run()
+    assert not app.exception
+
+    from core.entries import effective_entries, check_in_progress
+    from core.store import open_competition
+    from core.config import load_competition
+    comp = load_competition(programme_path())
+    el, _ = effective_entries(open_competition("CITA26"), comp)
+    assert check_in_progress(el, "ED").done is True
+    assert check_in_progress(el, "AL").verificati == 0  # only the filtered ones
+
+
+def test_entry_grid_edits_become_patches(iscritti_path, comp):
+    """The grid diff is tested directly: AppTest cannot drive a data_editor."""
+    import pandas as pd
+
+    from core.config import EVENT_ENTRY_LIST
+
+    from core.entries import import_master
+    from ui.pages.check_in import _diff
+
+    el = import_master(iscritti_path, comp)
+    rider = next(r for r in el.by_cat("AL") if "madison" in r.events)
+    events = [s for s in comp.event_order() if s != EVENT_ENTRY_LIST]
+
+    before = pd.DataFrame([{"key": rider.key, "Dors.": rider.bib,
+                            "Cognome": rider.last_name, "Nome": rider.first_name,
+                            "Regione": rider.region, "Società": rider.club,
+                            "Cod. Soc.": rider.club_code,
+                            "Ver.": False, "NP": False, "UCI ID": rider.uci_id,
+                            "Cat.": rider.cat,
+                            **{comp.event(s).short:
+                                (rider.events[s].flag
+                                 if s in rider.events else "")
+                               for s in events}}])
+    after = before.copy()
+    after.at[0, "Ver."] = True
+    after.at[0, "NP"] = True
+    after.at[0, "Dors."] = 500
+    after.at[0, "Madison"] = "2"
+    after.at[0, "Keirin"] = ""
+
+    patches = _diff(before, after, comp.event_headers(events),
+                    "verifica licenze")
+    ops = {(p.op, p.field) for p in patches}
+    assert ("set_checked_in", "") in ops
+    assert ("set_not_starting", "") in ops
+    assert ("set_field", "bib") in ops
+    assert ("set_event", "madison") in ops
+    assert all(p.reason == "verifica licenze" for p in patches)
+    assert all(p.target == rider.key for p in patches)
+
+    from core.entries import apply_overlay
+    assert apply_overlay(el, patches, comp) == []  # none stale
+    assert el.riders[rider.key].checked_in is True
+    assert el.riders[rider.key].not_starting is True
+    assert el.riders[rider.key].bib == 500
+    assert el.riders[rider.key].events["madison"].pair == 2
+
+
+def test_stampa_page_batches(app, iscritti_path):
+    _import(app, iscritti_path)
+    _documents(app, "Serie di documenti")
+    assert not app.exception
+    assert any("documenti" in c.value for c in app.caption)
+
+    app.sidebar.radio(key="stp_mode").set_value("Per specialità").run()
+    assert not app.exception
+    app.sidebar.radio(key="stp_mode").set_value("Per giornata").run()
+    assert not app.exception
+
+
+def test_stampa_page_shows_the_register(app, iscritti_path):
+    _import(app, iscritti_path)
+    _documents(app, "Registro comunicati")
+    assert not app.exception
+    assert [m.value for m in app.metric][:1] == ["138"]
+    assert any("registro" in b.label.lower() for b in app.button)
+
+
+def test_documenti_prints_one_recap_per_squadra(app, iscritti_path):
+    """The pile a team manager is handed: one sheet each, in one PDF."""
+    _import(app, iscritti_path)
+    _documents(app, "Serie di documenti")
+    app.sidebar.radio(key="stp_mode").set_value("Per squadra").run()
+    assert not app.exception
+
+    picker = app.sidebar.selectbox(key="stp_team")
+    regions = [o for o in picker.options if o != "(tutte)"]
+    assert len(regions) > 5                      # the rappresentative in gara
+    # "(tutte)" is the default: the whole pile, one page per squadra
+    assert picker.value == "(tutte)"
+    assert any(f"{len(regions)} documenti" in c.value for c in app.caption)
+
+    picker.set_value(regions[0]).run()
+    assert any("1 documento" in c.value for c in app.caption)
+    sheet = _preview(app)
+    assert regions[0] in sheet and "RIEPILOGO ISCRITTI" in sheet
+    # the kinds cannot be picked for this batch: a riepilogo is one sheet
+    assert app.sidebar.multiselect(key="stp_docs").disabled
+
+
+def test_documenti_prints_the_tabella_specialita(app, iscritti_path):
+    """The same table Verifica shows, on one sheet, for the briefing."""
+    _import(app, iscritti_path)
+    _documents(app, "Serie di documenti")
+    app.sidebar.radio(key="stp_mode").set_value("Tabella specialità").run()
+    assert not app.exception
+    assert any("1 documento" in c.value for c in app.caption)
+
+    sheet = _preview(app)
+    assert "TABELLA SPECIALITÀ" in sheet and "Totale" in sheet
+    # nothing to pick: the sheet is printed, not composed
+    assert app.sidebar.multiselect(key="stp_docs").disabled
+
+
+def test_the_register_does_not_need_an_entry_list(app):
+    """It reads the programme and the comunicati: nothing has to be imported.
+
+    On the old Stampa page it sat behind the same "importa gli iscritti" guard
+    as the batches, which it never needed.
+    """
+    _documents(app, "Registro comunicati")
+    assert not app.exception
+    assert [m.value for m in app.metric][:1] == ["138"]
+
+
+def test_documenti_keeps_both_halves_of_the_old_pages(app, iscritti_path):
+    """One page, three groups: the entry-list composer and the batches.
+
+    They print the same `entry_list`, which is why they were merged; what tells
+    them apart is that the composer carries the number, the note and the
+    filters of the sheet that goes out.
+    """
+    _import(app, iscritti_path)
+    _documents(app, "Elenchi iscritti")
+    assert app.text_input(key="pa_com")                      # the number
+    assert any(t.key.startswith("pa_dec_") for t in app.text_area)   # the note
+    assert app.checkbox(key="pa_ver")                        # solo verificati
+
+    _documents(app, "Serie di documenti")
+    assert app.sidebar.radio(key="stp_mode").value == "Per categoria"
+    assert not app.exception
+
+
+def test_settings_page_changes_the_output_folder(app, tmp_path):
+    from core.store import open_competition
+
+    _page(app, "Impostazioni")
+    assert not app.exception
+    assert "Cartella dei comunicati" in [s.value for s in app.subheader]
+
+    store = open_competition("CITA26")
+    assert app.text_input(key="out_dir_input").value == str(store.out_dir)
+
+    dest = tmp_path / "Comunicati"
+    app.text_input(key="out_dir_input").set_value(str(dest)).run()
+    [b for b in app.button if b.label == "Salva cartella"][0].click().run()
+    assert not app.exception
+    assert open_competition("CITA26").out_dir == dest
+
+    [b for b in app.button if b.label == "Ripristina predefinita"][0].click().run()
+    assert open_competition("CITA26").out_dir == store.root / "out"
+
+
+def test_settings_page_refuses_an_unwritable_folder(app):
+    _page(app, "Impostazioni")
+    app.text_input(key="out_dir_input").set_value("/proc/non-scrivibile").run()
+    assert not app.exception
+    assert any("Permesso negato" in e.value or "esiste" in e.value
+               for e in app.error)
+    save = [b for b in app.button if b.label == "Salva cartella"][0]
+    assert save.disabled
+
+
+def test_settings_page_changes_the_letterhead(app, tmp_path):
+    """Testata e piè si cambiano qui: un nuovo velodromo è un SVG, non codice."""
+    from core.store import open_competition
+
+    _page(app, "Impostazioni")
+    assert not app.exception
+    # The page runs from what the app is working on down to what destroys work:
+    # the entry list it is all read off, what a squadra is, the folder a
+    # comunicato lands in, then how it looks, then the programme, then the
+    # backups - and only last the one control here that deletes a race.
+    subs = [s.value for s in app.subheader]
+    assert subs == ["Elenco iscritti", "Squadra", "Cartella dei comunicati",
+                    "Aspetto dei comunicati", "Programma gare", "Backup",
+                    "Azzera una gara"]
+    # the three things that decide how a sheet looks are one section, not two:
+    # the letterhead was on the page while the signature was hidden behind an
+    # expander called «avanzate», which is not a different kind of choice
+    boxes = [e.label for e in app.expander]
+    assert boxes[:3] == ["Testata e piè di pagina", "Firma", "Nome"]
+
+    banner = tmp_path / "head_2027.svg"
+    banner.write_text('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    app.text_input(key="brand_header_img").set_value(str(banner)).run()
+    [b for b in app.button if b.label == "Salva testata"][0].click().run()
+    assert not app.exception
+    from ui import state
+    assert open_competition("CITA26").settings["header_img"] == str(banner)
+    assert state.competition("CITA26").branding.header_img == str(banner)
+
+
+def test_madison_pairing_page_composes_the_event(app, iscritti_path):
+    """The composition round: a number per coppia, a batteria per number."""
+    rid = _open_race(app, iscritti_path, "ES", "madison", "Composizione coppie")
+    assert not app.exception
+    assert any("coppie" in c.value and "batterie" in c.value for c in app.caption)
+
+    # deal the coppie into the two batterie, then file the composition
+    [b for b in app.button if "Distribuisci" in b.label][0].click().run()
+    [b for b in app.button if "Salva composizione" in b.label][0].click().run()
+    assert not app.exception
+
+    from core.store import open_competition
+    from core import race as R
+    store = open_competition("CITA26")
+    state = store.load_race(rid)
+    assert state is not None
+    assert sorted(set(state.payload[R.PAIR_HEATS].values())) == [1, 2]
+    assert len(set(state.payload[R.PAIR_NUMBERS].values())) == len(state.entrants)
+
+
+def test_madison_batteria_starts_only_its_own_coppie(app, iscritti_path):
+    _open_race(app, iscritti_path, "ES", "madison", "Composizione coppie")
+    [b for b in app.button if "Distribuisci" in b.label][0].click().run()
+    [b for b in app.button if "Salva composizione" in b.label][0].click().run()
+
+    _open_race(app, iscritti_path, "ES", "madison", "Qualificazioni Batteria 1")
+    assert not app.exception
+    head = [c.value for c in app.caption if "partenti" in c.value]
+    assert head and head[0].split()[0].isdigit()
+    # and the start order announces the cut of 3.2.157 by itself
+    assert any("Non si qualificano per la finale le ultime 2 coppie "
+               "tra le partenti"
+               in t.value for t in app.text_area)
+
+
+def test_madison_heat_results_load_the_final(app, iscritti_path):
+    """The results of a batteria send its qualifiers through, from that sheet."""
+    from core import race as R
+    from core.store import open_competition
+
+    _open_race(app, iscritti_path, "ES", "madison", "Composizione coppie")
+    [b for b in app.button if "Distribuisci" in b.label][0].click().run()
+    [b for b in app.button if "Salva composizione" in b.label][0].click().run()
+
+    store = open_competition("CITA26")
+    for key in ("Qualificazioni Batteria 1", "Qualificazioni Batteria 2"):
+        rid = _open_race(app, iscritti_path, "ES", "madison", key)
+        # every coppia of the batteria takes a sprint, in startlist order:
+        # the numbers on the page are the ones the composition assigned
+        state = store.load_race(rid) or R.RaceState(race_id=rid, cat="ES",
+                                                    event="madison")
+        _set_sprints(app, rid,
+                     ",".join(str(n) for n in _pair_numbers(app, state)))
+        [b for b in app.sidebar.button if "Salva" in b.label][0].click().run()
+        assert not app.exception
+
+    rid = _open_race(app, iscritti_path, "ES", "madison",
+                     "Qualificazioni Batteria 2")
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    [b for b in app.button if "Carica in finale" in b.label][0].click().run()
+    assert not app.exception
+    assert any("coppie in finale" in s.value for s in app.success)
+
+    final = store.load_race(R.race_key("ES", "madison", "Finale"))
+    assert final is not None and final.payload[R.QUALIFIED]
+    assert final.entrants == final.payload[R.QUALIFIED]
+    # two out of each batteria, as the composition says
+    everyone = store.load_race(R.race_key("ES", "madison",
+                                          "Composizione coppie")).entrants
+    assert len(final.entrants) == len(everyone) - 4
+
+
+def _pair_numbers(app, state) -> list[int]:
+    """The numbers the coppie of one saved heat wear."""
+    from core import race as R
+    from core.store import open_competition
+    store = open_competition("CITA26")
+    pr = R.pairing(store, _comp(app), state.cat, state.event)
+    return [pr.number(k) for k in state.entrants]
+
+
+def _comp(app):
+    from ui import state
+    return state.competition("CITA26")
+
+
+def test_every_pick_of_the_fase_dropdown_lands(app, iscritti_path):
+    """One pick, one race: the picker used to keep every other choice only.
+
+    `index=` was recomputed from the race last saved, so its default moved with
+    the jury's own pick and Streamlit re-initialised the widget on the run
+    after - a phase selected once stayed on the previous one.
+    """
+    _open_race(app, iscritti_path, "AL", "omnium", "Scratch")
+    for round_key in ("Tempo Race", "Eliminazione", "Corsa a Punti",
+                      "Scratch", "Qualificazioni Batteria 2"):
+        app.selectbox(key="ga_round").set_value(round_key).run()
+        assert app.selectbox(key="ga_round").value == round_key
+        assert round_key in app.header[0].value
+
+
+def test_saving_a_pdf_opens_it_without_a_button(app, iscritti_path):
+    """One click: the sheet is filed and the tab opens by itself."""
+    _open_race(app, iscritti_path, "AL", "omnium", "Scratch")
+    [b for b in app.button if b.label == "Salva PDF"][0].click().run()
+    assert not app.exception
+    assert any("Salvato" in t.value for t in app.toast)
+    assert not [b for b in app.button if b.label.startswith("Apri")]
+
+    from core.store import open_competition
+    files = list(open_competition("CITA26").out_dir.iterdir())
+    assert files, "il documento deve restare nella cartella dei comunicati"
+
+
+def test_screen_and_print_body_sizes_are_separate(app, iscritti_path):
+    """The speaker reads the preview across a desk; the sheet is read on paper."""
+    rid = _open_race(app, iscritti_path, "ES", "madison", "Finale")
+    labels = {s.label: s.value for s in app.sidebar.slider}
+    assert labels["Corpo tabella .pdf"] == 9        # an ordine di partenza
+    assert labels["Corpo tabella a schermo"] == 11
+
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    labels = {s.label: s.value for s in app.sidebar.slider}
+    assert labels["Corpo tabella .pdf"] == 9        # as every sheet but one
+    assert labels["Corpo tabella a schermo"] == 11  # unchanged by the document
+
+
+def test_the_last_sprint_is_called_out_over_the_preview(app, iscritti_path):
+    """The banner the speaker reads: only on screen, never on the sheet."""
+    rid = _open_race(app, iscritti_path, "ES", "madison", "Finale")
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    _set_sprints(app, rid, "1,2,3,4-4,3,2,1")
+    assert not app.exception
+
+    banner = [m.value for m in app.markdown if "volata" in m.value]
+    assert banner and "2ª volata" in banner[0]
+    # the numbers as they were called, the scoring four in bold
+    assert "<b>4</b> - <b>3</b> - <b>2</b> - <b>1</b>" in banner[0]
+
+    # the startlist has no sprint to call
+    app.radio(key=f"doc_{rid}").set_value("partenti").run()
+    assert not [m.value for m in app.markdown if "volata" in m.value]
+
+
+def test_the_team_sprint_start_order_saves_from_its_own_panel(app, iscritti_path):
+    """One squadra per start, and a button to file it where it is composed.
+
+    The save is asked for in the panel and done after the sidebar has run:
+    a click up the page must not file a race without the times typed into it.
+    """
+    from core.parse import parse_heats
+    from core.store import open_competition
+
+    rid = _open_race(app, iscritti_path, "AL", "vel_squadre", "Qualificazioni")
+    assert not any("Batterie" in n.label for n in app.number_input)
+    app.button(key=f"fill_{rid}").click().run()
+
+    note = [c.value for c in app.caption if c.value.startswith("Notazione")]
+    heats = parse_heats(note[0].split("`")[1])
+    assert heats and all(len(h) == 1 for h in heats)   # one squadra per start
+    assert any("Tutte le squadre sono nell'ordine" in c.value
+               for c in app.caption)
+
+    app.button(key=f"savegrid_{rid}").click().run()
+    assert not app.exception
+    state = open_competition("CITA26").load_race(rid)
+    assert state is not None and parse_heats(state.payload["heats"]) == heats
+
+
+def test_the_times_follow_the_start_order(app, iscritti_path):
+    """The sidebar is read while the track runs: same order, or a time slips.
+
+    The grid is composed in the page body and the fields are in the sidebar,
+    which is drawn after it: swapping two starts must move the fields in the
+    same run, without saving first.
+    """
+    rid = _open_race(app, iscritti_path, "AL", "vel_squadre", "Qualificazioni")
+    app.button(key=f"fill_{rid}").click().run()
+
+    slots = [s for s in app.selectbox if s.key.startswith(f"hs_{rid}_")]
+    order = [s.value for s in slots]
+    assert len(order) > 2
+
+    def times_order():
+        return [t.key[len(f"t_{rid}_"):] for t in app.sidebar.text_input
+                if t.key.startswith(f"t_{rid}_")]
+
+    assert times_order() == order
+
+    # first start against last: the fields follow, nobody is lost
+    slots[0].set_value(order[-1]).run()
+    app.selectbox(key=slots[-1].key).set_value(order[0]).run()
+    assert not app.exception
+    assert times_order() == [order[-1], *order[1:-1], order[0]]
+
+
+def test_a_squadra_left_out_of_the_grid_keeps_its_time_field(app, iscritti_path):
+    """An unfinished composition must not hide anyone from the sidebar."""
+    rid = _open_race(app, iscritti_path, "AL", "vel_squadre", "Qualificazioni")
+    app.button(key=f"fill_{rid}").click().run()
+    slots = [s for s in app.selectbox if s.key.startswith(f"hs_{rid}_")]
+    left_out = slots[0].value
+
+    slots[0].set_value("").run()          # not yet inserted
+    assert not app.exception
+    keys = [t.key[len(f"t_{rid}_"):] for t in app.sidebar.text_input
+            if t.key.startswith(f"t_{rid}_")]
+    assert keys[-1] == left_out and len(keys) == len(slots)
+
+
+def test_only_the_classifica_prints_a_point_smaller(app, iscritti_path):
+    """Every sheet prints at 9. The classifica is the one that drops a point:
+    it is the crowded one - it carries the societies and their codes."""
+    rid = _open_race(app, iscritti_path, "AL", "ins_squadre", "Qualificazioni")
+    font = f"font_{rid}"
+
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    assert app.sidebar.slider(key=f"{font}_risultati").value == 9
+
+    app.radio(key=f"doc_{rid}").set_value("partenti").run()
+    assert app.sidebar.slider(key=f"{font}_partenti").value == 9
+
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    assert app.sidebar.slider(key=f"font_{rid}_risultati").value == 9
+    app.radio(key=f"doc_{rid}").set_value("classifica").run()
+    assert app.sidebar.slider(key=f"font_{rid}_classifica").value == 8
+
+
+def test_one_name_column_gives_the_classifica_its_point_back(app, iscritti_path):
+    """A single Nome column is a whole column of width returned: with it the
+    classifica has no reason to print smaller than everything else."""
+    from core.store import open_competition
+
+    open_competition("CITA26").set_setting("name_style", "full")
+    rid = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    app.radio(key=f"doc_{rid}").set_value("classifica").run()
+    assert not app.exception
+    assert app.sidebar.slider(key=f"font_{rid}_classifica").value == 9
+
+
+def test_the_page_says_who_is_not_in_the_arrival(app, iscritti_path, comp):
+    """A prova di gruppo that has been run must place everybody."""
+    rid = _open_race(app, iscritti_path, "ED", "omnium", "Scratch")
+    assert not [w for w in app.warning if "non ancora nei risultati" in w.value]
+
+    bibs = _race_state(comp, "ED", "omnium", "Scratch").entrants
+    app.text_input(key=f"spr_{rid}").set_value(",".join(bibs[:-2])).run()
+    warn = [w for w in app.warning if "non ancora nei risultati" in w.value]
+    assert warn and f"{bibs[-2]}, {bibs[-1]}" in warn[0].value
+
+    app.text_input(key=f"spr_{rid}").set_value(",".join(bibs)).run()
+    assert not [w for w in app.warning if "non ancora nei risultati" in w.value]
+
+
+# ── omnium: every sheet of every prova ──────────────────────────────────────
+
+def test_every_sheet_of_a_prova_renders(app, iscritti_path):
+    """Each prova files its own sheets, and the picker offers exactly them."""
+    rid = _open_race(app, iscritti_path, "ED", "omnium", "Scratch")
+    assert app.radio(key=f"doc_{rid}").options == [
+        "Partenti", "Risultati", "Classifica Parziale"]
+    # a scratch is one arrival, not a series of sprints
+    app.text_input(key=f"spr_{rid}").set_value("1,2,3,4").run()
+    app.radio(key=f"doc_{rid}").set_value("classifica_parziale").run()
+    assert not app.exception
+    # the sheet is the ordine di partenza of the tempo race, and says so
+    assert app.text_input(key=f"com_{rid}_classifica_parziale").value == "53"
+    assert app.sidebar.checkbox(key=f"lane_{rid}").value is True
+
+    rid = _open_race(app, iscritti_path, "ED", "omnium", "Tempo Race")
+    assert app.radio(key=f"doc_{rid}").options == [
+        "Partenti", "Gara", "Risultati", "Classifica Parziale"]
+    for doc, number in (("gara", "-1"), ("risultati", "61"),
+                        ("classifica_parziale", "62")):
+        app.radio(key=f"doc_{rid}").set_value(doc).run()
+        assert not app.exception
+        assert app.text_input(key=f"com_{rid}_{doc}").value == number
+
+
+def test_the_risultati_of_a_prova_go_out_unnumbered(app, iscritti_path):
+    """The comunicato of a prova is the classifica parziale after it."""
+    rid = _open_race(app, iscritti_path, "ED", "omnium", "Scratch")
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    assert app.text_input(key=f"com_{rid}_risultati").value == "-1"
+
+    rid = _open_race(app, iscritti_path, "ED", "omnium", "Eliminazione")
+    assert app.text_input(key=f"com_{rid}_partenti").value == "-1"
+
+
+def test_the_omnium_classifica_offers_the_points_race_detail(app, iscritti_path):
+    rid = _open_race(app, iscritti_path, "ED", "omnium", "Corsa a Punti")
+    app.radio(key=f"doc_{rid}").set_value("classifica").run()
+    assert not app.exception
+    assert app.sidebar.checkbox(key=f"det_{rid}").value is True
+    app.sidebar.checkbox(key=f"det_{rid}").set_value(False).run()
+    assert not app.exception
+
+
+# ── velocità: the scheme, and every round it composes ───────────────────────
+
+def _save(app):
+    [b for b in app.sidebar.button if b.label.endswith("Salva")][0].click().run()
+
+
+def _qualify(app, iscritti_path, cat="AL", scheme="12"):
+    """Ride the 200 m: pick the scheme, give everybody a time, file the race."""
+    rid = _open_race(app, iscritti_path, cat, "velocita", "Qualificazioni")
+    app.selectbox(key=f"scheme_{rid}").set_value(scheme).run()
+    for i, box in enumerate([t for t in app.sidebar.text_input
+                             if t.key.startswith(f"t_{rid}_")]):
+        box.set_value(f"11,{i:03d}")
+    app.run()
+    _save(app)
+    return rid
+
+
+def _picks(app, prefix, rid):
+    """The segmented controls of one block of the sidebar, in order."""
+    return [g for g in app.sidebar.button_group
+            if g.key.startswith(f"{prefix}_{rid}_")]
+
+
+def _opt(group, i) -> str:
+    """The value behind the i-th button of a segmented control.
+
+    A button carries its label and not the value, so the value is read back off
+    the label: on a velocità an entrant *is* a dorsale, which is what
+    `_entrant_name` puts in front of the name ("84 BORDIGNON").
+    """
+    return group.options[i].content.split()[0]
+
+
+def _press(group, i):
+    """Press the i-th button of a segmented control."""
+    return group.set_value([_opt(group, i)])
+
+
+def _pick_all(app, rid, prefix):
+    """Whoever is in lane 1 wins: one control per batteria, in order."""
+    picks = _picks(app, prefix, rid)
+    assert picks, f"no {prefix} controls for {rid}"
+    for g in picks:
+        _press(g, 0)
+    app.run()
+    return picks
+
+
+def _advance(app, label):
+    hits = [b for b in app.button if b.label == label]
+    assert hits, f"{label!r} not on the page: {[b.label for b in app.button]}"
+    hits[0].click().run()
+    assert not app.exception
+
+
+def _round(app, cat, event, round_key):
+    """Move to another round of the race already open, without re-importing."""
+    from core.models import race_id
+
+    app.selectbox(key="ga_round").set_value(round_key).run()
+    assert not app.exception
+    return race_id(cat, event, round_key)
+
+
+def test_the_scheme_is_picked_on_the_qualifying_round(app, iscritti_path):
+    """The 200 m start order says how many it qualifies - and the jury decides."""
+    rid = _open_race(app, iscritti_path, "AL", "velocita", "Qualificazioni")
+    box = app.selectbox(key=f"scheme_{rid}")
+    assert "12 qualificati" in box.options[0]      # options come out formatted
+
+    box.set_value("8").run()
+    assert not app.exception
+    dec = app.sidebar.text_area(key=f"dec_{rid}_partenti")
+    assert dec.value == "Si qualificano direttamente ai quarti i migliori 8 tempi."
+
+    app.selectbox(key=f"scheme_{rid}").set_value("12").run()
+    assert (app.sidebar.text_area(key=f"dec_{rid}_partenti").value
+            == "Si qualificano per il 1° turno i migliori 12 tempi.")
+
+
+def test_the_qualifying_results_load_the_first_round(app, iscritti_path):
+    """Twelve qualify, and they meet 1-12, 2-11, … - the UCI table, composed."""
+    from core.formats import sprint as S
+    from core.models import race_id
+    from core.parse import parse_heats
+    from core.store import open_competition
+
+    rid = _qualify(app, iscritti_path)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    _advance(app, "Carica Turno 1")
+
+    st = open_competition("CITA26").load_race(race_id("AL", "velocita",
+                                                      S.TURNO1))
+    heats = [[str(b) for s in h for b in s]
+             for h in parse_heats(st.payload["heats"])]
+    assert len(heats) == 6 and all(len(h) == 2 for h in heats)
+    # the fastest meets the twelfth, and nobody rides twice
+    fast = [k for k, _ in sorted(
+        ((k, v) for k, v in open_competition("CITA26").load_race(
+            rid).payload["times"].items()), key=lambda kv: kv[1])][:12]
+    assert heats[0] == [fast[0], fast[11]] and heats[5] == [fast[5], fast[6]]
+    assert len({k for h in heats for k in h}) == 12
+
+
+def test_the_first_round_composes_its_own_recuperi(app, iscritti_path):
+    """One comunicato: the results above, the start order of the recuperi below.
+
+    The recuperi are not a round of the programme and nobody composes them by
+    hand - they are the six losers, dealt 1, 4, 6 against 2, 3, 5 - so they
+    appear as soon as every batteria has a winner.
+    """
+    rid = _qualify(app, iscritti_path)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    _advance(app, "Carica Turno 1")
+
+    rid = _round(app, "AL", "velocita", "Turno 1")
+    # «Risultati» alone would name neither of the two races the round files
+    assert [r for r in app.radio if r.key == f"doc_{rid}"][0].options == [
+        "Partenti", "Ris. Turno 1", "Ris. recuperi"]
+    assert not _picks(app, "rep", rid)
+
+    _pick_all(app, rid, "t1")
+    # the recuperi are a box of their own, opened by their own sheet - but
+    # drawn either way, or the run that hid them would drop what was typed
+    app.radio(key=f"doc_{rid}").set_value("risultati_recuperi").run()
+    rep = _picks(app, "rep", rid)
+    assert len(rep) == 2                       # two batterie of three
+    assert _picks(app, "t1", rid)              # still there, and still filled
+    boxes = {e.label: e.proto.expanded for e in app.sidebar.expander}
+    assert boxes["Recuperi"] and not boxes["Vincitori 1° turno"]
+
+    # the sheet that files the recuperi is the one that composes the quarti
+    app.radio(key=f"doc_{rid}").set_value("risultati_recuperi").run()
+    assert not app.exception
+    assert any(b.label == "Carica Quarti di finale" for b in app.button)
+    dec = app.sidebar.text_area(key=f"dec_{rid}_risultati_recuperi").value
+    assert dec.startswith("Due prove + ev. bella.")
+
+
+def test_a_quarter_is_ridden_at_the_best_of_three(app, iscritti_path):
+    """Two prove, and the bella only when they went one each."""
+    from core.models import race_id
+    from core.parse import parse_heats
+    from core.store import open_competition
+
+    rid = _qualify(app, iscritti_path)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    _advance(app, "Carica Turno 1")
+
+    rid = _round(app, "AL", "velocita", "Turno 1")
+    _pick_all(app, rid, "t1")
+    app.radio(key=f"doc_{rid}").set_value("risultati_recuperi").run()
+    _pick_all(app, rid, "rep")
+    _save(app)
+    _advance(app, "Carica Quarti di finale")
+
+    rid = _round(app, "AL", "velocita", "Quarti")
+    runs = _picks(app, "run", f"{rid}_0")
+    assert len(runs) == 2                      # prova 1 and prova 2, no bella
+    assert [r.label for r in runs] == ["Prova 1", "Prova 2"]
+
+    # one prova each: the bella appears
+    _press(runs[0], 0)
+    _press(runs[1], 1)
+    app.run()
+    runs = _picks(app, "run", f"{rid}_0")
+    assert len(runs) == 3 and runs[2].label == "ev. bella"
+
+    _press(runs[2], 0).run()
+    _save(app)
+    st = open_competition("CITA26").load_race(race_id("AL", "velocita",
+                                                      "Quarti"))
+    won = [str(b) for s in parse_heats(st.payload["results"])[0] for b in s]
+    # two prove to one, and the batteria is filed with him first
+    assert won[0] == _opt(runs[2], 0)      # the one the bella was given to
+
+
+def _preview(app) -> str:
+    """The sheet as it is drawn on the page - the same HTML the PDF is made of."""
+    return "\n".join(getattr(e.proto, "body", "") for e in app.main
+                     if e.type == "html")
+
+
+def test_a_velocita_is_ridden_from_the_200_m_to_the_champion(app, iscritti_path):
+    """The whole event through the pages, one comunicato at a time.
+
+    Every round is composed by the sheet before it, nothing is typed as
+    notation, and the classification names the champion and ranks everybody
+    the finals did not - on their 200 m.
+    """
+    rid = _qualify(app, iscritti_path)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    _advance(app, "Carica Turno 1")
+
+    rid = _round(app, "AL", "velocita", "Turno 1")
+    _pick_all(app, rid, "t1")
+    app.radio(key=f"doc_{rid}").set_value("risultati_recuperi").run()
+    _pick_all(app, rid, "rep")            # 1° of each repechage
+    _pick_all(app, rid, "rep")            # 2°: the third is whoever is left
+    _save(app)
+    # the results sheet of the first round carries the recuperi under it
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    # ...under a heading that says it is their start order, not more results,
+    # and with the columns of one - UCI ID included
+    sheet = _preview(app)
+    assert "Turno 1 - Recuperi - Ordine di Partenza" in sheet
+    assert "UCI ID" in sheet          # the results table above has no such column
+    # on screen the letterhead is dropped: the first table takes the subtitle,
+    # or the results would be a nameless block above a block with a heading
+    assert '<div class="table-title">Turno 1 - Risultati</div>' in sheet
+    app.radio(key=f"doc_{rid}").set_value("risultati_recuperi").run()
+    assert "Quarti di Finale - Ordine di Partenza" in _preview(app)
+    _advance(app, "Carica Quarti di finale")
+
+    rid = _round(app, "AL", "velocita", "Quarti")
+    _pick_all(app, rid, "run")            # prova 1 of every batteria
+    _pick_all(app, rid, "run")            # prova 2: two each, no bella
+    _save(app)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    sheet = _preview(app)
+    assert ("Semifinali - Ordine di Partenza" in sheet
+            and "Finale 5°-8° Posto - Ordine di Partenza" in sheet)
+    assert "Prova 1" in sheet and "ev. bella" in sheet
+    _advance(app, "Carica Semifinali")
+
+    rid = _round(app, "AL", "velocita", "Semifinali")
+    _pick_all(app, rid, "run")
+    _pick_all(app, rid, "run")
+    _save(app)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    assert "Finali - Ordine di Partenza" in _preview(app)
+    _advance(app, "Carica Finali")
+
+    rid = _round(app, "AL", "velocita", "Finali")
+    # on a finals round «Risultati» alone would not say which four it ranks:
+    # the sheet next to it is the 5°-8°
+    assert [r for r in app.radio if r.key == f"doc_{rid}"][0].options == [
+        "Partenti", "Ris. 5°-8°", "Ris. 1°-4°", "Classifica"]
+    app.radio(key=f"doc_{rid}").set_value("risultati_5-8").run()
+    for _ in range(3):                    # 5°, 6°, 7° - the 8° is what is left
+        _pick_all(app, rid, "f58")
+    _save(app)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    boxes = {e.label: e.proto.expanded for e in app.sidebar.expander}
+    assert boxes["Finali 1°-4°"] and not boxes["Finale 5°-8°"]
+    _pick_all(app, rid, "run")
+    _pick_all(app, rid, "run")
+    _save(app)
+
+    # the 5°-8° is one race: the batteria column says so once, against its
+    # first line, the way every other batteria number is printed - and on a
+    # finals sheet there is no batteria to number, so it is headed «Finale»
+    app.radio(key=f"doc_{rid}").set_value("risultati_5-8").run()
+    sheet = _preview(app)
+    assert sheet.count("<td class=\"c\">5°-8°</td>") == 1
+    assert "Finale</th>" in sheet and "Batt.</th>" not in sheet
+
+    # ...same on the ordine di partenza, where the 5°-8° prints under the
+    # composition of the two finals for the first four places
+    app.radio(key=f"doc_{rid}").set_value("partenti").run()
+    sheet = _preview(app)
+    assert sheet.count("<td class=\"c\">5°-8°</td>") == 1
+    assert "Batt.</th>" not in sheet
+
+    # and the sheet of the other two finals says which places they rode for
+    from core.config import DOC_RESULTS
+    from core.store import open_competition as _open
+    from ui.pages.races import _velocita_subtitle
+
+    state = _race_state(comp_of(_open("CITA26")), "AL", "velocita", "Finali")
+    assert _velocita_subtitle(state, DOC_RESULTS) == \
+        "Finali 1°/2° e 3°/4° posto - Risultati"
+
+    app.radio(key=f"doc_{rid}").set_value("classifica").run()
+    assert not app.exception
+    sheet = _preview(app)
+    # the apostrophe is escaped in the HTML the page draws
+    assert "CAMPIONE D&#39;ITALIA" in sheet and "CAMPIONESSA" not in sheet
+
+    from core import race as R
+    from core.store import open_competition
+    from core import entries as E
+    store = open_competition("CITA26")
+    el, _ = E.effective_entries(store, comp_of(store))
+    res = R.sprint_standings(store, comp_of(store), el, "AL", "velocita")
+    assert [p.position for p in res.placings[:8]] == list(range(1, 9))
+    assert len(res.placings) == 27        # everybody entered is classified
+
+
+def comp_of(store):
+    from core.config import load_competition
+    return load_competition(store.root / "programme.yaml")
+
+
+def test_a_velocita_start_order_carries_the_uci_id(app, iscritti_path):
+    """The UCI ID belongs on the ordine di partenza of a velocità - the 200 m
+    as much as the batterie composed from it."""
+    rid = _qualify(app, iscritti_path)
+    app.radio(key=f"doc_{rid}").set_value("partenti").run()
+    assert not app.exception
+    sheet = _preview(app)
+    assert "<th" in sheet and "UCI ID" in sheet
+
+    from core import entries as E
+    from core.store import open_competition
+
+    store = open_competition("CITA26")
+    el, _ = E.effective_entries(store, comp_of(store))
+    uci = {r.uci_id for r in el.by_cat("AL") if r.uci_id}
+    assert uci & set(re.findall(r">(\d{11})<", sheet))
+
+    # a bunch race keeps the columns it has always had
+    other = _open_race(app, iscritti_path, "AL", "omnium", "Corsa a Punti")
+    app.radio(key=f"doc_{other}").set_value("partenti").run()
+    assert "UCI ID" not in _preview(app)
+
+
+def test_the_200_m_results_carry_the_cut(app, iscritti_path):
+    """The line under the twelfth, and the decision that says why it is there."""
+    rid = _qualify(app, iscritti_path)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    assert (app.sidebar.text_area(key=f"dec_{rid}_risultati").value
+            == "Si qualificano per il 1° turno i migliori 12 tempi.")
+
+    import re
+
+    from core.store import open_competition
+    times = open_competition("CITA26").load_race(rid).payload["times"]
+    thirteenth = sorted(times, key=lambda k: times[k])[12]
+
+    rows = re.findall(r"<tr[^>]*>.*?</tr>", _preview(app), re.S)
+    strong = [r for r in rows if "group-start-strong" in r]
+    # one heavier rule on the sheet, and it opens the line of the thirteenth
+    assert len(strong) == 1
+    assert f">{thirteenth}<" in strong[0]
+
+
+def test_advanced_settings_hold_for_every_sheet(app):
+    """Firma e nome si scelgono una volta, in «Impostazioni avanzate»."""
+    from core.store import open_competition
+    from ui import state
+
+    _page(app, "Impostazioni")
+    app.radio(key="sig_mode").set_value("text").run()
+    assert not app.exception
+    app.text_input(key="sig_name").set_value("Mario Rossi").run()
+    [b for b in app.button if b.label == "Salva nome"][0].click().run()
+    app.selectbox(key="sig_scope").set_value("results").run()
+    app.radio(key="name_style").set_value("full").run()
+    assert not app.exception
+
+    s = open_competition("CITA26").settings
+    assert s["signature_mode"] == "text" and s["signature_name"] == "Mario Rossi"
+    assert s["signature_scope"] == "results" and s["name_style"] == "full"
+
+    # and from there they set the ticks the other pages open with
+    b = state.competition("CITA26").branding
+    assert b.signs("risultati") and b.signs("classifica")
+    assert not b.signs("partenti")
+
+
+def test_a_womens_velocita_is_written_about_women(app, iscritti_path, comp):
+    """«La vincitrice di ogni batteria», not a generic masculine.
+
+    The sheets are written about the riders in front of the jury, the way the
+    classification already names a CAMPIONESSA.
+    """
+    from core import race as R
+    from core.config import DOC_RESULTS, DOC_RESULTS_REP, DOC_STARTLIST
+    from core.store import open_competition
+    from ui.pages.races import _velocita_notes
+
+    store = open_competition("CITA26")
+
+    def notes(cat):
+        _qualify(app, iscritti_path, cat=cat)
+        state = _race_state(comp, cat, "velocita", "Turno 1")
+        return _velocita_notes(state, comp,
+                               R.sprint_scheme(store, comp, cat, "velocita"))
+
+    women = notes("DA")
+    assert women[DOC_STARTLIST].startswith("La vincitrice di ogni batteria")
+    assert women[DOC_STARTLIST].endswith("le altre ai recuperi.")
+    assert women[DOC_RESULTS].startswith("La vincitrice di ogni batteria dei "
+                                         "recuperi")
+    assert "Le vincitrici passano alle semifinali, le altre" \
+        in women[DOC_RESULTS_REP]
+
+    men = notes("AL")
+    assert men[DOC_STARTLIST].startswith("Il vincitore di ogni batteria")
+    assert men[DOC_RESULTS_REP].startswith("Due prove + ev. bella. I vincitori")
+
+
+# ── keirin ──────────────────────────────────────────────────────────────────
+
+def _kfields(boxes, prefix):
+    """The numbered fields of one block: `results` must not catch
+    `results_final_b`, which is another race of the same round."""
+    fields = [t for t in boxes if t.key.startswith(prefix)
+              and t.key[len(prefix):].isdigit()]
+    return sorted(fields, key=lambda t: int(t.key[len(prefix):]))
+
+
+def _kheats(app, rid, key):
+    """The composition fields of one race of a keirin round, in order."""
+    return _kfields(app.main.text_input, f"kh_{rid}_{key}_")
+
+
+def _korders(app, rid, key):
+    """The arrival fields in the sidebar, one per batteria."""
+    return _kfields(app.sidebar.text_input, f"kr_{rid}_{key}_")
+
+
+def _kcompose(app, comp, rid, cat, round_key, key="heats"):
+    """Type the batterie: the entrants dealt over the fields, as the jury does."""
+    entrants = _race_state(comp, cat, "keirin", round_key).entrants
+    fields = _kheats(app, rid, key)
+    assert fields, f"no composition fields for {rid}/{key}"
+    heats = [[] for _ in fields]
+    for i, bib in enumerate(entrants):
+        heats[i % len(fields)].append(bib)
+    for box, heat in zip(fields, heats):
+        box.set_value(", ".join(heat))
+    app.run()
+    assert not app.exception
+    return heats
+
+
+def _kride(app, rid, heats_key, results_key):
+    """Every batteria finishes in the order it lines up in."""
+    from core import race as R
+    from core.store import open_competition
+
+    heats = R.bracket_heats(open_competition("CITA26").load_race(rid),
+                            heats_key)
+    fields = _korders(app, rid, results_key)
+    assert len(fields) == len(heats), (len(fields), len(heats))
+    for box, heat in zip(fields, heats):
+        box.set_value(", ".join(heat))
+    app.run()
+    assert not app.exception
+    return heats
+
+
+def test_a_keirin_is_ridden_from_the_first_round_to_the_champion(app,
+                                                                 iscritti_path,
+                                                                 comp):
+    """The whole tournament through the pages: the jury composes the first
+    round, the tables compose everything after it."""
+    from core import race as R
+    from core.store import open_competition
+
+    rid = _open_race(app, iscritti_path, "AL", "keirin", "Turno 1")
+    # the shape of the tournament is on the page, read off the entry list
+    assert any("tabella UCI 29-42" in c.value for c in app.caption)
+    # the round files four sheets: its own two, and the two of its recuperi
+    assert [r for r in app.radio if r.key == f"doc_{rid}"][0].options == [
+        "Partenti", "Ris. Turno 1", "Recuperi", "Ris. recuperi"]
+    dec = app.sidebar.text_area(key=f"dec_{rid}_partenti").value
+    assert dec == ("Turno 1: 6 batterie. Il vincitore di ogni batteria passa "
+                   "alle semifinali, gli altri ai recuperi.")
+
+    _kcompose(app, comp, rid, "AL", "Turno 1")
+    _save(app)
+    heats = _kride(app, rid, "heats", "results")
+    _save(app)
+    # the batterie print on the ordine di partenza, in dorsale order
+    app.radio(key=f"doc_{rid}").set_value("partenti").run()
+    assert "Batt." in _preview(app)
+
+    # the risultati compose the recuperi, onto this same round
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    _advance(app, "Carica Recuperi")
+    rep = R.bracket_heats(open_competition("CITA26").load_race(rid),
+                          R.REP_HEATS)
+    assert len(rep) == 6 and all(len(h) == 5 for h in rep)
+    # nobody who won a batteria is in them
+    assert not {h[0] for h in heats} & {k for h in rep for k in h}
+
+    # both grids of the round are full now, each measured against its own
+    # riders: the recuperi start who did not qualify, not the categoria
+    assert len([c for c in app.caption
+                if c.value == "Tutti in batteria."]) == 2
+
+    app.radio(key=f"doc_{rid}").set_value("partenti_recuperi").run()
+    # the recuperi have an ordine di partenza of their own on this round: it
+    # starts the riders they took in, and not one of the batterie's winners
+    from core import entries as E
+    by_bib = R.riders_by_bib(
+        E.effective_entries(open_competition("CITA26"),
+                            comp_of(open_competition("CITA26")))[0], "AL")
+    sheet = _preview(app)
+    assert by_bib[rep[0][0]].last_name in sheet
+    assert by_bib[heats[0][0]].last_name not in sheet   # she won her batteria
+    _kride(app, rid, R.REP_HEATS, R.REP_RESULTS)
+    _save(app)
+    app.radio(key=f"doc_{rid}").set_value("risultati_recuperi").run()
+    _advance(app, "Carica Semifinali")
+
+    rid = _round(app, "AL", "keirin", "Semifinali")
+    semis = _kride(app, rid, "heats", "results")
+    assert len(semis) == 2 and all(len(h) == 6 for h in semis)
+    _save(app)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    # the sheet that decides the finals carries their start orders underneath
+    sheet = _preview(app)
+    assert "Finale 1°-6° posto - Ordine di Partenza" in sheet
+    assert "Finale 7°-12° posto - Ordine di Partenza" in sheet
+    _advance(app, "Carica Finali")
+
+    rid = _round(app, "AL", "keirin", "Finali")
+    assert [r for r in app.radio if r.key == f"doc_{rid}"][0].options == [
+        "Partenti", "Ris. 7°-12°", "Ris. 1°-6°", "Classifica"]
+    # both finals on the one ordine di partenza, each named by its places
+    sheet = _preview(app)
+    assert "Finale</th>" in sheet and "1°-6°" in sheet and "7°-12°" in sheet
+
+    app.radio(key=f"doc_{rid}").set_value("risultati_finale_b").run()
+    _kride(app, rid, R.HEATS_B, R.RESULTS_B)
+    _save(app)
+    app.radio(key=f"doc_{rid}").set_value("risultati").run()
+    top = _kride(app, rid, "heats", "results")
+    _save(app)
+
+    app.radio(key=f"doc_{rid}").set_value("classifica").run()
+    assert not app.exception
+    sheet = _preview(app)
+    assert "CAMPIONE D&#39;ITALIA" in sheet
+    # the classifica is read final by final: the one for the title, the one
+    # under it, and then everybody the tournament left before them
+    for block in ("FINALE 1°-6° POSTO", "FINALE 7°-12° POSTO",
+                  "CLASSIFICA GENERALE"):
+        assert f'<div class="table-title">{block}</div>' in sheet
+
+    from core import entries as E
+    store = open_competition("CITA26")
+    el, _ = E.effective_entries(store, comp_of(store))
+    res = R.keirin_standings(store, comp_of(store), el, "AL", "keirin")
+    assert [p.key for p in res.placings][:6] == top[0]
+    assert [p.position for p in res.placings[:12]] == list(range(1, 13))
+    assert len(res.placings) == len(R.keirin_entrants(el, comp_of(store),
+                                                      "AL", "keirin"))
+
+
+def test_a_keirin_says_what_is_wrong_with_a_batteria(app, iscritti_path, comp):
+    """A dorsale in two batterie, or one that is not entered, is said at once."""
+    rid = _open_race(app, iscritti_path, "AL", "keirin", "Turno 1")
+    entered = _race_state(comp, "AL", "keirin", "Turno 1").entrants
+    fields = _kheats(app, rid, "heats")
+    fields[0].set_value(", ".join(entered[:3]))
+    fields[1].set_value(f"{entered[0]}, 999")
+    app.run()
+    assert not app.exception
+    flags = [c.value for c in app.caption if ":red[" in c.value]
+    assert any("?999" in f for f in flags)
+    assert any(f"!{entered[0]}" in f for f in flags)
+    assert any("Non ancora in batteria" in c.value for c in app.caption)
+
+
+def test_a_womens_keirin_is_written_about_women(app, iscritti_path, comp):
+    """«La vincitrice», and the two finals named by the places they ride for."""
+    from core.config import DOC_RESULTS, DOC_STARTLIST, DOC_STARTLIST_REP
+    from ui.pages.races import _keirin_notes
+
+    _open_race(app, iscritti_path, "DA", "keirin", "Turno 1")
+    from core import entries as E
+    from core.store import open_competition
+
+    store = open_competition("CITA26")
+    el, _ = E.effective_entries(store, comp)
+    state = _race_state(comp, "DA", "keirin", "Turno 1")
+    notes = _keirin_notes(state, el, comp)
+    assert notes[DOC_STARTLIST] == ("Turno 1: 3 batterie. Le prime 2 "
+                                    "classificate di ogni batteria passano "
+                                    "alle semifinali, le altre ai recuperi.")
+    assert notes[DOC_STARTLIST_REP].startswith("Recuperi: 3 batterie. Le prime 2")
+
+    semi = _race_state(comp, "DA", "keirin", "Semifinali")
+    assert _keirin_notes(semi, el, comp)[DOC_RESULTS] == (
+        "Semifinali: 2 batterie. Le prime 3 classificate di ogni batteria "
+        "passano alla finale 1°-6° posto, le altre alla finale 7°-12° posto.")
+
+
+# ── the Programma page ──────────────────────────────────────────────────────
+#
+# The page edits `programme.yaml` and nothing else. What it must never do is
+# change the competition just by being opened and saved: the file it writes is
+# the one the championship runs from.
+
+def _programme_page(app):
+    _page(app, "Programma")
+    assert not app.exception
+    return app
+
+
+def test_programma_page_opens_on_a_tab_per_day(app):
+    """Gara, Specialità, and one tab per date of the competition."""
+    _programme_page(app)
+    labels = [t.label for t in app.tabs]
+    assert labels[:2] == ["Gara", "Specialità"]
+    # four dates in the programme, four tabs - and each says which day it is
+    assert labels[2:] == [f"Giornata {n} · 08-0{n + 3}" for n in (1, 2, 3, 4)]
+    # every day tab holds the two panels that make a day
+    assert [s.value for s in app.subheader].count("Gare della giornata") == 4
+    assert [s.value for s in app.subheader].count(
+        "Comunicati della giornata") == 4
+
+
+def test_saving_the_programme_changes_nothing(app, tmp_path):
+    """Open the page, press Salva, and the competition is what it was.
+
+    The one property the page owes: it is opened to change a programme, and
+    opening it must not change one. Checked on the real championship file -
+    the fixture works on a copy of it in a throwaway data directory.
+    """
+    from core.config import load_competition
+    from core.store import competitions_root
+
+    path = competitions_root() / "CITA26" / "programme.yaml"
+    before = load_competition(path)
+
+    _programme_page(app)
+    [b for b in app.button if "Salva programme" in b.label][0].click().run()
+    assert not app.exception
+
+    after = load_competition(path)
+    assert _competition_dict(after) == _competition_dict(before)
+
+
+def _competition_dict(comp):
+    import dataclasses
+    d = dataclasses.asdict(comp)
+    d.pop("path")
+    return d
+
+
+def test_the_previous_programme_is_kept_as_a_snapshot(app):
+    """Overwriting the programme is exactly what `.snapshots/` is for."""
+    from core.store import open_competition
+
+    _programme_page(app)
+    [b for b in app.button if "Salva programme" in b.label][0].click().run()
+    assert not app.exception
+    snaps = open_competition("CITA26").snapshots("programme.yaml")
+    assert snaps and "CAMPIONATI ITALIANI" in snaps[0].read_text(encoding="utf-8")
+
+
+def test_the_page_shows_what_the_file_will_look_like(app):
+    """The preview is the file itself: nothing is written blind."""
+    _programme_page(app)
+    assert any("Anteprima del file" in e.label for e in app.expander)
+    text = "\n".join(c.value for c in app.code)
+    assert "communiques:" in text and "programme:" in text
+
+
+def test_a_comunicato_can_carry_two_documents(app, iscritti_path):
+    """Stampa → Per comunicato builds exactly what the register declares.
+
+    The velocità has always printed the risultati of a turno with the ordine di
+    partenza of the round it composes underneath; the register can now say so
+    (`with:` in the programme), and the sheet comes out as one PDF.
+    """
+    from core.config import Sheet, load_competition
+    from core.programme import dump
+    from core.store import competitions_root
+
+    _import(app, iscritti_path)
+    path = competitions_root() / "CITA26" / "programme.yaml"
+    comp = load_competition(path)
+    # a round that has been ridden by nobody yet: both its sheets are named,
+    # and the page says of each that there is nothing to print
+    next(c for c in comp.communiques if c.n == 95).extra = [
+        Sheet(doc="partenti_recuperi")]
+    # two elenchi iscritti on one comunicato - the case a small competition
+    # files, and the one that prints without a single race being ridden
+    next(c for c in comp.communiques if c.n == 1).extra = [
+        Sheet(cat="ED", doc="partenti")]
+    path.write_text(dump(comp), encoding="utf-8")
+
+    _documents(app, "Serie di documenti")
+    app.sidebar.radio(key="stp_mode").set_value("Per comunicato").run()
+    assert not app.exception
+
+    picker = app.sidebar.selectbox(key="stp_com")
+    picker.set_value(next(o for o in picker.options if o.startswith("95 "))).run()
+    # the page names both documents of the number, and says of each that the
+    # race behind it has not been ridden
+    assert any("Risultati + Recuperi" in c.value for c in app.caption)
+    assert sum("Turno 1" in w.value for w in app.warning) == 2
+
+    picker = app.sidebar.selectbox(key="stp_com")
+    picker.set_value(next(o for o in picker.options if o.startswith("1 "))).run()
+    assert not app.exception
+    assert any("2 documenti" in c.value for c in app.caption)
+    # both categorie are on the sheet, which is the whole point of the number
+    sheet = _preview(app)
+    assert "UOMINI ESORDIENTI" in sheet and "DONNE ESORDIENTI" in sheet

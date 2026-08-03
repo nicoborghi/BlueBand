@@ -1,0 +1,5 @@
+[server]
+# serves static/ at app/static/: how the "Save PDF" link
+# can hand the freshly written PDF to a browser tab. A file:// link cannot -
+# Chrome refuses to follow one from an http page.
+enableStaticServing = true

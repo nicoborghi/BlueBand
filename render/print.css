@@ -1,0 +1,429 @@
+/* Print stylesheet for jury documents.
+ *
+ * Layout rules that matter:
+ *
+ * 1. The letterhead and the footer strip run the full page width - the page
+ *    box has no side margin and the content is padded instead.
+ * 2. Each comunicato is one <table class="sheet"> whose thead holds the
+ *    letterhead and whose tfoot holds the footer; browsers repeat both on
+ *    every page the table spans.
+ * 3. Result rows never wrap: one rider is one line. Column widths come from
+ *    normalised weights and long values are truncated with an ellipsis, so a
+ *    club name can never blow a row up to six lines.
+ * 4. Sheets with many columns print landscape via a named page.
+ *
+ * No Streamlit hashed class names: only the stable data-testid selectors that
+ * hide the app chrome when printing.
+ */
+
+.cmsr {
+    --header-color: #0a5688;
+    --rule: #b9c2cc;
+    --pad-x: 8mm;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #111;
+}
+
+/* ── sheet frame ─────────────────────────────────────────────────────── */
+
+.cmsr table.sheet {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 8mm 0;
+}
+
+.cmsr .sheet-wrap + .sheet-wrap {
+    page-break-before: always;
+}
+
+.cmsr table.sheet > thead > tr > td,
+.cmsr table.sheet > tfoot > tr > td,
+.cmsr table.sheet > tbody > tr > td {
+    padding: 0;
+    border: none;
+    vertical-align: top;
+}
+
+/* ── letterhead ──────────────────────────────────────────────────────── */
+
+.cmsr .banner img {
+    display: block;
+    width: 100%;              /* full page width */
+    height: auto;
+}
+
+.cmsr .head-body {
+    padding: 5mm var(--pad-x) 3mm var(--pad-x);
+}
+
+/* The comunicato number sits top right on its own line; the title is
+ * centred under it, as on the jury workbooks. */
+.cmsr .comunicato-row {
+    text-align: right;
+    margin-bottom: 4mm;      /* the title needs air, not a number stuck to it */
+}
+
+.cmsr .comunicato {
+    white-space: nowrap;
+    font-size: 10pt;
+    font-weight: bold;
+    border: 1px solid var(--header-color);
+    color: var(--header-color);
+    padding: 1mm 2mm;
+    border-radius: 1mm;
+}
+
+.cmsr .title {
+    text-align: center;
+    color: var(--header-color);
+    font-weight: bold;
+    font-size: 15pt;
+    line-height: 1.15;
+    letter-spacing: 0.3px;
+}
+
+.cmsr .subtitle {
+    text-align: center;
+    font-size: 12pt;
+    font-weight: bold;
+    margin-top: 1mm;
+}
+
+/* the heading of a second table on the same sheet: the recuperi under the
+   results of the first round, the semifinali under the quarti. Reads as the
+   subtitle of what follows, in black - the colour belongs to the letterhead */
+.cmsr .table-title {
+    text-align: center;
+    font-size: 12pt;
+    font-weight: bold;
+    /* well clear of the table above it: it heads what follows, and read too
+       close to the rows before it, it looks like their total */
+    margin: 9mm 0 1.5mm 0;
+    break-after: avoid;
+    page-break-after: avoid;
+}
+
+.cmsr .info {
+    text-align: center;
+    font-size: 9pt;
+    color: #444;
+    margin-top: 1mm;
+}
+
+/* key to the column sigle: sits under the table it explains, aligned with it */
+.cmsr .legend {
+    font-size: 7.5pt;
+    color: #555;
+    margin-top: 2mm;
+    padding: 0 var(--pad-x);
+}
+
+/* ── data tables ─────────────────────────────────────────────────────── */
+
+.cmsr .doc {
+    padding: 0 var(--pad-x);
+}
+
+.cmsr table.data {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin: 2mm 0 0 0;
+}
+
+.cmsr table.data thead th {
+    border-bottom: 1.2px solid #333;
+    border-top: 1.2px solid #333;
+    background: #eef2f6;
+    /* tight on the sides: every millimetre between the columns is a millimetre
+     * off a name */
+    padding: 1.4mm 0.7mm;
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.92em;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: normal;      /* a header may take two lines, never truncate */
+}
+
+.cmsr table.data tbody td {
+    padding: 0.9mm 0.7mm;
+    line-height: 1.2;
+    border: none;
+    /* one rider, one line: truncate rather than wrap */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The sprint columns hold one digit each and there can be a dozen of them:
+ * side padding there is width taken from the names, so they are set tight and
+ * the numbers still have air between them from the column rule of the sheet. */
+.cmsr table.data td.tight,
+.cmsr table.data th.tight {
+    padding-left: 0.2mm;
+    padding-right: 0.2mm;
+}
+
+.cmsr table.data tbody td.wrap {
+    white-space: normal;
+}
+
+.cmsr table.data tbody tr.alt td {
+    background: #f4f6f8;
+}
+
+/* a rule above the first row of a team / pair / heat, instead of a blank row */
+.cmsr table.data tbody tr.group-start td,
+.cmsr table.data tbody tr.side-start td {
+    border-top: 0.8px solid var(--rule);
+}
+
+/* the qualification cut (and the band above a final): heavier than a group
+ * rule, because it is the line the jury would draw on the workbook by hand */
+.cmsr table.data tbody tr.group-start-strong td {
+    border-top: 2px solid #55606b;
+}
+
+/* and one under the last row, so the table is closed on the same rule its
+ * groups are separated by rather than trailing off into the paper */
+.cmsr table.data tbody:last-of-type tr:last-child td {
+    border-bottom: 0.8px solid var(--rule);
+}
+
+.cmsr td.l, .cmsr th.l { text-align: left; }
+.cmsr td.c, .cmsr th.c { text-align: center; }
+.cmsr td.r, .cmsr th.r { text-align: right; }
+.cmsr td.b { font-weight: bold; }
+
+/* The second rider of a madison coppia wears the same number as the first, in
+ * red: the sheet says which of the two is on the track and which is resting,
+ * the way the numbers do at the trackside. Light enough to read as red on
+ * paper, dark enough to survive a black-and-white print. */
+.cmsr td.red { color: #d93636; }
+
+/* the result column reads at a glance */
+.cmsr table.data tbody td:first-child {
+    font-weight: bold;
+}
+
+/* "(ris)" says a reserve rode in someone's place - it is a note, not a placing */
+.cmsr table.data tbody tr.reserve td:first-child {
+    font-weight: normal;
+    font-style: italic;
+}
+
+/* the row counter is not a result: grey and light, and it hands the bold on
+ * to the column next to it, which is the one worth reading */
+.cmsr table.data td.mut,
+.cmsr table.data th.mut {
+    color: #9a9a9a;
+    font-weight: normal;
+}
+
+.cmsr table.data tbody td.mut + td {
+    font-weight: bold;
+}
+
+.cmsr table.data tbody tr.pending td { color: #666; }
+
+/* Bands: a line of their own across the sheet. The final these two teams rode,
+ * and - under the first line of the classification - the champion, in the blue
+ * of the title and with room to breathe above it. */
+.cmsr table.data tbody tr.band td,
+.cmsr table.data tbody tr.champion td {
+    font-weight: bold;
+    background: none;
+    padding-top: 2mm;
+}
+
+.cmsr table.data tbody tr.champion td {
+    color: var(--header-color);
+    letter-spacing: 0.04em;
+    /* it hangs off the line above - the rider it names - so it sits closer to
+     * it than a band does: the air belongs under it, not over it */
+    padding-top: 1.2mm;
+    /* nearly a blank line under it: the champions close the sheet's first
+     * block and the next team should not read as their fifth rider */
+    padding-bottom: 4.5mm;
+}
+
+/* A provisional sheet says so where the number would be: orange, so nobody
+ * files it as a comunicato by mistake. */
+.cmsr .bozza {
+    white-space: nowrap;
+    font-size: 10pt;
+    font-weight: bold;
+    border: 1px solid #b45309;
+    background: #fde68a;
+    color: #7c2d12;
+    padding: 1mm 2mm;
+    border-radius: 1mm;
+    letter-spacing: 0.5px;
+}
+
+/* ── decisione / signature / footer ──────────────────────────────────── */
+
+.cmsr .decisione {
+    margin: 4mm 0 0 0;
+    padding: 2mm 3mm;
+    border-left: 3px solid var(--header-color);
+    background: #f4f6f8;
+    font-weight: bold;
+    font-size: 9.5pt;
+    white-space: pre-line;
+}
+
+/* "Per la giuria:" followed by the scanned signature - nothing else: no typed
+ * name and no ruled line under it. */
+.cmsr .signature {
+    margin-top: 7mm;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 3mm;
+    font-size: 9pt;
+}
+
+/* the typed alternative to the scanned image: the name in bold, on the same
+ * line as the label and nothing under it */
+.cmsr .signature .sig-name {
+    font-weight: bold;
+    font-size: 10pt;
+    white-space: nowrap;
+}
+
+.cmsr .signature img {
+    display: block;
+    max-height: 14mm;
+    max-width: 55mm;
+    /* nudged down so it sits across the label rather than above it */
+    margin-top: 3mm;
+}
+
+.cmsr .doc-footer {
+    padding-top: 3mm;
+}
+
+/* One discreet line: when the sheet was printed, nothing the letterhead
+ * already says. No rule above it - the strip below is separation enough. */
+.cmsr .footline {
+    text-align: right;
+    font-size: 8pt;
+    color: #777;
+    letter-spacing: 0.2px;
+    padding: 0 var(--pad-x) 1.5mm var(--pad-x);
+}
+
+.cmsr .footer-strip img {
+    display: block;
+    width: 100%;              /* full page width */
+    height: auto;
+}
+
+/* ── print ───────────────────────────────────────────────────────────── */
+
+/* No side margin: the letterhead and the footer strip bleed to the paper
+ * edge. Content keeps clear of it through --pad-x. */
+@page {
+    size: A4 portrait;
+    margin: 0;
+}
+
+@page landscape {
+    size: A4 landscape;
+    margin: 0;
+}
+
+/* The footer belongs to the *paper*, not to the screen and not to the end of
+ * the table: on screen neither copy shows, and on paper the one in each tfoot
+ * is repeated by the browser to reserve the height while `.page-footer` is
+ * pinned to the bottom edge of every sheet. */
+.cmsr .page-footer {
+    display: none;
+}
+
+@media screen {
+    .cmsr .doc-footer {
+        display: none;
+    }
+}
+
+@media print {
+    /* The default 8px body margin was the white border down the sides of the
+     * letterhead: the footer strip is `position: fixed` and never had it, so
+     * only the head looked inset. Both bleed to the paper edge now. */
+    html, body {
+        margin: 0;
+        padding: 0;
+    }
+
+    .cmsr .page-footer {
+        display: block;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+    }
+
+    .cmsr .doc-footer {
+        visibility: hidden;       /* keeps the space, prints nothing */
+    }
+
+    section[data-testid="stSidebar"],
+    div[data-testid="stToolbar"],
+    div[data-testid="stDecoration"],
+    div[data-testid="stStatusWidget"],
+    header[data-testid="stHeader"],
+    .no-print {
+        display: none !important;
+    }
+
+    .cmsr { width: 100%; }
+
+    /* wide sheets (many sprint columns, the full speciality matrix).
+     * The rule targets the wrapper: putting `page:` on the table itself
+     * makes Chrome drop the repeated thead on continuation pages. */
+    .cmsr .sheet-wrap.landscape { page: landscape; }
+
+    /* this is what puts the letterhead on every sheet */
+    .cmsr table.sheet > thead { display: table-header-group; }
+    .cmsr table.sheet > tfoot { display: table-footer-group; }
+
+    .cmsr table.sheet { page-break-inside: auto; margin-bottom: 0; }
+    .cmsr table.data tr { page-break-inside: avoid; }
+
+    /* Each team / pair / heat side is its own tbody: it goes over to the next
+     * sheet whole. A quartetto with one rider stranded on page 2 is unusable
+     * at the track - and it reads as a team of three. */
+    .cmsr table.data tbody.keep {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    .cmsr .page-break { page-break-before: always; }
+}
+
+@media screen {
+    /* mimic the sheet on screen so the preview matches the print */
+    .cmsr table.sheet {
+        border: 1px solid var(--rule);
+        margin-bottom: 8mm;
+    }
+
+    /* On paper a hairline is enough to tell one coppia from the next; on a
+     * monitor, read from across the desk while the race is on, it dissolves.
+     * Same thin rules, a shade darker, plus a little air around each block:
+     * the eye has to catch "these two lines are one team" at a glance. */
+    .cmsr table.data tbody tr.group-start td,
+    .cmsr table.data tbody tr.side-start td {
+        border-top: 1px solid #8d99a6;
+    }
+
+    .cmsr table.data tbody tr.group-start td {
+        padding-top: 1.6mm;
+    }
+
+    .cmsr table.data tbody tr.group-start-strong td {
+        border-top: 2.5px solid #333c45;
+    }
+}

@@ -1,0 +1,225 @@
+{
+    "_last_updated_": "3 August 2026",
+    "1": {
+        "EN": "for not holding their line during the final sprint",
+        "FR": "pour avoir quitté sa ligne pendant le sprint final",
+        "ES": "por no mantener su línea durante el sprint final",
+        "IT": "per non aver mantenuto la propria traiettoria durante la volata finale"
+    },
+    "2": {
+        "EN": "for riding on the blue band",
+        "FR": "pour avoir roulé sur la côte d'azur",
+        "ES": "por pasar por la zona azul.",
+        "IT": "per aver pedalato sulla fascia azzurra"
+    },
+    "3": {
+        "EN": "for not having held their line during the last 200 meters of the race",
+        "FR": "pour ne pas avoir tenu sa ligne dans les 200 derniers mètres de l'épreuve",
+        "ES": "por no mantener su linea en los últimos 200 metros de la prueba",
+        "IT": "per non aver mantenuto la propria traiettoria negli ultimi 200 metri della prova"
+    },
+    "4": {
+        "EN": "for irregular movement to prevent the opponent from passing",
+        "FR": "pour manœuvre illicite, faite pour empêcher son adversaire de passer",
+        "ES": "por maniobra irregular para impedir el paso de su oponente",
+        "IT": "per manovra irregolare per impedire il sorpasso dell'avversario"
+    },
+    "5": {
+        "EN": "for dangerous riding during the race",
+        "FR": "pour manœuvre dangereuse au cours de l'épreuve",
+        "ES": "por movimientos peligrosos durante la prueba",
+        "IT": "per condotta di guida pericolosa durante la gara"
+    },
+    "6": {
+        "EN": "for entering the sprinter's lane when the opponent was already there",
+        "FR": "pour être entré dans le couloir des sprinters alors que son adversaire s'y trouvait déjà",
+        "ES": "por entrar en el passillo de sprinters cuanda estaba ocupado por su adversario",
+        "IT": "per essere entrato nella corsia dei velocisti quando l'avversario vi si trovava già"
+    },
+    "7": {
+        "EN": "for moving down towards the inside of the track when an opponent was already there",
+        "FR": "pour s'être rabattu vers l'intérieur alors que son concurrent s'y trouvait déjà",
+        "ES": "por movimiento brusco hacia el interior donde se encontraba su oponente",
+        "IT": "per essersi spostato verso l'interno della pista quando un avversario vi si trovava già"
+    },
+    "8": {
+        "EN": "for moving down towards the inside of the track and forcing another competitor off the track",
+        "FR": "pour s'être rabattu à la corde obligeant ainsi son adversaire à sortir de la piste",
+        "ES": "por desplazamiento hacia el interior forzando a su adversario a salir de la pista",
+        "IT": "per essersi spostato verso l'interno della pista costringendo un altro concorrente a uscire dalla pista"
+    },
+    "9": {
+        "EN": "for crowding their opponent with the intention of causing them to slow down",
+        "FR": "pour avoir tassé l'adversaire dans le but de le faire ralentir",
+        "ES": "por presionar cerrando al adversario para obligarle a disminuir su marcha",
+        "IT": "per aver stretto l'avversario con l'intento di farlo rallentare"
+    },
+    "10": {
+        "EN": "for moving outward with the intention of forcing the opponent to go up",
+        "FR": "pour avoir dévié de sa trajectoire avec l'intention de forcer son adversaire vers l'extérieur",
+        "ES": "por presionar cerrando al adversario para obligarle a subir hacia el exterior",
+        "IT": "per essersi spostato verso l'esterno con l'intento di costringere l'avversario a salire"
+    },
+    "11": {
+        "EN": "for going down too quickly after overtacking their opponent",
+        "FR": "pour s'être rabattu trop rapidement après avoir dépassé son adversaire",
+        "ES": "por descender demasiado rápido y cerrar a su adversario después de adelantarle",
+        "IT": "per essere sceso troppo rapidamente dopo aver sorpassato l'avversario"
+    },
+    "12": {
+        "EN": "for deliberate and flagrant fault against ...",
+        "FR": "pour faute flagrante et volontaire contre",
+        "ES": "por accion flagrante y voluntaria en contra de...",
+        "IT": "per fallo intenzionale e flagrante contro ..."
+    },
+    "13": {
+        "EN": "for causing the crash of their opponent",
+        "FR": "pour avoir provoqué la chute de son adversaire",
+        "ES": "por provocar la caïda de su adversario",
+        "IT": "per aver causato la caduta dell'avversario"
+    },
+    "14": {
+        "EN": "for having blocked an opponent",
+        "FR": "pour avoir gêné/bloqué son adversaire",
+        "ES": "por acciones de bloqueo sobre su opponente",
+        "IT": "per aver bloccato un avversario"
+    },
+    "15": {
+        "EN": "for pushing their opponent",
+        "FR": "pour avoir poussé son adversaire",
+        "ES": "por empujon sobre su oponente",
+        "IT": "per aver spinto l'avversario"
+    },
+    "16": {
+        "EN": "for delaying the start",
+        "FR": "pour retard au départ",
+        "ES": "por presentarse con retraso a la linea de salida",
+        "IT": "per aver ritardato la partenza"
+    },
+    "17": {
+        "EN": "for ignoring commissaires' instructions to leave track during a race",
+        "FR": "pour avoir ignoré les instructions des commissaires de quitter la piste pendant la course",
+        "ES": "por haber ignorado las instrucciones de los comisarios de salirse de la pista durante la prueba",
+        "IT": "per aver ignorato le istruzioni dei commissari di abbandonare la pista durante una gara"
+    },
+    "18": {
+        "EN": "for failure to obey commissaires instructions",
+        "FR": "pour non-respect des instructions des commissaires",
+        "ES": "por no obedecer las instrucciones de los comisarios",
+        "IT": "per mancato rispetto delle istruzioni dei commissari"
+    },
+    "19": {
+        "EN": "for failing to maintain proper control of the bicycle",
+        "FR": "pour ne pas maintenir le bon contrôle du vélo",
+        "ES": "por no mantener el control adecuado de la bicicleta",
+        "IT": "per non aver mantenuto il corretto controllo della bicicletta"
+    },
+    "20": {
+        "EN": "for taking off their helmet while on the track",
+        "FR": "pour avoir enlevé son casque sur la piste",
+        "ES": "por haberse quitado el casco mientras estaban en pista",
+        "IT": "per essersi tolto il casco mentre si trovava in pista"
+    },
+    "21": {
+        "EN": "for incorrect behaviour behind derny",
+        "FR": "pour comportement incorrect derrière le derney.",
+        "ES": "por comportamento incorecto detras el derny",
+        "IT": "per comportamento scorretto dietro il derny"
+    },
+    "22": {
+        "EN": "for cheating/collusion",
+        "FR": "pour tricherie/entente en course/collusion",
+        "ES": "por engaño/colusión",
+        "IT": "per frode/collusione"
+    },
+    "23": {
+        "EN": "for carrying an item onto the track that can fall on the track",
+        "FR": "pour avoir un objet en piste qui puisse tomber sur la piste",
+        "ES": "para llevar un elemento a la pista que puede caer sobre la pista",
+        "IT": "per aver portato in pista un oggetto che può cadere sulla pista stessa"
+    },
+    "24": {
+        "EN": "for dropping an item on the track",
+        "FR": "pour faire tomber un objet sur la piste",
+        "ES": "para dejar caer un elemento en la pista",
+        "IT": "per aver fatto cadere un oggetto sulla pista"
+    },
+    "25": {
+        "EN": "for unauthorised feeding",
+        "FR": "pour ravitaillement non-autorisé",
+        "ES": "para alimentación no autorizada",
+        "IT": "per rifornimento non autorizzato"
+    },
+    "26": {
+        "EN": "for behaviour that causes damage to the environment",
+        "FR": "pour comportement nuisible à l'environnement",
+        "ES": "por comportamiento que causa daño al medio ambiente",
+        "IT": "per comportamento che causa danni all'ambiente"
+    },
+    "27": {
+        "EN": "for assault, intimidation, insults, threats, improper conduct between riders",
+        "FR": "pour agression, intimidation, insultes, menaces, mauvaise conduite entre coureurs",
+        "ES": "por asalto, intimidación, insultos, amenazas, conducta inapropiada entre corredores",
+        "IT": "per aggressione, intimidazione, insulti, minacce, condotta impropria tra corridori"
+    },
+    "28": {
+        "EN": "for assault, intimidation, insults, threats, improper conduct directed at any other person",
+        "FR": "pour agression, intimidation, insultes, menaces, mauvaise conduite, destiné à toute autre personne",
+        "ES": "por asalto, intimidación, insultos, amenazas, conducta inapropiada dirigida a cualquier otra persona",
+        "IT": "per aggressione, intimidazione, insulti, minacce, condotta impropria rivolta a qualsiasi altra persona"
+    },
+    "30": {
+        "EN": "for improper or non compliant clothing during the protocol ceremony",
+        "FR": "pour vêtement inaproprié ou non conforme pendant cérémonie protocolaire",
+        "ES": "por vestimentas inapropiada o no conforme durante la ceremonia de protocolo",
+        "IT": "per abbigliamento improprio o non conforme durante la cerimonia protocollare"
+    },
+    "31": {
+        "EN": "for improper or non compliant clothing during the race",
+        "FR": "pour vêtement inaproprié ou non conforme pendant la course",
+        "ES": "por vestimentas inapropiada o no conforme durante la prueba",
+        "IT": "per abbigliamento improprio o non conforme durante la gara"
+    },
+    "32": {
+        "EN": "for failure to have the bike or any equipment controlled",
+        "FR": "pour défaut de contrôle du vélo ou tout autre équipement",
+        "ES": "por no tener la bicicleta o otro material controlada",
+        "IT": "per non aver sottoposto a controllo la bicicletta o altro equipaggiamento"
+    },
+    "33": {
+        "EN": "for use or attempt to use any non compliant material (bike, comm./electronic devices,...)",
+        "FR": "pour utilisation/tenter d'utiliser tout matériel non conforme (vélo,comm./électroniques,...)",
+        "ES": "para usar o intentar usar cualquier material no conforme (bicicleta, com./electrónicos,...)",
+        "IT": "per utilizzo o tentato utilizzo di materiale non conforme (bicicletta, dispositivi di comunicazione/elettronici,...)"
+    },
+    "34": {
+        "EN": "for unauthorised person on the safety zone during a race",
+        "FR": "pour personne non autorisée sur la zone de sécurité pendant une course",
+        "ES": "para personas no autorizadas en la zona de seguridad durante una carrera.",
+        "IT": "per la presenza di persona non autorizzata nella zona di sicurezza durante una gara"
+    },
+    "35": {
+        "EN": "for team personnel or equipment blocking access to the track",
+        "FR": "pour personnel ou équipement d'une équipe bloquant l'accès à la piste",
+        "ES": "para el personal del equipo o el material que bloquea el acceso a la pista.",
+        "IT": "per personale o equipaggiamento della squadra che blocca l'accesso alla pista"
+    },
+    "36": {
+        "EN": "qualified to... but not starting without justification",
+        "FR": "qualifié pour les... et absent au départ sans justification",
+        "ES": "classificado para... y ausente sin justificación",
+        "IT": "qualificato per... ma assente alla partenza senza giustificazione"
+    },
+    "37": {
+        "EN": "for missing/modified/not visible body number or transponder",
+        "FR": "pour dossard ou transpondeur manquant/modifié/non visible",
+        "ES": "para dorsal o transpondedor faltante/modificado/no visible",
+        "IT": "per numero dorsale o transponder mancante/modificato/non visibile"
+    },
+    "38": {
+        "EN": "for incorrect body number or transponder",
+        "FR": "pour dossard ou transpondeur incorrect",
+        "ES": "por dorsal o transpondedor incorrecto",
+        "IT": "per numero dorsale o transponder errato"
+    }
+}

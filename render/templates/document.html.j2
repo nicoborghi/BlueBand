@@ -1,0 +1,123 @@
+{% macro data_table(t) -%}
+{% if t.title %}<div class="table-title">{{ t.title }}</div>{% endif %}
+<table class="data" style="font-size: {{ t.font_size }}pt">
+  <colgroup>
+    {% for c in t.columns %}<col style="width: {{ c.pct }}%">{% endfor %}
+  </colgroup>
+  <thead>
+    <tr>
+      {% for c in t.columns %}<th class="{{ c.align }}{% if c.muted %} mut{% endif %}{% if c.tight %} tight{% endif %}">{{ c.label }}</th>{% endfor %}
+    </tr>
+  </thead>
+  {# one tbody per team / pair / heat side, so print never splits one #}
+  {% for block in t.blocks %}
+  <tbody{% if t.grouped %} class="keep"{% endif %}>
+    {% for row in block %}
+      <tr class="{{ row._class|default('') }}">
+        {# a band: one line of its own across the sheet (which final these two
+           rode, who is champion) instead of the row's cells #}
+        {% if row._banner %}
+        {% set off = t.banner_offset(row) %}
+        {% for c in t.columns[:off] %}<td></td>{% endfor %}
+        <td class="l" colspan="{{ t.columns|length - off }}">{{ row._banner }}</td>
+        {% else %}
+        {# a row may bold single cells of its own (`_bold`: the qualified teams
+           on a qualifying sheet), or print them red (`_red`: the second rider
+           of a madison coppia, who wears the red number), on top of the
+           columns that are always bold #}
+        {% for c in t.columns %}<td class="{{ c.align }}{% if c.bold or c.key in row._bold|default([]) %} b{% endif %}
+          {%- if c.key in row._red|default([]) %} red{% endif %}
+          {%- if c.wrap %} wrap{% endif %}{% if c.muted %} mut{% endif %}
+          {%- if c.tight %} tight{% endif %}">{{ row[c.key]|default('') }}</td>
+        {% endfor %}
+        {% endif %}
+      </tr>
+    {% endfor %}
+  </tbody>
+  {% endfor %}
+</table>
+{%- endmacro %}
+
+{# The foot of the sheet says only what the letterhead does not: when the sheet
+   came off the printer. Competition, venue and comunicato number are all in
+   the block above - repeating them was noise. #}
+{% macro footer_block() -%}
+<div class="doc-footer">
+  <div class="footline">{{ printed_at }}</div>
+  {% if footer_img %}<div class="footer-strip"><img src="{{ footer_img }}"></div>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{# One <table class="sheet"> per comunicato: browsers repeat a table's thead
+   and tfoot on every printed page, so the letterhead and the footer appear on
+   all sheets of a document that runs long - not only on the first one. #}
+{# The named page must sit on a wrapper, not on the table itself: with
+   `page:` on the table Chrome stops repeating its thead across pages. #}
+<div class="sheet-wrap{% if doc.is_landscape %} landscape{% endif %}">
+<table class="sheet">
+  {# `head=False` (the on-screen preview) prints the table on its own: the app
+     page already carries the race and its distances above it. #}
+  <thead>
+    <tr><td>
+      {% if head %}
+      <div class="sheet-head">
+        {% if banner %}<div class="banner"><img src="{{ banner }}"></div>{% endif %}
+        <div class="head-body">
+          {# A provisional sheet carries no comunicato number: it is not one
+             yet, and a number on paper is a promise the jury has not made. #}
+          {% if doc.draft %}
+          <div class="comunicato-row">
+            <span class="bozza">NON DEFINITIVO</span>
+          </div>
+          {% elif doc.communique %}
+          <div class="comunicato-row">
+            <span class="comunicato">Comunicato n. {{ doc.communique }}
+              {%- if doc.pages %} pag. {{ doc.pages }}{% endif %}</span>
+          </div>
+          {% endif %}
+          <div class="title">{{ doc.title }}</div>
+          {% if doc.subtitle %}<div class="subtitle">{{ doc.subtitle }}</div>{% endif %}
+          {% if doc.info %}<div class="info">{{ doc.info }}</div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </td></tr>
+  </thead>
+
+  {# The repeated tfoot reserves the footer's height at the bottom of every
+     page the table spans; `.page-footer` in page.html.j2 is what actually
+     prints there, pinned to the paper edge. See print.css. #}
+  <tfoot>
+    <tr><td>
+      {% if footer %}{{ footer_block() }}{% endif %}
+    </td></tr>
+  </tfoot>
+
+  <tbody>
+    <tr><td>
+      <div class="doc">
+        {% for t in doc.tables %}{{ data_table(t) }}{% endfor %}
+
+        {# the key to the column headings belongs under the table it explains #}
+        {% if doc.legend %}<div class="legend">{{ doc.legend }}</div>{% endif %}
+
+        {% if doc.decision %}<div class="decisione">{{ doc.decision }}</div>{% endif %}
+
+        {# The scanned signature or the typed name, never both and never a
+           ruled line: which one is a setting (Impostazioni avanzate). #}
+        {% if signature or signature_name %}
+        <div class="signature">
+          <span class="sig-label">{{ signature_label }}</span>
+          {% if signature %}
+          <img src="{{ signature }}"{% if signature_style %} style="{{ signature_style }}"{% endif %}>
+          {% else %}
+          <span class="sig-name">{{ signature_name }}</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </td></tr>
+  </tbody>
+</table>
+</div>

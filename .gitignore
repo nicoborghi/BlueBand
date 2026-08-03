@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.benchmarks/
+.pytest_cache/
+.claude/
+.ruff_cache/
+HANDOFF.md
+
+# competition data: entry lists and results
+competitions/
+
+# copies of the last saved PDFs, served to the browser
+static/

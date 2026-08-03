@@ -1,0 +1,61 @@
+{% if standalone %}<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>{{ page_title }}</title>
+<style>{{ css|safe }}</style>
+{# A page of our own: nothing else lives on it, so it starts at the paper edge
+   like the print does - no default body margin around the letterhead. #}
+<style>html, body { margin: 0; padding: 0; }</style>
+{# Only when the document really runs over one sheet. The number has to sit in
+   a page margin box: that is the one place Chrome resolves counter(page) - in
+   the letterhead, or in the fixed footer, it prints 0/0, and a fixed element
+   pushed into the margin is clipped away. So the whole foot of the sheet moves
+   into that one box: the strip is its background, against the paper edge, and
+   "Emesso il ... · pag. 1/2" prints on top of the box, exactly where the
+   footline sits on a single sheet. #}
+{% if page_numbers %}
+{% set foot_box %}
+  content: "{{ printed_at }} · pag. " counter(page) "/" counter(pages);
+  font: 8pt "Helvetica Neue", Arial, sans-serif; color: #777;
+  width: 100%; text-align: right; padding-right: 8mm; vertical-align: top;
+{% if footer_img %}
+  background-image: url("{{ footer_img }}"); background-repeat: no-repeat;
+  background-position: bottom center; background-size: 100% auto;
+{% endif %}
+{% endset %}
+<style>
+@page { margin-bottom: {{ foot_mm }}mm; @bottom-center { {{ foot_box }} } }
+@page landscape { margin-bottom: {{ foot_mm_land }}mm; @bottom-center { {{ foot_box }} } }
+/* the foot is printed by the margin box now: the running copy would double it */
+.cmsr .page-footer { display: none; }
+/* ...and so would the copy in the repeated tfoot, which on a numbered sheet
+   reserves a second band of the same height *inside* the page - a strip's
+   worth of blank paper at the bottom of every page, on top of the margin the
+   strip already has. Dropped: the table gets those millimetres back, which is
+   often a whole batteria more per sheet. */
+.cmsr .doc-footer { display: none; }
+</style>
+{% endif %}
+</head>
+<body>
+{% else %}
+{# A fragment for a page that may already carry the stylesheet (the app injects
+   it once per run: st.html throws away the <style> of what it is given). #}
+{% if css %}<style>{{ css|safe }}</style>{% endif %}
+{% endif %}
+<div class="cmsr" style="--header-color: {{ header_color }}">
+{{ body|safe }}
+{# Printed at the bottom of every sheet (position: fixed); the copy inside each
+   document's tfoot only reserves the space. #}
+{% if footer %}
+<div class="page-footer">
+  <div class="footline">{{ printed_at }}</div>
+  {% if footer_img %}<div class="footer-strip"><img src="{{ footer_img }}"></div>
+  {% endif %}
+</div>
+{% endif %}
+</div>
+{% if standalone %}</body>
+</html>
+{% endif %}
