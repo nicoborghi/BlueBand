@@ -10,7 +10,7 @@
   <a href="https://claude.ai"><img src="https://img.shields.io/badge/built_with-Claude-orange?logo=anthropic&logoColor=white" alt="Built with Claude"></a>
 </p>
 
-Jury console for track cycling competitions: licence check, race management,
+Commissaire console for track cycling competitions: licence check, race management,
 classifications, decisions, communiqués. Based on streamlit.
 
 > [!NOTE]
