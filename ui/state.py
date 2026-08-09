@@ -6,7 +6,7 @@ this module is the only place that knows about `st.session_state`.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, replace
 
 import streamlit as st
 
@@ -24,7 +24,8 @@ PROGRAMME = "programme.yaml"
 # changes with the jury president.
 BRANDING_SETTINGS = ("signature", "header_img", "footer_img",
                      "signature_mode", "signature_name", "signature_scope",
-                     "name_style")
+                     "name_style", "name_width", "note_colors",
+                     "decision_codes")
 
 # What a squadra is here and what it is called: the programme states the rule,
 # this machine can override it (Impostazioni → Squadra).
@@ -44,6 +45,34 @@ def _load(path: str, mtime: float) -> Competition:
     return load_competition(path)
 
 
+def _stale_free(path: str, mtime: float) -> Competition:
+    """The cached programme, re-read when the code has moved on under it.
+
+    `st.cache_data` keeps the object across a hot reload, and it restores it
+    without running `__init__`: a field added to `Branding` (or to any other
+    part of the programme) since the object was cached is simply *not there* on
+    the instance, and the next `dataclasses.replace` raises AttributeError on a
+    running app - at the track, on a page that was working a minute ago.
+
+    So the cached object is checked against the dataclasses as they are now,
+    and a programme older than the code is dropped and read again. One `hasattr`
+    per field of three small dataclasses, once per rerun; the alternative is
+    telling the jury to restart the app.
+    """
+    comp = _load(path, mtime)
+    if _complete(comp):
+        return comp
+    _load.clear()
+    return _load(path, mtime)
+
+
+def _complete(comp: Competition) -> bool:
+    """Whether a cached programme still carries every field the code expects."""
+    return all(hasattr(obj, f.name)
+               for obj in (comp, comp.branding, comp.entry_sheet, comp.quotas)
+               for f in fields(obj))
+
+
 def competition(name: str) -> Competition | None:
     """The programme, with the local overrides from Impostazioni applied.
 
@@ -53,9 +82,13 @@ def competition(name: str) -> Competition | None:
     p = competitions_root() / name / PROGRAMME
     if not p.exists():
         return None
-    comp = _load(str(p), p.stat().st_mtime)
+    comp = _stale_free(str(p), p.stat().st_mtime)
     settings = open_competition(name).settings
-    over = {k: settings[k] for k in BRANDING_SETTINGS if settings.get(k)}
+    # an empty value is not a choice - a signature never set must not blank the
+    # one the programme carries - but False *is* one: a tick taken off in
+    # Impostazioni has to win over a programme that turns it on
+    over = {k: settings[k] for k in BRANDING_SETTINGS
+            if settings.get(k) or isinstance(settings.get(k), bool)}
     if over:
         comp = replace(comp, branding=replace(comp.branding, **over))
     over = {k: settings[k] for k in ENTRY_SETTINGS if settings.get(k)}

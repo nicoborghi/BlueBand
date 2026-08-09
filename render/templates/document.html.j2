@@ -43,7 +43,7 @@
    the block above - repeating them was noise. #}
 {% macro footer_block() -%}
 <div class="doc-footer">
-  <div class="footline">{{ printed_at }}</div>
+  {% if printed_at %}<div class="footline">{{ printed_at }}</div>{% endif %}
   {% if footer_img %}<div class="footer-strip"><img src="{{ footer_img }}"></div>
   {% endif %}
 </div>
@@ -102,7 +102,13 @@
         {# the key to the column headings belongs under the table it explains #}
         {% if doc.legend %}<div class="legend">{{ doc.legend }}</div>{% endif %}
 
-        {% if doc.decision %}<div class="decisione">{{ doc.decision }}</div>{% endif %}
+        {# The decisions taken in the race, each tinted by what it is, and last
+           the sheet's own note in the plain box. See render.Document.blocks. #}
+        {# `white-space: pre-line` in the box: the tag and the text stay on one
+           line here, or every block would open with a blank one. #}
+        {% for b in doc.blocks %}
+        <div class="decisione {{ b.kind }}">{% if b.title %}<span class="dec-tag">{{ b.title }}</span> {% endif %}{{ b.text }}</div>
+        {% endfor %}
 
         {# The scanned signature or the typed name, never both and never a
            ruled line: which one is a setting (Impostazioni avanzate). #}

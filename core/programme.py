@@ -111,7 +111,7 @@ def _competition_head(comp: Competition) -> list[str]:
 
 def _entries(comp: Competition) -> list[str]:
     e = comp.entry_sheet
-    if not (e.source or e.columns or e.ksport):
+    if not (e.source or e.columns or e.ksport or e.check_in):
         return []
     out = ["entries:"]
     if e.source:
@@ -121,7 +121,16 @@ def _entries(comp: Competition) -> list[str]:
     out.append(f"{INDENT}team_group: {e.team_group}")
     if e.team_name:
         out.append(f"{INDENT}team_name: {scalar(e.team_name)}")
-    for name, table in (("columns", e.columns), ("ksport", e.ksport)):
+    # the deroga that lets two rappresentative ride as one squadra: written
+    # back, or pressing Salva would quietly undo it
+    if e.team_merge:
+        out.append(f"{INDENT}team_merge:")
+        out += _mapping("", e.team_merge, level=2)
+        if e.team_merge_events:
+            out.append(f"{INDENT}team_merge_events: "
+                       f"{flow_list(e.team_merge_events)}")
+    for name, table in (("columns", e.columns), ("ksport", e.ksport),
+                        ("check_in", e.check_in)):
         if table:
             out.append(f"{INDENT}{name}:")
             out += _mapping("", table, level=2)
@@ -132,7 +141,7 @@ def _branding(comp: Competition) -> list[str]:
     b = comp.branding
     kept = _kept(b, "header_img", "footer_img", "color", "signature",
                  "signature_label", "signature_mode", "signature_name",
-                 "signature_scope", "name_style")
+                 "signature_scope", "name_style", "name_width")
     return _block("branding", [f"{INDENT}{k}: {scalar(v)}" for k, v in kept])
 
 

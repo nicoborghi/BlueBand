@@ -41,16 +41,56 @@ spesso ci si torna:
    non cambia mai, e riapplicato sopra il file nuovo. Se una modifica non ha
    più senso (l'atleta non è più iscritto) l'app lo dice in Verifica invece di
    perderla in silenzio.
+   Sotto c'è l'interruttore **Tieni le modifiche a parte (non scrivere nel
+   file)**. Spegnendolo si ribalta il verso: la Verifica **scrive direttamente
+   nel workbook**. Correggi un dorsale, una società o un'iscrizione nella
+   griglia, premi *Salva nel file iscritti*, e la cella viene modificata nel
+   file vero, che viene subito riletto. Prima di ogni scrittura una copia del
+   file finisce in `.snapshots/entries_source/`. È il modo di lavorare quando
+   il master è l'xlsx e lo si vuole tenere aggiornato.
+   Anche **verificato e NP** finiscono nel file, ma solo dove c'è una colonna
+   per loro: il formato federale non ce l'ha, la si aggiunge a mano (intestata
+   `Verificato` e `NP`) nei fogli di categoria e/o nel foglio `KSPORT`, e la si
+   dichiara nel programme sotto `entries.check_in`. L'app scrive `SI` in tutti
+   i fogli che hanno la colonna, così rileggendo il file la spunta c'è comunque;
+   dove la colonna manca l'app lo dice e la casella resta grigia.
+   Un limite resta: la riga viene riconosciuta
+   dall'**UCI ID** — se il file è stato modificato a mano nel frattempo, l'app
+   si ferma e chiede di ricaricare invece di scrivere sulla riga sbagliata.
+   Le modifiche già registrate a parte non si perdono: restano lì e tornano
+   riaccendendo l'interruttore.
 3. **Squadra** — che cos'è una squadra a questa manifestazione: *regione*
    (rappresentativa, a un campionato italiano), *società*, *provincia* o
    *nazione*, e **come si chiama sui documenti** (di default «Squadra»: cambia
    la parola in tutte le intestazioni stampate). Decide anche come si raggruppa
    il riepilogo per squadra in Documenti.
+   *Deroga — due regioni una squadra sola*: quando due rappresentative sono
+   autorizzate a schierare una squadra unica (a CITA26 Piemonte e Valle
+   d'Aosta nell'inseguimento a squadre), si dichiara nel `programme.yaml`,
+   sotto `entries:`:
+
+   ```yaml
+   team_merge:
+     "PIEMONTE": "PIEMONTE - V.D.A"
+     "VALLE D'AOSTA": "PIEMONTE - V.D.A"
+   team_merge_events: [ins_squadre]   # vuoto = tutte le prove a squadre
+   ```
+
+   Cambia solo come si compongono le squadre (e le coppie) di quelle prove e
+   il nome con cui corrono su partenti e risultati. Ogni atleta resta della
+   propria regione dappertutto: prove individuali, quote, riepilogo per
+   squadra.
 4. **Cartella dei comunicati** — dove finiscono i PDF. Può essere una cartella
    Drive condivisa con tutta la giuria, o una chiavetta. **Impostala prima del
    primo comunicato.**
 5. **Aspetto dei comunicati** — testata e piè di pagina (le immagini con sede e
    date), firma del segretario, e se un atleta si stampa su una o due colonne.
+   Con la colonna unica c'è anche quanto larga la vuoi: quello che la colonna
+   «Nome» non prende va alle colonne per cui il foglio si legge — volate, punti,
+   società. Qui c'è anche **come compaiono le decisioni sul comunicato** (§ 6):
+   il colore di squalifica, retrocessione, ammenda e ammonizione, e se stampare
+   il codice UCI compatto (`A1`, `C3`) in testa al riquadro — di norma no. La
+   nota resta grigia: non sanziona nessuno.
 6. **Programma** — sola lettura: che cosa dice il file della manifestazione, con
    distanze e giri calcolati. Il registro dei comunicati non è più qui: sta in
    *Documenti → Registro comunicati*, che dice anche quali sono già usciti e lo
@@ -134,6 +174,12 @@ di raggruppare:
   ogni specialità, con i totali. È la stessa tabella che sta in Verifica, ed è
   il foglio da leggere alla riunione.
 
+Su questi due ultimi modi — gli unici con una colonna per specialità — c'è
+*Nomi brevi al posto delle sigle*: le colonne si intestano «Ins. Individuale»,
+«Madison» invece di «IP», «MD», e la legenda delle sigle sotto la tabella
+sparisce perché non serve più. Le colonne però diventano più larghe: con molte
+specialità conviene lasciare le sigle.
+
 ### Registro comunicati
 
 Quali sono previsti, quali emessi, qual è il prossimo numero libero. Se un
@@ -163,6 +209,96 @@ corre davvero:
 | Keirin | Le batterie le compone la giuria, poi l'ordine di arrivo di ognuna |
 | Omnium | Le quattro prove, una dentro l'altra |
 
+### Le batterie che decide la giuria (madison e omnium)
+
+Dove il programma prevede delle **batterie di qualificazione**, chi corre in
+quale batteria non lo decide un risultato: lo decide la giuria, in una fase che
+non si corre — *Composizione coppie* nella madison, *Composizione batterie*
+nell'omnium. Si sceglie dal menù **Fase** come tutte le altre.
+
+La pagina è una griglia, una riga per coppia (o per atleta) e a fianco la
+batteria. **Distribuisci nelle batterie** le assegna a giro — 1ª, 2ª, 1ª, … —
+perché l'elenco è in ordine di regione o di dorsale e tagliarlo a metà
+metterebbe mezzo alfabeto in una batteria sola; poi ogni riga si corregge a
+mano. Nella madison si assegnano anche i numeri di coppia; nell'omnium no, gli
+atleti corrono col proprio dorsale.
+
+Sotto la griglia c'è **Non si qualificano le ultime N**: quante coppie (o
+quanti atleti) escono da *ogni* batteria, tra quelli partiti (UCI 3.2.157: mai
+meno di 2). Parte dal valore scritto nel programma — `eliminate` sulla fase di
+composizione — e la giuria può cambiarlo. La riga a fianco dice quanti restano.
+
+Da lì in poi tutto il resto dell'evento segue: ogni batteria parte solo con i
+suoi, i fogli dicono da soli quanti ne escono e quanti passano, e a batterie
+corse il pulsante *Carica in finale* (madison) / *Carica nelle prove* (omnium)
+porta i qualificati nelle gare che seguono — nell'omnium in tutte e quattro le
+prove, mescolati per batteria: 1° della 1ª, 1° della 2ª, 2° della 1ª, …
+**Chi non passa non è nella classifica della specialità.**
+
+**Due alla volta o una alla volta.** Nelle prove contro il tempo, sopra la
+griglia di composizione c'è *Come si corre*: **due alla volta (batterie)**,
+com'è di norma l'inseguimento — uno per rettilineo — oppure **una alla volta**,
+cioè un ordine di partenza come la velocità a squadre. È una scelta della
+giuria su *questa* prova: si salva con la gara e i fogli (partenti e risultati)
+seguono, contando le partenze invece delle batterie. Cambiandola, quello che
+hai già composto resta nello stesso ordine: cambia solo quanti stanno su una
+riga. Nelle finali non viene chiesto — si corre due contro due comunque.
+
+**Finali non disputate.** Sotto i tempi, nella fase di finale, c'è *Finali non
+disputate*: per la 1°/2° e per la 3°/4° un menù a tendina con **Disputata** (di
+default: decide il tempo corso in finale), **Pari merito** e **Tempi
+qualifiche**.
+
+- *Pari merito*: nessuno dei due posti viene assegnato da solo, le due squadre
+  (o i due atleti) si classificano insieme al posto più basso dei due —
+  entrambe **2°**, o entrambe **4°**, e **senza tempo**: quella finale non è
+  stata corsa. Sulla 1°/2° il primo posto resta vuoto e la classifica non
+  nomina nessun campione.
+- *Tempi qualifiche*: la finale non si corre ma si decide lo stesso, sul tempo
+  delle qualificazioni — l'unico che hanno corso, ed è quello che finisce in
+  colonna. Restano un primo e un secondo.
+
+In tutti i casi chi sta sotto non si sposta: il quinto resta quinto.
+
+### Le decisioni della giuria, nella barra laterale
+
+Sotto i campi degli stati (`DNS`, `DNF`, `ABD`, `DSQ`, `REL`) c'è il pannello
+**Decisioni**. Si apre con il **riassunto della specialità** — che cosa è già
+stato deciso in ogni fase, dalle qualificazioni in avanti — e con chi porta
+un'ammonizione. Poi il pulsante **➕ Nuova decisione**, che apre il modulo:
+
+- il **dorsale**, scelto tra i partenti e mostrato con il nome (`12 ROSSI
+  Mario`), non scritto a memoria (`Altro...` per chi non è in elenco);
+- la **penalità UCI compatta**: il provvedimento (A, B, C, D) e l'articolo
+  della tabella UCI, che insieme fanno il codice `A1`, `C3`, `D5`;
+- il **testo**: **Ricomponi** lo propone dai campi qui sopra, nello stile delle
+  decisioni già registrate, e resta modificabile — è una proposta, decide la
+  giuria.
+
+Categoria, specialità, fase e giornata le mette l'app: sono quelle della gara
+aperta. Sotto al pannello ci sono le decisioni già registrate in **questa
+fase**: dorsale, codice e testo si correggono e si eliminano da lì, senza
+uscire dalla gara. Che cosa succede dopo un'ammonizione: § 6.
+
+La spunta **Ammonizioni (W) sui fogli** mette (o toglie) la W degli ammoniti
+sui fogli di questa specialità.
+
+`ABD` compare solo nelle prove di gruppo: è chi scende dalla pista di sua
+volontà, va in classifica dietro ai ritirati e non stampa punti.
+
+### Mentre la gara è in corso
+
+Sopra l'anteprima, in rosso, l'app dice quello che è appena stato scritto — lo
+stesso riquadro nei due casi, perché si legge per la stessa ragione:
+
+- in una prova di gruppo, l'**ultima volata** come è stata chiamata, i quattro
+  che vanno a punti in grassetto;
+- in una gara a cronometro, il **tempo appena preso**: il tempo in grassetto, il
+  dorsale e il nome, e il posto che occupa *per ora*.
+
+La pagina inoltre riapre il foglio su cui l'avevi lasciata: se esci da Gare
+mentre sei sui *Risultati*, ci ritrovi i risultati, non l'ordine di partenza.
+
 ### Le segnalazioni rosse sotto i campi
 
 Ogni campo dove si scrivono dorsali controlla quello che è stato scritto e lo
@@ -189,7 +325,8 @@ l'unico pulsante della pagina che cambia un'altra gara:
 
 - *Carica Turno 1*, *Carica Quarti*, *Carica Semifinali*, *Carica Finali* nella
   velocità e nel keirin;
-- *Carica in finale* nella madison a batterie;
+- *Carica in finale* nella madison a batterie, *Carica nelle prove* nell'omnium
+  con le batterie di qualificazione;
 - *Carica Finali* nell'inseguimento e nella velocità a squadre.
 
 Se manca ancora un risultato lo dice e non compone niente.
@@ -215,27 +352,85 @@ corregge a mano.
 
 ## 6. Decisioni
 
-Il quaderno del segretario di giuria: **un campo di testo grande** e niente
-altro fra i piedi. Si scrive quello che la giuria ha deciso — un reclamo, una
-penalità, una deroga, una partenza negata — e si preme *Registra la decisione*.
-Ogni decisione prende un numero e resta con la manifestazione
-(`decisions.json`); si può correggere (**Correggi**) o eliminare.
+Ogni decisione è una **riga di un registro**: giornata, categoria, specialità,
+fase, dorsale, la **penalità UCI compatta** (`A1`, `C3`, `D5` — provvedimento e
+articolo) e il testo che va sul comunicato. Resta con la manifestazione
+(`decisions.json`), numerata nell'ordine in cui è stata presa.
 
-I selettori in cima (giornata, categoria, specialità, dorsali) servono solo a
-ritrovarla dopo: non entrano nel testo.
+**Si scrivono di norma nella gara in cui sono state prese**: nella barra
+laterale di Gare (§ 4), dove categoria, specialità e fase sono quelle della
+gara aperta. Lo stesso modulo è qui, con **➕ Nuova decisione**, e in più la
+fase si sceglie: serve quando la giuria si accorge dopo, o quando la gara non è
+aperta sullo schermo.
 
-Due pannelli a scomparsa:
+La pagina si legge in tre modi:
 
-- **Penalità rapide**, sopra il campo di testo — si sceglie il motivo dalla
-  tabella UCI e il provvedimento, e la riga si aggiunge in fondo al testo già
-  scritta come va sul comunicato: `AL 1 ROSSI Mario: RETROCESSIONE (C) per aver
-  pedalato sulla fascia azzurra`. Resta modificabile. I quattro provvedimenti
-  sono **A** ammonizione, **B** ammenda, **C** retrocessione,
-  **D** squalifica. Se hai scritto i dorsali qui sopra, l'atleta viene chiamato
-  per nome e categoria.
-- **Cosa prevede il PUIS**, sotto — il prontuario federale, nella colonna delle
-  categorie in gara, con una casella di ricerca su infrazione e sanzione. Si
-  consulta e basta: decide la giuria.
+- **Decisioni della specialità** — scelte categoria e specialità, che cosa è
+  stato deciso in ciascuna fase. È il riassunto che la giuria firma;
+- **Registro delle decisioni** — la tabella di tutto, filtrabile e da
+  **stampare in PDF**;
+- **Decisioni registrate** — una per una, nell'ordine in cui sono state prese,
+  con *Correggi* per rimettere a posto dorsale, codice o testo, ed eliminare.
+
+I quattro provvedimenti sono **A** ammonizione, **B** ammenda,
+**C** retrocessione, **D** squalifica.
+
+### Come compaiono sul comunicato
+
+Sul foglio della gara ogni decisione è un **riquadro colorato** sotto la
+tabella, con il testo per esteso. Il colore dice che cos'è, da lontano:
+
+| | |
+|---|---|
+| **Squalifica** | rosso |
+| **Retrocessione** | arancio chiaro |
+| **Ammenda** | viola |
+| **Ammonizione** | giallo |
+| **Nota** | grigio, come sempre |
+
+La **nota** è l'altra cosa, e resta separata: è quella che ricorda come si
+svolge il torneo, chi è qualificato, quanti passano. Si scrive nel campo
+*Decisione / note* del foglio, e stampa per ultima.
+
+Tinte e codice si cambiano in **Impostazioni → Aspetto dei comunicati →
+Decisioni sui comunicati** (§ 2). Il **codice UCI compatto** (`A1`, `C3`) in
+testa al riquadro è **spento**: sul comunicato va la decisione scritta per
+esteso, il codice resta nel registro della giuria. Chi lo cita sulla carta lo
+accende lì, una volta per manifestazione.
+
+Le decisioni escono **una volta sola**, con i **risultati** della fase in cui
+sono state prese — non sull'ordine di partenza, che va fuori prima che si
+corra, e **non sulla classifica**, che è il foglio dell'ordine d'arrivo della
+specialità e non un nuovo elenco di sanzioni. L'unica eccezione è la
+specialità che si chiude con la sola classifica: lì la classifica *è* il
+foglio della fase, e le porta.
+
+### L'ammonizione viaggia
+
+L'ammonizione (provvedimento **A**) è l'unica decisione che non finisce con la
+gara in cui è stata presa:
+
+- l'atleta ammonito porta una **W** attaccata al dorsale (`1 W`) su **tutti i
+  fogli delle fasi successive della stessa specialità** — non su quelli della
+  fase in cui è stata presa, che portano già la decisione, e non sulla
+  classifica, che non è una gara in cui entrare ammoniti. La spunta
+  *Ammonizioni (W) sui fogli*, nella barra laterale di Gare, la toglie dalla
+  stampa;
+- **due ammonizioni nella stessa fase sono una squalifica**: l'app lo dice e
+  scrive il dorsale nel campo `DSQ` della gara, dove resta modificabile.
+
+La spunta *Includi le ammonizioni* decide se finiscono nel registro stampato:
+toglila per avere solo le decisioni che vanno pubblicate.
+
+Sotto, due tabelle che si consultano e basta:
+
+- **Penalità UCI** — la formulazione ufficiale di ogni infrazione, numerata come
+  la numera l'UCI: è il numero del codice compatto, e la frase che *Ricomponi*
+  propone — `AL 1 ROSSI MARIO: RETROCESSIONE (C) per essere transitato sulla
+  fascia azzurra.`
+- **Cosa prevede il PUIS** — il prontuario federale, nella colonna delle
+  categorie in gara, con una casella di ricerca su infrazione e sanzione.
+  Decide la giuria.
 
 ---
 
@@ -299,10 +494,16 @@ cose che cambiano.
 | Sigla | Significato | In classifica |
 |---|---|---|
 | `REL` | Declassato | **Resta classificato**, in coda: stampa `8° REL` |
-| `DNF` | Ritirato: partito, non arrivato | Fuori classifica |
-| `DNS` | Non partito | Fuori classifica |
-| `DSQ` | Squalificato | Fuori classifica |
+| `DNF` | Ritirato: partito, non arrivato | Fuori classifica, **tiene i punti** |
+| `ABD` | Sceso dalla pista di sua volontà (solo prove di gruppo) | Fuori classifica, **senza punti** |
+| `DNS` | Non partito | **Non compare in classifica**: solo una nota sotto la tabella |
+| `DSQ` | Squalificato | Fuori classifica, in fondo a tutti |
 | `NP` | Non partente, dichiarato prima della gara | Non compare tra i partenti |
+| `W` | Ammonito (non è uno stato: viene dalle Decisioni) | Una **W** attaccata al dorsale (`1 W`), fino alla fine della specialità |
+
+Nelle prove di gruppo i ritirati si scrivono **nell'ordine in cui lasciano la
+gara**: l'ultimo che lascia è il primo dei ritirati, perché è quello che è
+andato più avanti. Vale per `DNF` e per `ABD`, ciascuno nel suo campo.
 
 Due precisazioni che contano:
 

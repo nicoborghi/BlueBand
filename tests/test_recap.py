@@ -139,6 +139,25 @@ def test_the_column_heads_are_abbreviated_and_keyed_under_the_table(el, comp):
     assert comp.event("madison").short in doc.legend
 
 
+def test_the_short_names_can_head_the_columns_instead_of_the_sigle(el, comp):
+    """«Madison» over the column instead of «MD» keyed under the table.
+
+    The sigla is right where a dozen specialità have to fit; a manager reading
+    their own squadra would rather not look anything up.
+    """
+    doc = D.team_recap(el, comp, "Emilia-Romagna", short_headers=True)
+    heads = [c.label for c in doc.tables[0].columns][-2:]
+    assert heads == [comp.event("velocita").short, comp.event("madison").short]
+    # nothing to key any more, but what the caselle say is still explained
+    assert comp.event("madison").abbr not in doc.legend
+    assert "X iscritto" in doc.legend
+    # and the head is what has to fit: the columns are wider than the marks
+    abbr = D.team_recap(el, comp, "Emilia-Romagna")
+    assert (next(c.pct for c in doc.tables[0].columns if c.key == "ev_madison")
+            > next(c.pct for c in abbr.tables[0].columns
+                   if c.key == "ev_madison"))
+
+
 def test_a_composed_batteria_follows_the_mark(el, comp):
     heats = {("AL", "velocita", "a"): ("Qualificazioni", 2)}
     doc = D.team_recap(el, comp, "Emilia-Romagna", heats=heats)
@@ -203,3 +222,11 @@ def test_the_speciality_table_prints(el, comp):
     assert "Totale" in html
     # the sigle of the specialità are keyed under the table
     assert "SP = Velocità" in html
+
+
+def test_the_speciality_table_can_be_headed_by_the_short_names(el, comp):
+    doc = D.speciality_table(el, comp, short_headers=True)
+    html = to_html(doc, comp)
+    assert comp.event("velocita").short in html
+    # the head says it: there is no key left to print
+    assert "SP = Velocità" not in html and doc.legend == ""

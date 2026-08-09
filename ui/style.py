@@ -17,6 +17,7 @@ from __future__ import annotations
 import streamlit as st
 
 from render.render import stylesheet
+from ui import icons
 
 # A zero-height component iframe is a control that does something and shows
 # nothing: the scroll script, and the one that opens a saved comunicato in a
@@ -63,10 +64,36 @@ section[data-testid="stSidebar"] .st-key-page label:has(input:checked) {
 section[data-testid="stSidebar"] .st-key-page label:has(input:checked) p {
     font-weight: 600;
 }
+/* one icon per page, in the order the pages are listed (`ui.icons.NAV`).
+   Drawn as a mask, not as an image: the shape is the glyph and the colour is
+   the row's own, so it follows the theme - and the current page - by itself. */
+section[data-testid="stSidebar"] .st-key-page label::before {
+    content: "";
+    flex: 0 0 auto;
+    align-self: center;
+    width: 1.05em;
+    height: 1.05em;
+    margin-right: .6rem;
+    background-color: currentColor;
+    opacity: .75;
+    -webkit-mask: var(--fa) no-repeat center / contain;
+    mask: var(--fa) no-repeat center / contain;
+}
+section[data-testid="stSidebar"] .st-key-page label:has(input:checked)::before {
+    opacity: 1;
+}
 """
+
+
+def _nav_icons() -> str:
+    """The icon of each page, keyed on its position in the picker."""
+    return "\n".join(
+        f'section[data-testid="stSidebar"] .st-key-page '
+        f"label:nth-of-type({i}) {{ --fa: {icons.data_uri(name)}; }}"
+        for i, name in enumerate(icons.NAV, start=1))
 
 
 def inject() -> None:
     """Put print.css on the page. Cheap enough to repeat on every run."""
-    st.markdown(f"<style>{stylesheet()}{_HIDDEN_FRAMES}{_NAV}</style>",
-                unsafe_allow_html=True)
+    st.markdown(f"<style>{stylesheet()}{_HIDDEN_FRAMES}{_NAV}"
+                f"{_nav_icons()}</style>", unsafe_allow_html=True)

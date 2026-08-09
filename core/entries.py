@@ -21,6 +21,12 @@ Column headings are never hard-coded: `entries.columns` and `entries.ksport` in
 programme.yaml map the file's Italian headings to the field names used here,
 matched by name rather than by position, so a shifted column does not silently
 import garbage and a differently-worded export is a config change.
+
+`entries.check_in` is the third mapping and the odd one out: the two columns of
+the licence check (`Verificato`, `NP`) are not in the federation's layout at
+all - the giuria adds them to the workbook itself. Wherever they are, on the
+category sheets or on the KSPORT one, they are read on import and written back
+by `write_back`; where they are not, the check lives in the overlay as before.
 """
 
 from __future__ import annotations
@@ -73,6 +79,21 @@ def _uci(v: Any) -> str:
     if s.endswith(".0"):
         s = s[:-2]
     return "".join(ch for ch in s if ch.isdigit())
+
+
+#: What a ticked cell is written as. The workbook says SI / NO in its own
+#: columns (`Riserva`), so the licence check speaks the same language: a
+#: checkbox written as TRUE would read as English in an Italian file.
+YES = "SI"
+
+#: Everything read back as ticked: the app writes SI, the giuria types whatever
+#: is at hand - an X, a flag typed in Excel as a boolean.
+YES_VALUES = ("SI", "S", "YES", "X", "TRUE", "VERO", "1")
+
+
+def _yes(v: Any) -> bool:
+    """Is this cell a tick? (blank, NO and anything else are not)."""
+    return _s(v).upper() in YES_VALUES
 
 
 def _date(v: Any) -> str:
@@ -269,13 +290,18 @@ def _read_category_sheet(ws, cat: str, el: EntryList, headers: dict[str, str],
                                row=sheet.header_row))
 
     # Event columns run from the first column after the last fixed one until the
-    # first blank header; anything past that is a hidden helper column.
+    # first blank header; anything past that is a hidden helper column. The
+    # check-in columns are added by the giuria wherever there is room - before
+    # the specialità or after them - so they count as neither boundary.
     event_cols: dict[int, str] = {}
-    for c in range(max(at.values(), default=len(sheet.fields)) + 1,
+    fixed = [c for f, c in at.items() if f not in CHECK_IN_FIELDS]
+    for c in range(max(fixed, default=len(sheet.fields)) + 1,
                    ws.max_column + 1):
         h = hdr.get(c, "")
         if not h:
             break
+        if sheet.field_of(h):        # a column we already know by name
+            continue
         code = _match_event(h, headers)
         if code:
             event_cols[c] = code
@@ -308,6 +334,8 @@ def _read_category_sheet(ws, cat: str, el: EntryList, headers: dict[str, str],
             nation=_s(cell(r, "nation")) or "ITA",
             club=_s(cell(r, "club")), club_code=_s(cell(r, "club_code")),
             region=norm_region(cell(r, "region")), source=f"{ws.title}!{r}",
+            checked_in=_yes(cell(r, "checked_in")),
+            not_starting=_yes(cell(r, "not_starting")),
         )
         for c, code in event_cols.items():
             e = parse_flag(ws.cell(r, c).value)
@@ -338,7 +366,7 @@ def _enrich_from_ksport(ws, el: EntryList, sheet: EntrySheet,
         return row[i] if i is not None and i < len(row) else None
 
     seen = set()
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for r, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         uci = _uci(col(row, "uci_id"))
         if not uci:
             continue
@@ -356,6 +384,13 @@ def _enrich_from_ksport(ws, el: EntryList, sheet: EntrySheet,
         rider.reserve_entry = _s(col(row, "reserve_entry")).upper() \
             in ("SI", "S", "YES")
         rider.certificate_date = _date(col(row, "certificate_date"))
+        rider.ksport_source = f"{ws.title}!{r}"
+        # The licence check lives in both places when the giuria added the
+        # columns to both: a tick anywhere counts, so a rider verified by hand
+        # in the foglio di categoria is not undone by a blank KSPORT cell (and
+        # the other way round). Untick from the app clears both at once.
+        rider.checked_in = rider.checked_in or _yes(col(row, "checked_in"))
+        rider.not_starting = rider.not_starting or _yes(col(row, "not_starting"))
         if not rider.region:
             rider.region = (norm_region(col(row, "region"))
                             or _resolve_region_from_note(rider.note)
@@ -496,6 +531,8 @@ def import_ksport_export(path: str | Path, comp: Competition) -> EntryList:
             reserve_entry=_s(val(row, "reserve_entry")).upper()
             in ("SI", "S", "YES"),
             certificate_date=_date(val(row, "certificate_date")),
+            checked_in=_yes(val(row, "checked_in")),
+            not_starting=_yes(val(row, "not_starting")),
             source=f"{path.name}!{i + 2}",
         )
         # a categoria the programme does not run: the rider would be on no
@@ -546,10 +583,19 @@ def build_teams_and_pairs(el: EntryList, comp: Competition) -> None:
             _build_pairs(el, comp, code)
 
 
-def _by_region(riders: Iterable[Rider]) -> dict[str, list[Rider]]:
+def _by_region(riders: Iterable[Rider],
+               merge: dict[str, str] | None = None) -> dict[str, list[Rider]]:
+    """Riders by regione, in bib order.
+
+    `merge` puts two rappresentative in the same bucket under one name, where
+    they were authorised to field a squadra together (`Competition.team_merge`).
+    Passed only where the squadre are composed: everything else - the quote
+    above all - counts each regione as itself.
+    """
     out: dict[str, list[Rider]] = {}
     for r in sorted(riders, key=lambda r: (r.bib or 9999, r.last_name)):
-        out.setdefault(r.region or "?", []).append(r)
+        region = r.region or "?"
+        out.setdefault((merge or {}).get(region, region), []).append(r)
     return out
 
 
@@ -565,11 +611,14 @@ def _build_teams(el: EntryList, comp: Competition, event: str, size: int) -> Non
     invent a quartetto the jury never decided. A lettered squadra that does not
     field exactly `size` riders is an error: the jury wrote it, so it has to
     be right. An `X` region is still provisional and only warns.
+
+    Two rappresentative authorised to ride together (`entries.team_merge`) are
+    one region here, under the name of the joint squadra.
     """
     for cat in comp.cat_order():
         pool = [r for r in el.riders.values()
                 if r.cat == cat and event in r.events and not r.not_starting]
-        for region, riders in _by_region(pool).items():
+        for region, riders in _by_region(pool, comp.team_merge(event)).items():
             lettered: dict[int, list[Rider]] = {}
             spare: dict[int, list[Rider]] = {}   # AR, BR, ...: per squadra
             loose: list[Rider] = []              # X, still to be assigned
@@ -625,7 +674,7 @@ def _build_pairs(el: EntryList, comp: Competition, event: str) -> None:
     for cat in comp.cat_order():
         pool = [r for r in el.riders.values()
                 if r.cat == cat and event in r.events and not r.not_starting]
-        for region, riders in _by_region(pool).items():
+        for region, riders in _by_region(pool, comp.team_merge(event)).items():
             numbered: dict[int, list[Rider]] = {}
             unnumbered: list[Rider] = []
             reserves: list[Rider] = []
@@ -687,6 +736,16 @@ OPS = ("set_field", "set_checked_in", "set_not_starting", "set_event",
 # Ticking a rider in at the licence desk needs no written reason; every other
 # edit does. See ui/pages/verifica.py.
 CHECK_IN_OPS = ("set_checked_in", "set_not_starting")
+
+#: The same two, as rider fields. The federation's file has no column for them:
+#: they are written back only where the giuria added one (`entries.check_in`).
+CHECK_IN_FIELDS = ("checked_in", "not_starting")
+
+
+def check_in_columns(comp: Competition) -> tuple[str, ...]:
+    """Which of the two the entry file is declared to have a column for."""
+    declared = set(comp.entry_sheet.check_in.values())
+    return tuple(f for f in CHECK_IN_FIELDS if f in declared)
 
 # Names used before the code moved to English, still readable from an overlay
 # written by an earlier version.
@@ -785,11 +844,40 @@ def save_overlay(store, patches: list[Patch], action: str = "edit_entries") -> N
     store.write_json(OVERLAY_FILE, patches_to_json(patches), action=action)
 
 
-def effective_entries(store, comp: Competition) -> tuple[EntryList | None, list[str]]:
-    """Import snapshot + overlay applied. Returns (list, stale-patch messages)."""
+#: Whether the jury's edits are applied on top of the import at all. On by
+#: default, and it is what the Verifica page is for. Off, the entry list *is*
+#: the workbook: the file is the one place the entries are changed, and it is
+#: re-imported. The overlay is not deleted - it is set aside, and comes back
+#: whole the moment the setting goes back on.
+OVERLAY_SETTING = "use_overlay"
+
+
+def overlay_on(store) -> bool:
+    """Whether the overlay of jury edits is in force (Impostazioni)."""
+    return store.settings.get(OVERLAY_SETTING, True) is not False
+
+
+def set_overlay_on(store, on: bool) -> None:
+    # written even when it is False: `set_setting` drops None and "", not False
+    store.set_setting(OVERLAY_SETTING, bool(on))
+
+
+def effective_entries(store, comp: Competition, *, overlay: bool | None = None
+                      ) -> tuple[EntryList | None, list[str]]:
+    """Import snapshot + overlay applied. Returns (list, stale-patch messages).
+
+    `overlay` overrides the setting, for a caller that has to see one or the
+    other whatever the competition is set to.
+    """
     el = load_import(store)
     if el is None:
         return None, []
+    if not (overlay_on(store) if overlay is None else overlay):
+        # the squadre and the coppie are read off the entries, and applying the
+        # overlay is what normally builds them: with no overlay to apply they
+        # still have to be built
+        build_teams_and_pairs(el, comp)
+        return el, []
     stale = apply_overlay(el, load_overlay(store), comp)
     return el, stale
 
@@ -992,6 +1080,237 @@ def validate_entries(el: EntryList, comp: Competition) -> list[Issue]:
                     "quota_teams", cat=cat, event=comp.event(event).short,
                     region=region, n=n, max=lim)))
     return issues
+
+
+# ── writing the entries back into the workbook ──────────────────────────────
+#
+# With the overlay off (`OVERLAY_SETTING`) the workbook is the master and the
+# app edits it: what the jury types in Verifica is written into the file
+# itself, which is then re-imported. Only what the file has a column for can be
+# written, and the previous version is always copied aside first, because this
+# is the one file the app does not own.
+
+#: The edits a workbook can hold. The licence check is written too, but only
+#: where a column for it exists (`entries.check_in`): the federation's layout
+#: has none, so it is the giuria that adds it - see `_write_check_in`.
+WRITABLE_OPS = ("set_field", "set_event", "clear_event", "set_pair")
+
+#: Where the copy of the file made before writing to it goes, under the
+#: competition folder - never next to the original, which may be a Drive folder
+#: the federation also writes to.
+SOURCE_BACKUP = "entries_source"
+
+
+def backup_source(store, path: str | Path) -> Path:
+    """Copy the entry workbook aside, under the competition's snapshots."""
+    import shutil
+
+    path = Path(path)
+    folder = Path(store.root) / ".snapshots" / SOURCE_BACKUP
+    folder.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dst = folder / f"{stamp}_{path.name}"
+    n = 0
+    while dst.exists():
+        n += 1
+        dst = folder / f"{stamp}-{n}_{path.name}"
+    shutil.copy2(path, dst)
+    store.journal(action="backup_entries_source", target=str(path))
+    return dst
+
+
+def write_back(path: str | Path, comp: Competition, el: EntryList,
+               patches: list[Patch], *, store=None) -> tuple[int, list[str]]:
+    """Write the jury's edits into the entry workbook itself.
+
+    `el` is the list as imported: the patches are applied to it and every cell
+    they touch is written with the *resulting* value, so the file ends up
+    saying exactly what the app shows. Returns how many cells were written and
+    the edits the file has no place for, each with its reason.
+
+    The rows are found through `Rider.source` - the sheet and row each rider
+    was read from - and checked against the UCI ID before anything is written:
+    a file edited by hand since the import must not have the wrong line
+    overwritten.
+    """
+    import openpyxl
+
+    path = Path(path)
+    if path.suffix.lower() != ".xlsx":
+        # openpyxl writes .xlsx only, and a silent no-op here would look like
+        # a save that worked
+        return 0, [msg("write_back_not_xlsx", file=path.name)]
+
+    refused = list(apply_overlay(el, patches, comp))
+    flat = is_flat_export(path, comp)
+    if store is not None:
+        backup_source(store, path)
+
+    # not `data_only`: read that way, every formula in the workbook would be
+    # saved back as the value it last held
+    wb = openpyxl.load_workbook(path)
+    headers = _events_by_header(comp)
+    maps: dict[str, tuple[dict[str, int], dict[str, int]]] = {}
+    written = 0
+
+    for p in patches:
+        rider = el.riders.get(p.target)
+        if rider is None:
+            continue                      # apply_overlay already said so
+        op = LEGACY_OPS.get(p.op, p.op)
+        if op in CHECK_IN_OPS:
+            n, why = _write_check_in(wb, rider, _op_field(op),
+                                     comp.entry_sheet, flat, headers, maps)
+            written += n
+            refused += why
+            continue
+        if op not in WRITABLE_OPS:
+            refused.append(msg("write_back_no_column", name=rider.full_name,
+                               what=label(LEGACY_KEYS.get(p.field, p.field)
+                                          or _op_field(op))))
+            continue
+        found = _locate_row(wb, rider, comp.entry_sheet, flat, headers, maps)
+        if found is None:
+            refused.append(msg("write_back_row_gone", name=rider.full_name,
+                               source=rider.source or "?"))
+            continue
+        ws, row, at, event_cols = found
+
+        if op == "set_field":
+            field = LEGACY_KEYS.get(p.field, p.field)
+            col = at.get(field)
+            if col is None:
+                refused.append(msg("write_back_no_column",
+                                   name=rider.full_name, what=label(field)))
+                continue
+            value = getattr(rider, field, None)
+        else:
+            code = p.field
+            col = event_cols.get(code)
+            if col is None:
+                refused.append(msg("write_back_no_event_column",
+                                   name=rider.full_name,
+                                   event=comp.event(code).short))
+                continue
+            e = rider.events.get(code)
+            value = e.flag if e else None
+
+        ws.cell(row, col).value = value if value not in ("", None) else None
+        written += 1
+
+    if written:
+        wb.save(path)
+    wb.close()
+    return written, refused
+
+
+def _op_field(op: str) -> str:
+    """The field name behind an op that does not carry one."""
+    return {"set_checked_in": "checked_in",
+            "set_not_starting": "not_starting"}.get(op, op)
+
+
+def _write_check_in(wb, rider: Rider, field: str, sheet: EntrySheet, flat: bool,
+                    headers: dict[str, str], maps: dict) -> tuple[int, list[str]]:
+    """Tick verificato / NP in every sheet that has a column for it.
+
+    The master workbook carries the same rider twice - on the foglio di
+    categoria the giuria prints and on the KSPORT sheet the federation sent -
+    so both are written and a re-import reads the same answer from either one.
+    Written as SI / blank, the way the workbook writes its own yes-no columns.
+    """
+    value = YES if getattr(rider, field, False) else None
+    rows = [r for r in (_locate_row(wb, rider, sheet, flat, headers, maps),
+                        _locate_ksport_row(wb, rider, sheet, maps))
+            if r is not None]
+    if not rows:
+        return 0, [msg("write_back_row_gone", name=rider.full_name,
+                       source=rider.source or "?")]
+    written = 0
+    for ws, row, at, _ in rows:
+        col = at.get(field)
+        if col is None:
+            continue
+        ws.cell(row, col).value = value
+        written += 1
+    if not written:
+        return 0, [msg("write_back_no_column", name=rider.full_name,
+                       what=label(field))]
+    return written, []
+
+
+def _locate_ksport_row(wb, rider: Rider, sheet: EntrySheet, maps: dict):
+    """The rider's row on the KSPORT sheet, checked against the UCI ID."""
+    name, _, r = (rider.ksport_source or "").rpartition("!")
+    row = _int(r)
+    if not row or name not in wb.sheetnames:
+        return None
+    ws = wb[name]
+    if row > ws.max_row:
+        return None
+    if ws.title not in maps:
+        # the KSPORT sheet reads by the `ksport` mapping and heads its first
+        # row, exactly like the flat export
+        maps[ws.title] = _sheet_columns(ws, sheet, True, {})
+    at, event_cols = maps[ws.title]
+    col = at.get("uci_id")
+    if not col or not rider.uci_id:
+        return None
+    if _uci(ws.cell(row, col).value) != rider.uci_id:
+        return None
+    return ws, row, at, event_cols
+
+
+def _locate_row(wb, rider: Rider, sheet: EntrySheet, flat: bool,
+                headers: dict[str, str], maps: dict):
+    """(worksheet, row, fields->col, events->col) for one rider, or None."""
+    name, _, r = (rider.source or "").rpartition("!")
+    row = _int(r)
+    ws = (wb[name] if name in wb.sheetnames
+          else wb.worksheets[0] if flat and wb.worksheets else None)
+    if ws is None or not row or row > ws.max_row:
+        return None
+    if ws.title not in maps:
+        maps[ws.title] = _sheet_columns(ws, sheet, flat, headers)
+    at, event_cols = maps[ws.title]
+
+    # the row has to still be this rider: the file may have been edited, or
+    # rows inserted, since the import it was read from
+    uci_col, name_col = at.get("uci_id"), at.get("last_name")
+    if rider.uci_id and uci_col:
+        if _uci(ws.cell(row, uci_col).value) != rider.uci_id:
+            return None
+    elif name_col:
+        if _s(ws.cell(row, name_col).value).upper() != rider.last_name.upper():
+            return None
+    else:
+        return None
+    return ws, row, at, event_cols
+
+
+def _sheet_columns(ws, sheet: EntrySheet, flat: bool, headers: dict[str, str]
+                   ) -> tuple[dict[str, int], dict[str, int]]:
+    """Which column holds which field, and which one holds which event.
+
+    The same rule the import reads by: matched on the heading, never on the
+    position, so a workbook with a column inserted still writes where it reads.
+    """
+    header_row = 1 if flat else sheet.header_row
+    at: dict[str, int] = {}
+    event_cols: dict[str, int] = {}
+    for c in range(1, ws.max_column + 1):
+        h = _s(ws.cell(header_row, c).value)
+        if not h:
+            continue
+        field = (sheet.field_of(h, ksport=True) or sheet.field_of(h) if flat
+                 else sheet.field_of(h))
+        if field:
+            at.setdefault(field, c)
+        elif not flat:
+            code = _match_event(h, headers)
+            if code:
+                event_cols.setdefault(code, c)
+    return at, event_cols
 
 
 # ── export ──────────────────────────────────────────────────────────────────

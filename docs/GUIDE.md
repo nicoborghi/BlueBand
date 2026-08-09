@@ -44,17 +44,55 @@ back to it:
    recorded separately against the **UCI ID**, which never changes, and
    re-applied on top of the new file. An edit that no longer applies is
    reported on Verifica instead of being silently dropped.
+   Under it sits the **Tieni le modifiche a parte** (keep the edits aside)
+   switch. Turning it off reverses the direction: Verifica **writes the
+   workbook itself**. Fix a bib, a club or an event entry in the grid, press
+   *Salva nel file iscritti*, and the cell is changed in the real file, which
+   is re-read straight away. A copy of the previous file goes to
+   `.snapshots/entries_source/` before every write. This is the way to work
+   when the xlsx is the master and you want it kept up to date.
+   **Checked-in and NP** go into the file too, but only where there is a column
+   for them: the federal layout has none, so you add it by hand (headed
+   `Verificato` and `NP`) on the category sheets and/or on the `KSPORT` sheet,
+   and declare it in the programme under `entries.check_in`. The app writes
+   `SI` on every sheet that has the column, so a re-import reads the tick back
+   whichever one it looks at; where the column is missing it says so and the
+   checkbox stays greyed out.
+   One limit remains: rows are matched on the **UCI ID** — if the file was
+   edited by hand meanwhile, the app stops and asks for a reload rather than
+   write over the wrong line. Edits already recorded aside are not lost: they
+   come back when the switch goes on again.
 3. **Squadra** (team) — what a team is at this competition: *region* (the
    selection, at an Italian championship), *club*, *province* or *nation*, and
    **what it is called on the documents** ("Squadra" by default: the word
    changes in every printed heading). It also decides how the per-team recap in
    Documenti is grouped.
+   *Deroga — two regions, one squadra*: where two selections are authorised to
+   field a joint team (Piemonte and Valle d'Aosta in the team pursuit at
+   CITA26), declare it in `programme.yaml` under `entries:`:
+
+   ```yaml
+   team_merge:
+     "PIEMONTE": "PIEMONTE - V.D.A"
+     "VALLE D'AOSTA": "PIEMONTE - V.D.A"
+   team_merge_events: [ins_squadre]   # empty: every team event
+   ```
+
+   It changes one thing only: how the squadre (and the coppie) of those events
+   are composed, and the name they race under on startlists and results. Each
+   rider keeps their own region everywhere else — individual events, quotas,
+   per-team recap.
 4. **Cartella dei comunicati** (output folder) — where the PDFs land. It can be
    a Drive folder shared with the whole panel, or a USB stick. **Set it before
    the first comunicato.**
 5. **Aspetto dei comunicati** (appearance) — letterhead and footer (the images
    with venue and dates), the secretary's signature, and whether a rider prints
-   in one column or two.
+   in one column or two. With the single column there is also how wide you want
+   it: whatever the «Nome» column does not take goes to the columns the sheet is
+   read for — sprints, points, club. **How decisions appear on a comunicato**
+   is here as well (§ 6): the colour a disqualification, a relegation, a fine
+   and a warning are printed in, and whether the box opens with the compact UCI
+   code (`A1`, `C3`) — normally not. The note stays grey: it sanctions nobody.
 6. **Programma** — read-only: what the competition file says, with the distances
    and laps worked out. The comunicato register is no longer here: it lives in
    *Documenti → Registro comunicati*, which also says which ones have gone out,
@@ -141,6 +179,12 @@ group them:
   in each event, with the totals. It is the table Verifica shows, and the sheet
   to read out at the briefing.
 
+Those last two — the only ones with a column per event — carry a *Nomi brevi al
+posto delle sigle* (short names instead of the sigle) tick: the columns are
+headed «Ins. Individuale», «Madison» rather than «IP», «MD», and the key under
+the table goes away because nothing is left to look up. The columns get wider,
+though: with many events the sigle are the better bargain.
+
 ### Registro comunicati (the register)
 
 Which are planned, which have been issued, what the next free number is. If a
@@ -170,6 +214,95 @@ ridden:
 | Keirin | The panel composes the heats, then the finish of each one |
 | Omnium | The four events, one inside the other |
 
+### The heats the panel composes (madison and omnium)
+
+Where the programme schedules **qualifying heats**, who rides which one is not
+produced by a result: the panel decides it, in a round that is not ridden -
+*Composizione coppie* in a madison, *Composizione batterie* in an omnium. Pick
+it from the **Fase** menu like any other round.
+
+The page is a grid, one line per pair (or per rider) with its heat beside it.
+**Distribuisci nelle batterie** deals them out 1, 2, 1, … - the list is in
+region or bib order, and halving it would put half the alphabet in one heat -
+and every line can then be corrected by hand. A madison also hands out the pair
+numbers here; an omnium does not, its riders keep their own bib.
+
+Under the grid, **Non si qualificano le ultime N**: how many pairs (or riders)
+go out of *each* heat, counted among those who started (UCI 3.2.157, never
+fewer than two). It opens on what the programme says - `eliminate` on the
+composition round - and the panel can move it.
+
+Everything else follows from there: each heat starts only its own entrants, the
+sheets say by themselves how many go out and how many go through, and once the
+heats are ridden *Carica in finale* (madison) / *Carica nelle prove* (omnium)
+carries the qualifiers into the races that follow - all four prove of an
+omnium - dealt across the heats: 1st of heat 1, 1st of heat 2, 2nd of heat 1, …
+**Whoever does not go through is not in the classification of the event.**
+
+**Two at a time, or one at a time.** In a race against the clock, above the
+composition grid, *Come si corre* asks how this round is ridden: **two at a
+time (batterie)**, as a pursuit normally is — one rider per straight — or
+**one at a time**, a start order like the team sprint. It is the panel's call
+on *this* round: it is saved with the race and the sheets follow, counting
+starts instead of heats. Switching keeps what is already composed in the same
+order — only how many share a line changes. The finals never ask: they are
+ridden two against two whatever the qualifying did.
+
+**Finals that are not ridden.** Under the times of a finals round there is
+*Finali non disputate*: for the 1°/2° and for the 3°/4°, a dropdown with
+**Disputata** (the default - the time ridden in the final decides), **Pari
+merito** and **Tempi qualifiche**.
+
+- *Pari merito*: neither place is assigned on its own, the two entrants share
+  the lower one - both 2°, or both 4°, and **with no time**: that final was
+  not ridden. On the 1°/2° first place stays empty and the classification
+  names no champion.
+- *Tempi qualifiche*: the final is not ridden but is still decided, on the
+  qualifying time - the only one they rode, and the one the sheet carries.
+  There is still a first and a second.
+
+Either way nothing below moves: the fifth is still fifth.
+
+### The panel's own decisions, in the sidebar
+
+Under the status fields (`DNS`, `DNF`, `ABD`, `DSQ`, `REL`) there is
+**Decisioni**. It opens with the **recap of the event** - what has been decided
+in each of its rounds - and with who is already carrying a warning. Then the
+**➕ Nuova decisione** button, which opens the form:
+
+- the **dorsale**, picked among the starters and shown with the name
+  (`12 ROSSI Mario`) rather than typed from memory (`Altro...` for anybody the
+  entry list does not know);
+- the **compact UCI code**: the degree (A, B, C, D) and the article of the UCI
+  table, which together make `A1`, `C3`, `D5`;
+- the **text**: **Ricomponi** proposes it from the fields above, in the wording
+  of the decisions already filed, and it stays editable - it is a proposal, the
+  panel decides.
+
+Category, event, round and day are the open race's own; the app fills them in.
+Under the panel are the decisions already filed **in this round**: bib, code and
+text are corrected there, or deleted, without leaving the race. See § 6 for what
+a warning does after that.
+
+The tick **Ammonizioni (W) sui fogli** puts (or keeps) the W of a warned rider
+on the sheets of this event.
+
+`ABD` is offered in bunch races only: the rider who came down of her own accord,
+who is ranked behind the ritirati and whose points are not printed.
+
+### While the race is on
+
+Over the preview, in red, the app calls out what has just been typed - the same
+banner in both cases, because it is read for the same thing:
+
+- in a bunch race, the **last sprint** as it was called, the scoring four in
+  bold;
+- in a race against the clock, the **time just taken**: the time in bold, the
+  bib and the name, and the place it stands in *for now*.
+
+The page also comes back to the sheet it was left on: leave Gare on the
+*Risultati* of a race and it opens there, not on the ordine di partenza.
+
 ### The red marks under the fields
 
 Every field where bibs are typed checks what was written and says so **straight
@@ -195,7 +328,8 @@ it is the only button on the page that changes another race:
 
 - *Carica Turno 1*, *Carica Quarti*, *Carica Semifinali*, *Carica Finali* in the
   sprint and the keirin;
-- *Carica in finale* in a madison ridden in heats;
+- *Carica in finale* in a madison ridden in heats, *Carica nelle prove* in an
+  omnium with qualifying heats;
 - *Carica Finali* in the pursuit and the team sprint.
 
 If a result is still missing it says so and composes nothing.
@@ -221,27 +355,83 @@ is corrected by hand.
 
 ## 6. Decisioni
 
-The jury secretary's notebook: **one big text field** and nothing in its way.
-You write what the panel decided — a protest, a penalty, a derogation, a start
-refused — and press *Registra la decisione*. Each decision takes a number and
-stays with the competition (`decisions.json`); it can be corrected
-(**Correggi**) or deleted.
+Every decision is a **row of a register**: day, category, event, round, bib,
+the **compact UCI code** (`A1`, `C3`, `D5` - degree and article) and the text
+that goes out on the comunicato. It stays with the competition
+(`decisions.json`), numbered in the order it was taken.
 
-The pickers at the top (day, category, event, bibs) are only there to find it
-again afterwards: they do not go into the text.
+**It is normally written in the race it was taken in**: in the Gare sidebar
+(§ 5), where category, event and round are the open race's own. The same form is
+here too, behind **➕ Nuova decisione**, with the round to pick as well - for
+when the panel realises afterwards, or the race is not on screen.
 
-Two collapsible panels:
+The page reads the register three ways:
 
-- **Penalità rapide** (quick penalties), above the text field — pick the reason
-  from the UCI table and the degree, and the line is appended to the text
-  already written the way it goes on the comunicato: `AL 1 ROSSI Mario:
-  RETROCESSIONE (C) per aver pedalato sulla fascia azzurra`. It stays editable.
-  The four degrees are **A** warning, **B** fine, **C** relegation,
-  **D** disqualification. If you typed the bibs above, the rider is named with
-  their category.
-- **Cosa prevede il PUIS**, below — the federal penalty table, in the column of
-  the categories being ridden, with a search box over infringement and sanction.
-  It is there to be consulted, nothing more: the panel decides.
+- **Decisioni della specialità** - with a category and an event chosen, what was
+  decided in each round. It is the recap the panel signs off;
+- **Registro delle decisioni** - the table of everything, filtered, and the one
+  button that **prints it as a PDF**;
+- **Decisioni registrate** - one by one, in the order they were taken, with
+  *Correggi* to put a bib, a code or the text right, and to delete.
+
+The four degrees are **A** warning, **B** fine, **C** relegation,
+**D** disqualification.
+
+### How they appear on the comunicato
+
+On the sheet of the race each decision is a **tinted box** under the table,
+with the sentence in full. The colour says what it is from across the room:
+
+| | |
+|---|---|
+| **Disqualification** | red |
+| **Relegation** | light orange |
+| **Fine** | violet |
+| **Warning** | yellow |
+| **Note** | grey, as before |
+
+The **note** is the other thing, and stays separate: it is what says how the
+tournament is run, who is qualified, how many go through. It is written in the
+sheet's *Decisione / note* field and prints last.
+
+Tints and code are set in **Impostazioni → Aspetto dei comunicati → Decisioni
+sui comunicati** (§ 2). The **compact UCI code** (`A1`, `C3`) at the head of the
+box is **off**: what goes out to the teams is the sentence, written in full, and
+the article stays in the jury's own register. A panel that quotes it on paper
+turns it on there, once per competition.
+
+A decision goes out **once**, with the **results** of the round it was taken in
+- not on the start order, which is published before the race is ridden, and
+**not on the classifica**, which is the final order of the event and not a fresh
+list of sanctions. The one exception is an event filed as a classification and
+nothing else: there the classifica *is* the sheet of the round, and carries
+them.
+
+### A warning travels
+
+The warning (degree **A**) is the one decision that does not end with the race
+it was given in:
+
+- the rider carries a **W** on the dorsale itself (`1 W`) on **every sheet of
+  every round that follows, in the same event** — not on the sheets of the
+  round it was given in, which carry the decision itself, and not on the
+  classifica, which is no race to enter carrying a warning. The tick
+  *Ammonizioni (W) sui fogli*, in the Gare sidebar, keeps it off the paper;
+- **two warnings in the same round are a disqualification**: the app says so and
+  writes the bib into the race's `DSQ` field, where it stays editable.
+
+The tick *Includi le ammonizioni* decides whether they go into the printed
+register: leave it off for the decisions that are meant to be published.
+
+Below, two tables that are there to be consulted and nothing more:
+
+- **Penalità UCI** — the official wording of each offence, numbered as the UCI
+  numbers it: the number is the one in the compact code, and the wording is what
+  *Ricomponi* proposes — `AL 1 ROSSI MARIO: RETROCESSIONE (C) per essere
+  transitato sulla fascia azzurra.`
+- **Cosa prevede il PUIS** — the federal penalty table, in the column of the
+  categories being ridden, with a search box over infringement and sanction.
+  The panel decides.
 
 ---
 
@@ -307,10 +497,16 @@ the few things that change.
 | Code | Meaning | In the classification |
 |---|---|---|
 | `REL` | Relegated | **Stays classified**, at the back: prints `8° REL` |
-| `DNF` | Did not finish: started, did not arrive | Out of the classification |
-| `DNS` | Did not start | Out of the classification |
-| `DSQ` | Disqualified | Out of the classification |
+| `DNF` | Did not finish: started, did not arrive | Out of the classification, **keeps its points** |
+| `ABD` | Came down of their own accord (bunch races only) | Out of the classification, **no points printed** |
+| `DNS` | Did not start | **Not listed at all**: one line under the table |
+| `DSQ` | Disqualified | Out of the classification, behind everybody |
 | `NP` | Not starting, declared before the race | Does not appear among the starters |
+| `W` | Warned (not a status: it comes from Decisioni) | A **W** on the dorsale (`1 W`), to the end of the event |
+
+In a bunch race the riders who leave it are typed **in the order they leave**:
+the last to leave heads them, being the one who went furthest. That is true of
+`DNF` and of `ABD`, each in its own field.
 
 Two points that matter:
 

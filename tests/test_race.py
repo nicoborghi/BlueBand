@@ -46,12 +46,21 @@ def test_phase_format(comp, cat, event, round_key, kind):
 # ── entrants ────────────────────────────────────────────────────────────────
 
 def test_entrants_are_bibs_teams_or_pairs(entries, comp):
+    # counted off the entry list, never written down here: the file is
+    # re-imported while the championship runs and a number typed in a test
+    # would only say when it was typed
+    entered = [r for r in entries.riders.values()
+               if r.cat == "AL" and "omnium" in (r.events or {})]
     bibs = R.entrants(entries, comp, "AL", "omnium", "Scratch")
-    assert len(bibs) == 44 and all(b.isdigit() for b in bibs)
+    assert bibs and len(bibs) <= len(entered)
+    assert all(b.isdigit() for b in bibs)
 
     teams = R.entrants(entries, comp, "AL", "ins_squadre", "Qualificazioni")
     assert all(k in entries.teams for k in teams)
-    assert "LOMBARDIA" in [entries.teams[k].label for k in teams]
+    # a rappresentativa that fields two squadre is "LOMBARDIA A" and
+    # "LOMBARDIA B": what is checked is that the label is the regione's
+    labels = [entries.teams[k].label for k in teams]
+    assert any(name.startswith("LOMBARDIA") for name in labels)
 
     pairs = R.entrants(entries, comp, "ED", "madison", "Finale")
     assert pairs and all(k in entries.pairs for k in pairs)
@@ -336,6 +345,47 @@ def test_individual_pursuit_from_qualification_to_the_champion(ev, entries, comp
     assert ranking[4] in [p.key for p in res.placings]
 
 
+def test_a_final_left_a_pari_merito_names_no_champion(ev, entries, comp):
+    """The 1°/2° is not ridden: two seconde and no squadra campione.
+
+    The 3/4 final below it is ridden as usual and still decides third and
+    fourth: leaving one final unridden does not move the other.
+    """
+    from ui.pages.races import _load_finals
+
+    qual = R.ensure_state(ev, comp, "AL", "ins_squadre", "Qualificazioni",
+                          entries)
+    keys = qual.entrants[:6]
+    qual.payload["times"] = {k: parse_time(f"3:5{i},000")
+                             for i, k in enumerate(keys)}
+    ev.save_race(qual)
+    result = R.classify(qual, entries, comp)
+    ranking = [p.key for p in result.placings if p.position]
+    _load_finals(qual, result, entries, comp, ev, "Finali")
+
+    fin = R.ensure_state(ev, comp, "AL", "ins_squadre", "Finali", entries)
+    fin.payload["finals_tied"] = [1]
+    fin.payload["times"] = {ranking[2]: parse_time("3:40,000"),
+                            ranking[3]: parse_time("3:41,000")}
+    res = R.classify(fin, entries, comp)
+    assert [p.label for p in res.placings][:5] == \
+        ["2°", "2°", "3°", "4°", "5°"]
+    assert [p.position for p in res.placings][:5] == [2, 2, 3, 4, 5]
+    # the 1/2 was not ridden: no time goes in that column
+    assert [p.data["time"] for p in res.placings][:2] == [None, None]
+    # the 1/2 will not be ridden: nothing is still to come on this sheet
+    assert res.pending == 0
+
+    classifica = to_html(D.race_classification(
+        fin, res, entries, comp, champion=True,
+        champion_label="CAMPIONE D'ITALIA"), comp)
+    assert "CAMPIONE D" not in classifica
+
+    risultati = to_html(D.race_classification(fin, res, entries, comp,
+                                              by_final=True), comp)
+    assert "FINALE 1°/2° POSTO" in risultati
+
+
 def test_a_squadra_out_in_qualification_stays_on_the_final_classification(
         ev, entries, comp):
     """DSQ in qualification: no place, but the classifica files the decision.
@@ -460,9 +510,66 @@ def test_archive_writes_a_reprintable_file(ev, entries, comp):
     doc = D.race_classification(state, result, entries, comp, communique="94")
     p = archive(ev, doc, comp, number="94")
     assert p.name.startswith("094_")
+    if p.suffix == ".pdf":               # with a browser; the HTML is the fallback
+        assert p.read_bytes().startswith(b"%PDF")
+        return
     text = p.read_text(encoding="utf-8")
     assert text.lstrip().startswith("<!doctype html>")
     assert "Comunicato n. 94" in text
+
+
+# ── what a prova di gruppo prints ───────────────────────────────────────────
+
+def test_the_classifica_of_a_prova_does_not_list_who_never_started(
+        ev, entries, comp):
+    """A DNS is an absence, not a result: it goes under the table, in a line."""
+    state = R.ensure_state(ev, comp, "AL", "omnium", "Scratch", entries)
+    bibs = state.entrants[:5]
+    state.payload["sprints"] = ",".join(bibs[1:])
+    R.set_status(state, bibs[0], Status.DNS)
+    doc = D.race_classification(state, R.classify(state, entries, comp),
+                                entries, comp)
+    rows = doc.tables[0].rows
+    assert not any(r.get("rank") == "DNS" for r in rows)
+    assert str(bibs[0]) not in {str(r.get("bib")) for r in rows}
+    assert f"Non partiti: {bibs[0]}" in doc.legend
+
+
+def test_the_riders_who_left_the_race_print_in_the_order_they_left(
+        ev, entries, comp):
+    """Reverse order of the DNF field, and a scesa carries no points."""
+    state = R.ensure_state(ev, comp, "AL", "omnium", "Corsa a Punti", entries)
+    bibs = state.entrants[:6]
+    state.payload["sprints"] = ",".join(bibs[:4])
+    R.set_statuses_from_text(state, f"{bibs[0]}, {bibs[1]}", Status.DNF)
+    R.set_statuses_from_text(state, f"{bibs[2]}, {bibs[3]}", Status.ABD)
+    result = R.classify(state, entries, comp)
+    order = [p.key for p in result.placings]
+    assert order[-4:] == [bibs[1], bibs[0], bibs[3], bibs[2]]
+    assert result.by_key(bibs[0]).data["total"] > 0     # DNF keeps its points
+    assert result.by_key(bibs[2]).data["total"] == 0    # ABD does not
+
+
+def test_an_ammonizione_prints_a_w_on_the_sheets_that_follow(ev, entries, comp):
+    from core import decisions as DEC
+
+    state = R.ensure_state(ev, comp, "AL", "omnium", "Scratch", entries)
+    bib = int(state.entrants[0])
+    DEC.add(ev, DEC.Decision(cat="AL", event="omnium", round_key="Scratch",
+                             bibs=str(bib), penalty=DEC.WARNING,
+                             text="ammonizione"))
+    warned = R.warnings_carried(ev, comp, "AL", "omnium", "Tempo Race")
+    assert warned == {bib: "Scratch"}
+
+    # written on the dorsale itself - "1 W" - and not in a column of its own
+    rows = D.race_startlist(state, entries, comp, warned=warned).tables[0].rows
+    assert [r["bib"] for r in rows if str(r.get("bib")).endswith(" W")] \
+        == [f"{bib} W"]
+    plain = D.race_startlist(state, entries, comp).tables[0]
+    assert not any(str(r.get("bib")).endswith(" W") for r in plain.rows)
+    assert [c.key for c in plain.columns] == [
+        c.key for c in D.race_startlist(state, entries, comp,
+                                        warned=warned).tables[0].columns]
 
 
 def test_bad_input_does_not_crash_the_race(ev, entries, comp):
@@ -580,7 +687,7 @@ def test_qualifiers_are_counted_among_those_who_started(comp):
     placings.append(Placing(key="8", status=Status.DNF))
     result = Result(placings=placings)
 
-    through, out = R.madison_qualifiers(result, 2)
+    through, out = R.heat_cut(result, 2)
     # 7 started (six finishers plus the DNF), two go out: five qualify
     assert through == ["1", "2", "3", "4", "5"]
     # the coppia that never started is not one of the eliminated, it is absent
@@ -598,7 +705,7 @@ def test_the_final_starts_the_qualifiers_and_nobody_else(madison, entries, comp)
         madison.save_race(state)
         heats[n] = state.entrants
 
-    info = R.load_madison_final(madison, comp, entries, "ES", "madison", "Finale")
+    info = R.load_qualified(madison, comp, entries, "ES", "madison")
 
     assert not info["missing"]
     expected = sum(max(0, len(v) - 2) for v in heats.values())
@@ -634,14 +741,14 @@ def test_the_cut_counts_only_the_coppie_that_started(madison, entries, comp):
                         "Qualificazioni Batteria 1", entries)
     # the cut in force travels onto the batteria, so its sheets keep saying it
     assert b1.payload[R.ELIMINATE] == 2
-    assert R.madison_qualify_count(b1, 2) == len(b1.entrants) - 2
+    assert R.qualify_count(b1, 2) == len(b1.entrants) - 2
 
     R.set_status(b1, b1.entrants[-1], Status.DNS)
-    assert R.madison_qualify_count(b1, 2) == len(b1.entrants) - 3
+    assert R.qualify_count(b1, 2) == len(b1.entrants) - 3
     # still two eliminated among the six who started, not three
     b1.payload["sprints"] = ",".join(str(entries.pairs[k].bib)
                                      for k in b1.entrants[:-1])
-    through, out = R.madison_heat_qualifiers(b1, entries, comp, 2)
+    through, out = R.heat_qualifiers(b1, entries, comp, 2)
     assert len(through) == len(b1.entrants) - 3 and len(out) == 2
     assert b1.entrants[-1] not in through + out
 
@@ -662,7 +769,7 @@ def test_the_results_sheet_rules_off_the_qualifiers(madison, entries, comp):
     cut = [i for i, r in enumerate(rows)
            if "group-start-strong" in r.get("_class", "")]
     assert len(cut) == 1
-    through = R.madison_qualify_count(b1, 2)
+    through = R.qualify_count(b1, 2)
     # the rule opens the line of the first coppia that did not make it
     assert rows[cut[0]]["rank"] == f"{through + 1}°"
 
@@ -693,26 +800,24 @@ def test_the_startlist_runs_in_coppia_number_order(madison, entries, comp):
     assert printed == [str(n) for n in numbers for _ in (0, 1)]
 
 
-def test_a_coppia_rides_under_its_region_not_a_letter(madison, entries, comp):
-    """A/B belongs to the composition round: everywhere else it is the region.
+def test_a_coppia_carries_its_letter_on_the_sheets(madison, entries, comp):
+    """A region that fields two coppie keeps the A/B next to them everywhere.
 
-    Two coppie of the same region are told apart by their number, which is the
-    column right next to the name - the letter next to it only read as a
-    second squadra.
+    The number says who is on the track; the letter says which of the two
+    coppie of that rappresentativa it is, and the jury reads both off the same
+    line - as it does for the two quartetti of a squadra.
     """
     pairs = [k for k in R.entrants(entries, comp, "ES", "madison")
              if entries.pairs[k].letter]
     assert pairs, "the fixture must field a region with two coppie"
     key = pairs[0]
-    assert R.entrant_label(key, entries) == entries.pairs[key].region
-    assert R.entrant_label(key, entries, letter=True) \
-        == entries.pairs[key].label
+    assert R.entrant_label(key, entries) == entries.pairs[key].label
 
     b1 = R.ensure_state(madison, comp, "ES", "madison",
                         "Qualificazioni Batteria 1", entries)
     teams = {r["team"] for r in D.race_startlist(b1, entries, comp).tables[0].rows
              if r.get("team")}
-    assert teams and not any(t.endswith((" A", " B")) for t in teams)
+    assert any(t.endswith((" A", " B")) for t in teams)
 
 
 def test_the_madison_sheets_carry_no_society(madison, entries, comp):
@@ -784,12 +889,15 @@ def test_a_coppia_that_did_not_start_is_classified_last(madison, entries, comp):
     assert tail == [Status.DNF, Status.DNS, Status.DSQ]
     assert all(p.position is None and not p.data["total"]
                for p in result.placings[-3:])
-    # and the sheet prints them at the bottom, by status
-    rows = D.race_classification(b1, result, entries, comp,
-                                 doc_kind="risultati").tables[0].rows
-    assert [r["rank"] for r in rows if r["rank"]][-3:] == ["DNF", "DNS", "DSQ"]
+    # and the sheet prints them at the bottom, by status - all but the coppia
+    # that never started, which is a line under the table (`hide_dns`)
+    doc = D.race_classification(b1, result, entries, comp,
+                                doc_kind="risultati")
+    rows = doc.tables[0].rows
+    assert [r["rank"] for r in rows if r["rank"]][-2:] == ["DNF", "DSQ"]
+    assert str(bibs[-1]) in doc.legend
     # a coppia that did not start is not one of the eliminated (3.2.157)
-    assert R.madison_qualify_count(b1, 2) == len(b1.entrants) - 3
+    assert R.qualify_count(b1, 2) == len(b1.entrants) - 3
 
 
 def test_the_team_sprint_starts_one_squadra_at_a_time(ev, entries, comp):

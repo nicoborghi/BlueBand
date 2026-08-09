@@ -7,10 +7,17 @@ competition, appended to and never rewritten by anything else:
 
     <competition>/decisions.json
 
-Each entry is numbered from 1, in the order the jury took it, and carries what
-the secretary can say without typing it twice - the day, the category, the
-event, the bibs, the degree of the penalty - plus the free text, which is the
-part that matters and the only one that is required.
+Each entry is numbered from 1, in the order the jury took it, and is a *row of
+a register*, not a note: the day, the categoria, la specialità, la fase, the
+dorsale, and the provvedimento with the UCI article it was taken under - `A1`,
+`C3` - which together are the compact code the jury quotes. On top of those
+columns sits the free text, which is the sentence that goes out to the teams:
+`compose` proposes it from the columns, the jury edits it.
+
+Filled in that way the log is readable both ways round: `by_round` gives what
+was decided in each fase of a specialità - the recap the panel wants in front
+of it before filing the next one - and the sheet of a race prints its own
+decisions, tinted by `KINDS`, without anybody retyping them.
 
 Two reference tables come with it, read-only, from `regulations/`:
 
@@ -28,10 +35,12 @@ the file.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from .i18n import msg, penalty_name
 from .store import Store, now_iso
 
 FILE = "decisions.json"
@@ -44,6 +53,22 @@ PUIS_FILE = REGULATIONS / "PUIS.json"
 #: writes the letter on the sheet; `i18n.penalty_name` spells it out.
 CLASSES = ("A", "B", "C", "D")
 
+#: The degree that is an *ammonizione*: the warning a rider carries with her.
+#: It is the one penalty that outlives the race it was given in - see
+#: `warned_bibs` - and the one that counts twice over (`double_warned`).
+WARNING = "A"
+
+#: What a decision *is*, for whoever has to colour it: the provvedimento, or
+#: `NOTE` when the jury wrote something that sanctions nobody (how a torneo was
+#: run, who is qualified). The comunicato tints the block by this and nothing
+#: else - see `render.render.Note` and `Branding.note_colors`.
+NOTE = "note"
+KINDS = {"A": "warning", "B": "fine", "C": "relegation", "D": "disqualification"}
+
+#: Every kind a block on a sheet can have, in the order the settings list them:
+#: the four provvedimenti from the gravest down, then the plain note.
+NOTE_KINDS = ("disqualification", "relegation", "fine", "warning", NOTE)
+
 #: Keys of the reference files that are metadata, not content.
 _META = "_last_updated_"
 
@@ -52,7 +77,18 @@ _META = "_last_updated_"
 
 @dataclass
 class Decision:
-    """One decision of the panel, as it will be read back weeks later."""
+    """One decision of the panel, as it will be read back weeks later.
+
+    Every field but `text` is a *column*: the categoria, the specialità, the
+    fase, the dorsale, the provvedimento and the UCI article it was taken
+    under. They are what makes the log a register rather than a pile of notes -
+    filtered, summarised per specialità, and printed on the sheet of the race
+    they belong to without anybody retyping them.
+
+    `text` is the sentence that goes out to the teams. The app proposes it
+    (`compose`), the jury edits it: what the panel actually decided is never
+    something the machine gets to have the last word on.
+    """
 
     n: int = 0                   # numbered from 1, in the order taken
     ts: str = ""                 # when it was written down
@@ -62,6 +98,7 @@ class Decision:
     round_key: str = ""
     bibs: str = ""               # as typed: "12" or "12, 15"
     penalty: str = ""            # "" | A | B | C | D
+    reason: str = ""             # the UCI article number: "1", "6", "13"
     communique: str = ""         # where it was published, when it was
     text: str = ""               # what was decided - the only required part
     author: str = ""
@@ -76,6 +113,29 @@ class Decision:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @property
+    def code(self) -> str:
+        """The compact UCI code - `A1`, `C3` - or '' when it is a plain note.
+
+        Provvedimento and article in three characters: it is what fits in a
+        column of the register, what the jury quotes on the radio, and what
+        the sheet prints next to the dorsale.
+        """
+        return f"{str(self.penalty).upper().strip()}{str(self.reason).strip()}"
+
+    @property
+    def kind(self) -> str:
+        """What this is, for whoever has to colour it (`KINDS`)."""
+        return KINDS.get(str(self.penalty).upper().strip(), NOTE)
+
+
+def parse_code(code: str) -> tuple[str, str]:
+    """`'C3'` -> `('C', '3')`. Anything else comes back as much as is there."""
+    m = re.match(r"\s*([A-Da-d])?\s*(\d+)?\s*$", str(code or ""))
+    if not m:
+        return "", ""
+    return (m.group(1) or "").upper(), m.group(2) or ""
 
 
 # ── the file ────────────────────────────────────────────────────────────────
@@ -126,6 +186,127 @@ def remove(store: Store, n: int, *, actor: str = "") -> None:
     """
     save(store, [d for d in load(store) if d.n != n],
          action="delete_decision", actor=actor)
+
+
+# ── ammonizioni: the decision that travels ──────────────────────────────────
+#
+# Every other penalty is spent on the race it was given in. An ammonizione is
+# not: it stays on the rider for the whole specialità, is read again on the
+# sheet of every fase that follows, and a second one taken in the same fase is
+# a squalifica. So it is the one decision the sheets have to ask the log about,
+# and this is where they ask.
+
+
+def bibs_of(decision: Decision) -> list[int]:
+    """The numbers one decision is about, as numbers.
+
+    The field is typed by hand ("12, 15", "12 e 15"): anything that is not a
+    number in it is not a dorsale, and a decision the jury wrote about nobody
+    in particular is about nobody in particular.
+    """
+    return [int(n) for n in re.findall(r"\d+", str(decision.bibs or ""))]
+
+
+def warnings_of(decisions: list[Decision], cat: str, event: str
+                ) -> list[Decision]:
+    """The ammonizioni given in one specialità of one categoria, in order."""
+    return [d for d in decisions
+            if str(d.penalty).upper() == WARNING
+            and (not d.cat or not cat or d.cat == cat)
+            and d.event == event]
+
+
+def warned_bibs(decisions: list[Decision], cat: str, event: str, *,
+                rounds: list[str] = (), upto: str = "") -> dict[int, str]:
+    """dorsale -> the fase the warning was taken in, for one specialità.
+
+    What the sheets print the W from. `rounds` is the fasi in the order they
+    are ridden and `upto` the one being printed: a warning shows on the fasi
+    that *follow* the one it was given in, and not on that one. The sheet of
+    the race where it was taken says what happened in that race - the decision
+    itself goes on it, in the Decisione note - and a W there would be the same
+    thing said twice; what the W is for is the next race, where nothing else
+    would say that this rider is already carrying one.
+
+    Without an order to read (a warning filed against no fase, a round that is
+    not in the programme) it counts everywhere: the jury wrote it down about
+    this specialità, and losing it would be worse than showing it early.
+    """
+    order = {key: i for i, key in enumerate(rounds)}
+    limit = order.get(upto)
+    out: dict[int, str] = {}
+    for d in warnings_of(decisions, cat, event):
+        taken = order.get(d.round_key)
+        if limit is not None and taken is not None and taken >= limit:
+            continue
+        for bib in bibs_of(d):
+            out.setdefault(bib, d.round_key)
+    return out
+
+
+def double_warned(decisions: list[Decision], cat: str, event: str,
+                  round_key: str) -> list[int]:
+    """Who has taken two ammonizioni in the same fase: that is a squalifica.
+
+    Reported, not applied: the DSQ is the panel's to declare, and the app says
+    which numbers it is now looking at.
+    """
+    seen: dict[int, int] = {}
+    for d in warnings_of(decisions, cat, event):
+        if d.round_key != round_key:
+            continue
+        for bib in bibs_of(d):
+            seen[bib] = seen.get(bib, 0) + 1
+    return sorted(b for b, n in seen.items() if n > 1)
+
+
+# ── reading the log back, per race ──────────────────────────────────────────
+#
+# The register is one file for the whole competition, but it is *read* one
+# specialità at a time: what was decided in this categoria, in this evento, in
+# each of its fasi. That is the summary the jury wants above the button before
+# it files the next one, and it is what the sheet of a race prints.
+
+
+def for_race(decisions: list[Decision], cat: str, event: str,
+             round_key: str | None = None) -> list[Decision]:
+    """The decisions taken in one race - or in one whole specialità.
+
+    `round_key=None` is the specialità (every fase of it); a string, including
+    `""`, is that fase and only that one. The difference matters: `""` is a
+    real fase key - a specialità ridden in one go - and must not silently
+    widen to everything the categoria did in that evento.
+    """
+    return [d for d in decisions
+            if d.cat == cat and d.event == event
+            and (round_key is None or d.round_key == round_key)]
+
+
+def by_round(decisions: list[Decision], cat: str, event: str,
+             rounds: list[str] = ()) -> list[tuple[str, list[Decision]]]:
+    """(fase, decisions taken in it) for one specialità, in programme order.
+
+    `rounds` is the fasi as the programme runs them: they come out in that
+    order, and a fase nobody was penalised in does not appear at all. Anything
+    filed against a fase the programme does not know - a key edited by hand, a
+    round dropped from the programme afterwards - is kept, at the end, rather
+    than quietly lost.
+    """
+    mine = for_race(decisions, cat, event)
+    order = {key: i for i, key in enumerate(rounds)}
+    groups: dict[str, list[Decision]] = {}
+    for d in mine:
+        groups.setdefault(d.round_key, []).append(d)
+    return sorted(groups.items(),
+                  key=lambda kv: (order.get(kv[0], len(order)), kv[0]))
+
+
+def counts(decisions: list[Decision]) -> dict[str, int]:
+    """How many of each kind, for the one-line recap ({'warning': 2, ...})."""
+    out: dict[str, int] = {}
+    for d in decisions:
+        out[d.kind] = out.get(d.kind, 0) + 1
+    return out
 
 
 # ── the regulations behind it ───────────────────────────────────────────────
@@ -207,3 +388,30 @@ def puis_search(column: str, text: str) -> list[dict]:
         return rows
     return [r for r in rows
             if needle in f"{r.get('infrazione', '')} {r.get('sanzione', '')}".lower()]
+
+
+# ── the sentence the jury signs ─────────────────────────────────────────────
+
+def compose(who: str, penalty: str = "", number: str = "",
+            lang: str = "IT") -> str:
+    """The decision as it goes out: '<who>: AMMONIZIONE (A) <UCI wording>'.
+
+    A *proposal*, and nothing more. It is the wording the jury would have
+    written by hand - the rider named as the sheets name her, the provvedimento
+    spelled out with its letter, the article quoted verbatim from the UCI table
+    - and the field it lands in is editable, because the panel decides what it
+    decided and the app does not.
+
+    Every part is optional and an absent one leaves no trace: a decision about
+    nobody in particular, with no provvedimento, quoting no article, composes
+    to the empty string and the jury types it.
+    """
+    line = " ".join(p for p in (
+        msg("penalty_for", who=who) if who else "",
+        f"{penalty_name(penalty).upper()} ({penalty})" if penalty else "",
+        reason(number, lang) if number else "") if p)
+    # the UCI table punctuates some of its articles and not others: the sheet
+    # is not the place to notice it, so a quoted one ends as a sentence either
+    # way. Only after an article - "AL 3:" on its own is a line still being
+    # written, not a sentence missing its stop.
+    return f"{line}." if number and line and not line.endswith(".") else line

@@ -11,8 +11,8 @@ from core.config import (DOC_ALL_KINDS, DOC_CLASSIFICATION, DOC_RESULTS,
 
 def test_planned_register_is_the_2026_numbering(comp):
     plan = C.planned(comp)
-    assert len(plan) == 138
-    assert [c.n for c in plan] == list(range(1, 139))
+    assert len(plan) == 140
+    assert [c.n for c in plan] == list(range(1, 141))
 
 
 @pytest.mark.parametrize("cat,event,round_key,doc,n", [
@@ -28,10 +28,10 @@ def test_planned_register_is_the_2026_numbering(comp):
     ("ES", "velocita", "Qualificazioni", DOC_STARTLIST, 33),
     ("ED", "omnium", "Scratch", DOC_STARTLIST, 39),
     ("AL", "keirin", "Turno 1", DOC_STARTLIST, 37),
-    ("AL", "velocita", "Qualificazioni", DOC_RESULTS, 88),
-    ("AL", "omnium", "", DOC_CLASSIFICATION, 111),
-    ("AL", "madison", "Qualificazioni Batteria 1", DOC_STARTLIST, 121),
-    ("DA", "madison", "", DOC_CLASSIFICATION, 138),
+    ("AL", "velocita", "Qualificazioni", DOC_RESULTS, 89),
+    ("AL", "omnium", "", DOC_CLASSIFICATION, 115),
+    ("AL", "madison", "Qualificazioni Batteria 1", DOC_STARTLIST, 123),
+    ("DA", "madison", "", DOC_CLASSIFICATION, 140),
 ])
 def test_find_returns_the_planned_number(comp, cat, event, round_key, doc, n):
     c = C.find(comp, cat, event, round_key, doc)
@@ -41,8 +41,8 @@ def test_find_returns_the_planned_number(comp, cat, event, round_key, doc, n):
 
 def test_ret_is_preserved(comp):
     ret = [c for c in comp.communiques if c.ret]
-    assert [c.n for c in ret] == [92]
-    assert ret[0].label == "92 RET"
+    assert [c.n for c in ret] == [93]
+    assert ret[0].label == "93 RET"
     assert "Omnium" in ret[0].title
 
 
@@ -67,15 +67,15 @@ def test_issue_uses_the_planned_number(store, comp):
 def test_issue_off_plan_takes_the_next_free_number(store, comp):
     e = C.issue(store, comp, cat="AL", event="velocita", round_key="Extra",
                 doc=DOC_RESULTS, title="Turno supplementare")
-    assert e.n == 139  # the plan ends at 138
-    assert C.next_free(comp, C.load(store)) == 140
+    assert e.n == 141  # the plan ends at 140
+    assert C.next_free(comp, C.load(store)) == 142
 
 
 def test_issue_accepts_an_explicit_number_and_ret(store, comp):
     e = C.issue(store, comp, cat="AL", event="omnium",
                 round_key="Qualificazioni Batteria 1", doc=DOC_RESULTS,
-                number="92 RET")
-    assert e.n == 92 and e.ret and e.label == "92 RET"
+                number="93 RET")
+    assert e.n == 93 and e.ret and e.label == "93 RET"
 
 
 def test_reissuing_replaces_rather_than_duplicates(store, comp):
@@ -93,7 +93,7 @@ def test_status_marks_what_has_been_issued(store, comp):
     C.issue(store, comp, cat="ES", event=EVENT_ENTRY_LIST, round_key="",
             doc=DOC_STARTLIST)
     rows = C.status(comp, C.load(store))
-    assert len(rows) == 138
+    assert len(rows) == 140
     assert rows[0]["issued"] is True
     assert rows[1]["issued"] is False
 
@@ -102,7 +102,7 @@ def test_status_lists_off_plan_documents_too(store, comp):
     C.issue(store, comp, cat="AL", event="velocita", round_key="Extra",
             doc=DOC_RESULTS, title="Turno supplementare")
     rows = C.status(comp, C.load(store))
-    assert len(rows) == 139
+    assert len(rows) == 141
     assert "fuori programma" in rows[-1]["title"]
 
 
@@ -118,9 +118,9 @@ def test_register_document(store, comp):
     doc = comunicati_register(rows, comp)
     html = to_html(doc, comp)
     assert "REGISTRO COMUNICATI" in html
-    assert "138 documenti" in html
-    assert "92 RET" in html
-    assert html.count("<tr") >= 138
+    assert "140 documenti" in html
+    assert "93 RET" in html
+    assert html.count("<tr") >= 140
 
 
 # ── what the Gare page pre-fills ────────────────────────────────────────────

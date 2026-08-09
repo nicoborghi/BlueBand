@@ -21,7 +21,12 @@ from typing import Any
 
 import yaml
 
+from .formats.omnium import TEMPO as _TEMPO_ROUND
 from .i18n import IT, fix_accents, label, msg
+
+#: The name the tempo race is scheduled under inside an omnium, lowercased:
+#: which prova a round is, is its name (see `race.round_format`).
+TEMPO_RACE = _TEMPO_ROUND.lower()
 
 DEFAULT_TRACK_LEN = 0.3333  # km
 
@@ -328,6 +333,34 @@ NAME_SPLIT = "split"     # two columns: Cognome, Nome
 NAME_FULL = "full"       # one column: "ROSSI Mario Luigi"
 NAME_STYLES = (NAME_SPLIT, NAME_FULL)
 
+#: How wide the merged «Nome» column is, as a fraction of the two columns it
+#: replaces. "ROSSI Mario Luigi" is one string on one line: it does not need
+#: the width of two columns each sized to hold a long name by itself, and what
+#: it gives up goes to the columns the sheet is actually read for - the volate,
+#: i punti, la società. Set in Impostazioni → Nome; the bounds are what keeps
+#: a name readable at one end and the sheet readable at the other.
+DEFAULT_NAME_WIDTH = 0.62
+NAME_WIDTH_MIN = 0.40
+NAME_WIDTH_MAX = 1.00
+
+#: The tint of each kind of block printed under a table, keyed by
+#: `core.decisions.NOTE_KINDS`. A comunicato is read across a table by people
+#: who are not going to read it twice, so what a block *is* has to arrive
+#: before the sentence does: the ramp of the provvedimenti runs yellow (an
+#: ammonizione, which costs nothing yet) to red (a squalifica, which ends the
+#: race), the ammenda sits off that ramp because a fine is not a step on it,
+#: and the plain note keeps the grey it has always had - it sanctions nobody.
+#: Every one of them is overridable in Impostazioni: some federations print in
+#: their own colours, and a tint nobody can change is a tint that gets argued
+#: about instead of read.
+NOTE_COLORS = {
+    "disqualification": "#fecaca",
+    "relegation": "#fed7aa",
+    "fine": "#ddd6fe",
+    "warning": "#fef08a",
+    "note": "#f4f6f8",
+}
+
 
 @dataclass
 class Branding:
@@ -347,6 +380,30 @@ class Branding:
     signature_name: str = ""      # printed in bold when the mode is `text`
     signature_scope: str = SIG_ALWAYS
     name_style: str = NAME_SPLIT
+    name_width: float = DEFAULT_NAME_WIDTH
+    #: Whether the block of a decision opens with the compact UCI code it was
+    #: taken under (`A1`, `C3`). Off: the sentence is what goes out to the
+    #: teams, and the article is in the register the jury keeps. A panel that
+    #: quotes the code on paper turns it on in Impostazioni.
+    decision_codes: bool = False
+    #: kind -> hex tint, filled in from `NOTE_COLORS` for anything not set
+    note_colors: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self):
+        # the width comes from settings.json, which anything may have written:
+        # a bad value narrows every printed name at once, so it is clamped here
+        # rather than trusted down in the renderer
+        try:
+            width = float(self.name_width)
+        except (TypeError, ValueError):
+            width = DEFAULT_NAME_WIDTH
+        self.name_width = min(NAME_WIDTH_MAX, max(NAME_WIDTH_MIN, width))
+        # a partial dict is the normal case - the jury recolours the squalifica
+        # and leaves the rest alone - so what is missing falls back rather than
+        # printing a block with no tint at all
+        self.note_colors = {**NOTE_COLORS,
+                            **{k: v for k, v in (self.note_colors or {}).items()
+                               if k in NOTE_COLORS and str(v).strip()}}
 
     def signs(self, doc_kind: str) -> bool:
         """Whether a sheet of this kind opens with the signature ticked.
@@ -375,18 +432,38 @@ class EntrySheet:
     first_data_row: int = 7
     columns: dict[str, str] = field(default_factory=dict)   # header -> field
     ksport: dict[str, str] = field(default_factory=dict)    # header -> field
+    # The licence check (verificato / NP) is not part of the federation's
+    # layout: it is columns the giuria adds to the file by hand. Declared apart
+    # from `columns` so they are read and written where they exist without
+    # entering the fixed-column layout the elenco iscritti is exported in.
+    check_in: dict[str, str] = field(default_factory=dict)  # header -> field
     # What a rider rides for at *this* competition, and what it is called: the
     # regione at an Italian championship, the società at an open meeting. The
     # programme states the rule; Impostazioni can override it on this machine.
     team_group: str = DEFAULT_TEAM_GROUP
     team_name: str = ""            # blank: the word from the dictionary
+    # Two rappresentative authorised to field one squadra together (a federal
+    # deroga: PIEMONTE and VALLE D'AOSTA at CITA26). `{regione: nome unico}`,
+    # and it changes one thing only - how the squadre and the coppie of a team
+    # event are composed and what they are called. A rider keeps their own
+    # regione everywhere else: individual startlists and results, the quotas,
+    # the riepilogo per squadra.
+    team_merge: dict[str, str] = field(default_factory=dict)
+    # Which events the deroga was granted for, by code. Empty: every team
+    # event. The authorisation is per specialità, so it is written down as one.
+    team_merge_events: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         # headers are matched loosely: the workbook writes "Dors.", "Società"
         # and "Squadra\n(Regione)" with inconsistent spacing between exports
+        # the check-in columns are read on both shapes of the file: they are
+        # the same two headers wherever the giuria put them
+        extra = {_norm_header(h): f for h, f in self.check_in.items()}
         self._lookup = {
-            False: {_norm_header(h): f for h, f in self.columns.items()},
-            True: {_norm_header(h): f for h, f in self.ksport.items()},
+            False: {**extra,
+                    **{_norm_header(h): f for h, f in self.columns.items()}},
+            True: {**extra,
+                   **{_norm_header(h): f for h, f in self.ksport.items()}},
         }
 
     def field_of(self, header: str, *, ksport: bool = False) -> str:
@@ -394,7 +471,7 @@ class EntrySheet:
 
     def header_of(self, name: str, *, ksport: bool = False) -> str:
         """The workbook wording of a field, for the sheets we write ourselves."""
-        table = self.ksport if ksport else self.columns
+        table = {**self.check_in, **(self.ksport if ksport else self.columns)}
         for header, fname in table.items():
             if fname == name:
                 return header
@@ -466,6 +543,20 @@ class Competition:
         # the dictionary word, not `label("team")`: that one already answers
         # with whatever override is in force, which is what this *sets*
         return self.entry_sheet.team_name or IT["team"]
+
+    def team_merge(self, event: str = "") -> dict[str, str]:
+        """`{regione: nome della squadra unica}` for this event, if any.
+
+        The regioni are matched the way they are read off the entry file
+        (upper case, spaces squashed - see `entries.norm_region`), so the
+        programme can spell them the way the comunicato does.
+        """
+        merge = self.entry_sheet.team_merge
+        events = self.entry_sheet.team_merge_events
+        if not merge or (event and events and event not in events):
+            return {}
+        return {" ".join(str(k).upper().split()): str(v).strip()
+                for k, v in merge.items() if str(v).strip()}
 
     # -- lookups -------------------------------------------------------------
 
@@ -553,11 +644,22 @@ class Competition:
         """(distance km, laps, sprints) of one round, filling in defaults."""
         r = self.round_of(cat, event, round_key)
         fmt = self.event(event).fmt
+        # an omnium is four prove under one event, and which one this round is
+        # is in its name: the tempo race counts its sprints by its own rule,
+        # whether it is ridden inside an omnium or as an event of its own
+        tempo = fmt == "tempo" or (fmt == "omnium" and (round_key or "")
+                                   .strip().lower().startswith(TEMPO_RACE))
         distance = float(r.distance or 0.0)
         laps = r.laps if r.laps is not None else laps_from_distance(
             distance, self.track_len, fmt)
-        sprints = r.sprints if r.sprints is not None else sprints_from_laps(
-            laps, fmt)
+        # A tempo race sprints on every lap from the fifth: the count is the
+        # laps less the four neutralised ones and nothing else. It is derived
+        # and not read from the programme even when the programme writes it -
+        # the two would otherwise disagree on the sheet, and the sprint columns
+        # of the risultati are the ones the jury fills in lap by lap.
+        sprints = (sprints_from_laps(laps, "tempo") if tempo
+                   else r.sprints if r.sprints is not None
+                   else sprints_from_laps(laps, fmt))
         return distance, float(laps), int(sprints)
 
 

@@ -176,6 +176,9 @@ DOCS = {
     "register_col_n": "N.",
     "register_col_day": "G.",
     "register_title": "REGISTRO COMUNICATI",
+    "decisions_title": "REGISTRO DELLE DECISIONI",
+    "decisions_slug": "registro-decisioni",
+    "penalty_col": "Provv.",
     "issued": "Emesso",
     "issued_at": "Quando",
     "decision": "Decisione",
@@ -191,6 +194,14 @@ DOCS = {
     # the tabella specialità: how many riders each categoria fields in what
     "speciality_table": "TABELLA SPECIALITÀ",
     "speciality_table_slug": "tabella-specialita",
+    # il medagliere, on paper: the columns are written out, not the medals of
+    # the screen - an emoji is not a heading a sheet can be read out from
+    "medal_table_title": "MEDAGLIERE",
+    "medal_table_slug": "medagliere",
+    "medal_gold": "Oro",
+    "medal_silver": "Argento",
+    "medal_bronze": "Bronzo",
+    "podium_detail_title": "PODI",
     "entry_list_slug": "iscritti",
     "startlist_slug": "partenti",
     "register_slug": "registro-comunicati",
@@ -204,17 +215,21 @@ STATUSES = {
     "OK": "",
     "REL": "REL",          # declassato
     "DNF": "DNF",          # non ha finito
+    "ABD": "ABD",          # sceso di sua volontà
     "DNS": "DNS",          # non partito
     "DSQ": "DSQ",          # squalificato
     "NP": "NP",            # non partente (dichiarato prima della gara)
+    "W": "W",              # ammonizione: la porta con sé nelle fasi successive
 }
 
 STATUS_NAMES = {
     "REL": "Declassato",
     "DNF": "Ritirato",
+    "ABD": "Sceso",
     "DNS": "Non partito",
     "DSQ": "Squalificato",
     "NP": "Non partente",
+    "W": "Ammonito",
 }
 
 
@@ -229,6 +244,19 @@ PENALTIES = {
     "B": "Ammenda",
     "C": "Retrocessione",
     "D": "Squalifica",
+}
+
+# The same four said the other way round - by what the block on the sheet *is*
+# rather than by the letter it was given under (`core.decisions.KINDS`) - plus
+# the note, which is not a provvedimento at all: what the tint settings and the
+# recap of a specialità are labelled with.
+
+NOTE_KINDS = {
+    "disqualification": "Squalifica",
+    "relegation": "Retrocessione",
+    "fine": "Ammenda",
+    "warning": "Ammonizione",
+    "note": "Nota",
 }
 
 
@@ -269,12 +297,13 @@ UI = {
     # nav (`ui/style.py`), and an icon put there by CSS would be one more
     # thing to keep in step with this dictionary.
     "page": "Pagina",
-    "page_races": "❊ Gare",
-    "page_check_in": "☑ Verifica",
-    "page_decisions": "⚖ Decisioni",
-    "page_documents": "🖨 Documenti",
-    "page_programme": "🗓 Programma",
-    "page_settings": "⚙ Impostazioni",
+    "page_races": "Gare",
+    "page_check_in": "Verifica",
+    "page_decisions": "Decisioni",
+    "page_documents": "Documenti",
+    "page_stats": "Statistiche",
+    "page_programme": "Programma",
+    "page_settings": "Impostazioni",
     "programme_problems": "{n} problemi nel programma",
 
     # -- pickers shared by several pages -------------------------------------
@@ -307,6 +336,8 @@ UI = {
     "import_reload": "Importa / Ricarica",
     "export_effective": "Esporta XLSX (elenco effettivo)",
     "overlay_kept": "{n} modifiche della giuria vengono riapplicate a ogni ricarica.",
+    "use_overlay": "Tieni le modifiche a parte (non scrivere nel file)",
+    "save_to_file": "Salva nel file iscritti",
 
     # -- check-in ("Verifica") ----------------------------------------------
     "entry_list_title": "Elenco iscritti",
@@ -357,6 +388,7 @@ UI = {
     "mode_by_communique": "Per comunicato",
     "mode_by_team": "Per squadra",
     "mode_speciality_table": "Tabella specialità",
+    "short_headers": "Nomi brevi al posto delle sigle",
     "communique_carries": "Comunicato {n} · {title} — {docs}",
     "row_number": "Numero di riga",
     "event_matrix": "Matrice specialità",
@@ -385,16 +417,16 @@ UI = {
     "team_name": "Come si chiama sui documenti",
     "save_register_pdf": "Salva il registro in PDF",
     "print_preview": "Anteprima di stampa",
+    # the blocks printed under a table: their tints, and whether they open
+    # with the compact UCI code (Impostazioni → Aspetto)
+    "note_colors": "Decisioni sui comunicati",
+    "note_colors_reset": "↩ Tinte predefinite",
+    "decision_codes": "Codice UCI sul comunicato (A1, C3)",
 
     # -- decisions ("Decisioni") ---------------------------------------------
-    "decision_new": "Nuova decisione",
     "decision_body": "Decisione",
-    "decision_save": "💾 Registra la decisione",
-    "decision_none": "-",              # no penalty: a decision, not a sanction
-    "penalty": "Penalità",
     "penalty_quick": "Penalità rapide",
     "penalty_reason": "Motivo (tabella UCI)",
-    "penalty_add": "Aggiungi al testo",
     "penalty_class": "Provvedimento",
     "puis_panel": "Cosa prevede il PUIS",
     "puis_column": "Colonna del prontuario",
@@ -405,7 +437,33 @@ UI = {
     "decision_head": "n. {n} · {when}",
     "decision_delete": "🗑 Elimina",
     "decision_edit": "Correggi",
-    "decision_context": "Contesto",
+    # the panel that files a decision from the race being run, and the
+    # register the Decisioni page keeps of them all
+    "decision_panel": "Decisioni",
+    "decision_file": "💾 Registra",
+    "decision_update": "Aggiorna",
+    "decisions_here": "In questa fase ({n})",
+    "show_warnings": "Ammonizioni (W) sui fogli",
+    "include_warnings": "Includi le ammonizioni",
+    "decisions_register": "Registro delle decisioni",
+    "save_decisions_pdf": "Salva il registro in PDF",
+    "decisions_filter_cat": "Categoria",
+    "decisions_filter_event": "Specialità",
+    "decisions_all": "Tutte",
+    # the popover that files one: the columns of the register, in the order
+    # they are filled in, and the sentence they compose
+    "decision_add": "➕ Nuova decisione",
+    "decision_round": "Fase",
+    "decision_bib": "Dorsale",
+    "decision_code": "Penalità UCI",
+    "decision_code_none": "Nessuna (nota)",
+    "decision_proposal": "Proposta di testo",
+    "decision_recompose": "↻ Ricomponi",
+    "decision_no_starters": "Nessun partente: scrivi il dorsale a mano.",
+    "decision_bib_other": "Altro...",
+    "decision_summary": "Decisioni della specialità",
+    "decision_summary_none": "Nessuna decisione in questa specialità.",
+    "decision_of_round": "{round} ({n})",
 
     # -- races ("Gare"): the sheet being prepared ----------------------------
     "race_line": "{n} partenti · {info} · formato: {fmt} · ultimo salvataggio: {saved}",
@@ -432,6 +490,11 @@ UI = {
     "sprint_string_box": "Stringa",
     "volata_n": "{n}ª volata",
     "times": "Tempi",
+    "unridden_finals": "Finali non disputate",
+    "unridden_final": "Finale {name}",
+    "final_ridden": "Disputata",
+    "final_tied": "Pari merito ({place}°)",
+    "final_on_qual": "Tempi qualifiche",
     "laps_gained": "Giri guadagnati",
     "laps_lost": "Giri persi",
     "statuses": "Stati",
@@ -450,6 +513,11 @@ UI = {
     # -- races: heat / start-order builder ----------------------------------
     "build_start_order": "Composizione ordine di partenza",
     "build_heats": "Composizione batterie",
+    # come si corre la prova contro il tempo: due alla volta o una alla volta
+    "starts_mode": "Come si corre",
+    "starts_two": "Due alla volta (batterie)",
+    "starts_one_riders": "Un atleta alla volta",
+    "starts_one_teams": "Una squadra alla volta",
     "fill_in_entry_order": "Riempi in ordine di iscrizione",
     "start_n": "{n}ª partenza",
     "notation_is": "Notazione: `{text}`",
@@ -469,6 +537,9 @@ UI = {
     "scheme_8": "8 qualificati - quarti - semifinali - finali",
     "scheme_line": "{qualified} qualificati · {rounds}",
     "scheme_repechages": " · recuperi nel 1° turno",
+    "ride_final_5_8": "Si corre la finale 5°-8° posto",
+    "no_final_5_8_line": ("Si corrono le sole finali 1°-4°: dal 5° posto in "
+                          "poi la classifica segue i tempi dei 200 m."),
     "winners_round_1": "Vincitori 1° turno",
     "repechages": "Recuperi",
     "finals_1_4": "Finali 1°-4°",
@@ -485,12 +556,16 @@ UI = {
     "load_generic": "Carica {round}",
     "update_finals": "Aggiorna Finali",
     "load_madison_final": "Carica in finale",
+    "load_omnium_final": "Carica nelle prove",
     "compose_heats": "Componi batterie",
 
     # -- races: keirin -------------------------------------------------------
     "keirin_shape": "{n} iscritti · tabella UCI {lo}-{hi}",
     "keirin_stage": "{round}: {heats} batterie",
     "keirin_stage_rep": " + {n} recuperi",
+    "ride_final_b": "Si corre la seconda finale (7°-12° posto)",
+    "no_final_b_line": ("Si corre una sola finale: gli altri sono classificati "
+                        "in base alla fase raggiunta."),
     "compose_race": "Composizione · {race}",
     "arrivals_of": "Arrivi · {race}",
     "final_named": "Finale {name} posto",
@@ -519,6 +594,16 @@ UI = {
     "pairs_in_heat": "**{round}** - {n} coppie",
     "heat_qualified": "{n}ª batteria: {through} qualificate, {out} eliminate",
 
+    # -- races: composing the batterie of an omnium --------------------------
+    # the same page as the madison, without the numbers: gli atleti corrono
+    # con il proprio dorsale e l'unica decisione è chi corre in quale batteria
+    "riders_line_heats": "{n} atleti · {heats} batterie di qualificazione",
+    "riders_line_direct": "{n} atleti · nessuna batteria di qualificazione",
+    "eliminate_line_riders": "{sizes} partenti → **{through} ammessi**",
+    "riders_in_heat": "**{round}** - {n} atleti",
+    "heat_qualified_riders": "{n}ª batteria: {through} ammessi, {out} eliminati",
+    "the_prove": "le prove dell'omnium",
+
     # -- races: omnium -------------------------------------------------------
     "partial_after_scratch": "Risultati {scratch} e Ordine di Partenza {next}",
     "partial_standings": "Classifica Parziale e Ordine Partenza {next}",
@@ -528,6 +613,28 @@ UI = {
     "final_5_8_results": "Finale 5°-8° posto - Risultati",
     "finals_1_2_3_4_results": "Finali {a} e {b} posto - Risultati",
     "results_short": "Ris. {what}",
+
+    # -- statistics ("Statistiche") ------------------------------------------
+    "medal_table": "Medagliere",
+    "gold": "🥇 1°",
+    "silver": "🥈 2°",
+    "bronze": "🥉 3°",
+    "medals": "Medaglie",
+    "podium_places": "Podi",
+    "events_counted": "Specialità concluse",
+    "events_open": "Non concluse",
+    "include_unfinished": "Conta anche le specialità non concluse",
+    "stats_detail": "Podi, specialità per specialità",
+    "stats_open_list": "Specialità non ancora concluse ({n})",
+    "stats_provisional": "provvisorio",
+    "stats_partial": "risultati parziali",
+    "stats_no_result_yet": "nessun risultato",
+    "stats_position": "Pos.",
+    "stats_who": "Atleti",
+    "stats_download": "⬇ Scarica CSV",
+    "save_medals_pdf": "Salva il medagliere in PDF",
+    "stats_print_detail": "Stampa anche i podi",
+    "stats_no_printed_at": "Senza «Emesso il…»",
 
     # -- programme ("Programma") ---------------------------------------------
     "prog_tab_competition": "Gara",
@@ -625,6 +732,7 @@ UI = {
     "name_full": "Nome completo (una colonna)",
     "name_split_example": "ROSSI · Mario Luigi",
     "name_full_example": "ROSSI Mario Luigi - una sola colonna «Nome»",
+    "name_width": "Larghezza della colonna «Nome»",
     "reset_event": "Azzera una gara",
     "reset_confirm": "Confermo: cancella {n} gare di {cat} · {event}",
     "reset_with_results": " ({n} con risultati)",
@@ -652,8 +760,14 @@ HELP = {
     # -- notation ------------------------------------------------------------
     "bibs_csv": "Dorsali separati da virgola.",
     "teams_pick": "Si sceglie la squadra, non il dorsale.",
-    "status_dns": "Non partiti: non hanno preso il via.",
-    "status_dnf": "Ritirati: partiti, non arrivati.",
+    "status_dns": ("Non partiti: non hanno preso il via. Non compaiono in "
+                   "classifica, restano solo come nota sotto la tabella."),
+    "status_dnf": ("Ritirati: partiti, non arrivati. Tengono i punti fatti e "
+                   "si scrivono nell'ordine in cui lasciano la gara: l'ultimo "
+                   "che lascia è il primo dei ritirati."),
+    "status_abd": ("Scesi: hanno lasciato la gara di loro volontà. I punti "
+                   "non si stampano; l'ordine è quello del campo, l'ultimo "
+                   "che scende è il primo degli scesi."),
     "status_dsq": "Squalificati: fuori dalla classifica.",
     "status_rel": "Declassati: restano in classifica, in coda.",
     "sprint_order": "Ordine di arrivo dello sprint, dorsali separati da virgola.",
@@ -671,6 +785,12 @@ HELP = {
                  "giro per volta: `3, 3` = due giri."),
     "elimination_order": "Il primo eliminato è l'ultimo in classifica.",
     "time_format": "Tempo in m:ss,mmm.",
+    "unridden_final": ("Come si chiude la finale se non viene disputata. "
+                       "«Pari merito»: le due si classificano insieme al "
+                       "{place}° posto e il posto sopra resta vuoto. «Tempi "
+                       "qualifiche»: le due vengono piazzate sul tempo delle "
+                       "qualificazioni, l'unico che hanno corso. In entrambi "
+                       "i casi chi segue in classifica non si sposta."),
     # The one legend of the inline flags, shared by every field that shows them
     # (see `core.checks.FLAGS`): one notation, one explanation.
     "flags": ("?N il dorsale N non è tra i partenti · !N il dorsale N è "
@@ -681,8 +801,24 @@ HELP = {
     "sprint_scheme": ("Decide quanti atleti qualifica il 200 m e quali fasi si "
                       "corrono dopo. È la riga che va sull'ordine di partenza "
                       "qui sotto."),
+    "final_5_8_toggle": ("Se spento, i quarti non compongono la finale 5°-8°: "
+                         "non c'è il foglio dei risultati e dal 5° posto in "
+                         "poi la classifica della specialità segue i tempi "
+                         "delle qualificazioni. Si decide qui perché vale "
+                         "prima che i quarti compongano qualcosa."),
+    "final_b_toggle": ("Se spento, il keirin ha una sola finale: l'ultima fase "
+                       "compone solo la finale per il titolo, non c'è il foglio "
+                       "dei risultati della seconda e gli altri sono "
+                       "classificati in base alla fase raggiunta. Si decide "
+                       "qui perché vale prima che l'ultima fase componga "
+                       "qualcosa."),
     "reserve_bibs": ("Sostituisci il numero di chi non parte con quello della "
                      "riserva."),
+    "starts_mode": ("Due alla volta è la batteria dell'inseguimento (uno per "
+                    "rettilineo); una alla volta è un ordine di partenza, come "
+                    "la velocità a squadre. Vale per questa prova: cambiarlo "
+                    "rimette in fila quello che hai già composto, senza "
+                    "perdere l'ordine."),
     "fill_pairs": "Accoppia gli iscritti a due a due, poi correggi quello che serve.",
     "fill_start_order": ("Mette {who} in ordine di iscrizione, poi correggi "
                          "quello che serve."),
@@ -693,6 +829,13 @@ HELP = {
                      "metterebbe mezzo alfabeto in una batteria sola."),
     "eliminate_pairs": ("Coppie eliminate da OGNI batteria, tra quelle partite "
                         "(regolamento UCI 3.2.157: mai meno di 2)."),
+    "spread_riders": ("Assegna gli atleti a giro: 1ª batteria, 2ª batteria, "
+                      "1ª, ... L'ordine è per dorsale, e dividerlo a metà "
+                      "metterebbe mezza categoria in una batteria sola."),
+    "eliminate_riders": ("Atleti eliminati da OGNI batteria, tra quelli "
+                         "partiti. Gli altri sono ammessi alle quattro prove "
+                         "dell'omnium. Il valore di partenza è quello del "
+                         "programma."),
     "compose_next": "Compone «{round}»{extra} da questi risultati.",
     "compose_next_uci": ("Compone «{round}» da questi risultati, secondo la "
                          "tabella UCI."),
@@ -700,6 +843,9 @@ HELP = {
                     "dai primi qualificati."),
     "load_madison_final": ("Porta in «{round}» le coppie qualificate da tutte "
                            "le batterie."),
+    "load_omnium_final": ("Porta nelle quattro prove dell'omnium gli atleti "
+                          "ammessi da tutte le batterie, alternandoli "
+                          "batteria per batteria."),
     "compose_from_previous": "Compone questa fase dalla classifica della precedente.",
 
     # -- sheet options -------------------------------------------------------
@@ -744,6 +890,16 @@ HELP = {
                        "(Iscritti_NNNNNN_KSPORT.xlsx) o il workbook con un "
                        "foglio per categoria. Non viene mai modificato: si "
                        "può ricaricare quando ne arriva uno nuovo."),
+    "use_overlay": ("Acceso, quello che la giuria cambia in Verifica resta a "
+                    "parte e viene riapplicato sopra al file a ogni ricarica; "
+                    "il file non viene mai toccato. Spento, la Verifica "
+                    "scrive direttamente nel workbook: la cella viene "
+                    "modificata nel file e il file riletto (una copia del "
+                    "precedente finisce in .snapshots). Verificato e NP ci "
+                    "vanno solo se il file ha le colonne (vanno aggiunte a "
+                    "mano e dichiarate in entries.check_in nel programme). Le "
+                    "modifiche già registrate non si perdono: restano da "
+                    "parte e tornano riaccendendolo."),
 
     # -- team recap ----------------------------------------------------------
     "team_group": ("Come si raggruppano gli atleti in classifica e nel "
@@ -756,24 +912,51 @@ HELP = {
                    "sola, una colonna per specialità con X, R o la lettera "
                    "dell'accoppiamento e, dove la giuria l'ha già composta, "
                    "la batteria."),
+    "short_headers": ("Intesta le colonne delle specialità con il nome breve "
+                      "(«Ins. Individuale», «Madison») invece della sigla UCI "
+                      "(«IP», «MD»). Si legge senza legenda, ma le colonne "
+                      "sono più larghe: con molte specialità conviene la "
+                      "sigla."),
+    "name_width": ("Quanto della larghezza delle due colonne Cognome e Nome "
+                   "tiene la colonna unica: 1.00 le tiene tutte, sotto lascia "
+                   "il resto alle colonne per cui il foglio si legge - volate, "
+                   "punti, società."),
 
     # -- decisions -----------------------------------------------------------
-    "decision_body": ("Quello che la giuria ha deciso, scritto come andrà "
-                      "letto fra un mese: chi, cosa, e in base a quale "
-                      "articolo. È l'unico campo obbligatorio."),
-    "decision_bibs": ("Dorsali a cui si riferisce, separati da virgola. "
-                      "Servono a comporre la riga della penalità con nome e "
-                      "categoria."),
     "penalty_class": ("A ammonizione, B ammenda, C retrocessione, "
-                      "D squalifica."),
-    "penalty_quick": ("Compone la riga della penalità - atleta, "
-                      "provvedimento, motivo UCI - e la aggiunge in fondo al "
-                      "testo, dove resta modificabile."),
+                      "D squalifica. Dà la tinta del riquadro sul "
+                      "comunicato."),
+    "penalty_quick": ("Le infrazioni della tabella UCI, con il numero con cui "
+                      "vanno citate. Si consulta: il testo della decisione si "
+                      "compone nel modulo di inserimento."),
     "puis_panel": ("Prontuario Unico Infrazioni Sportive: quanto prevede la "
                    "federazione per ogni infrazione, nella colonna delle "
                    "categorie in gara. Si consulta, non decide."),
-    "decision_context": ("Facoltativo: a quale gara si riferisce. Serve a "
-                         "ritrovarla, non entra nel testo."),
+    "decision_panel": ("La decisione si scrive qui, nella gara in cui è "
+                       "stata presa: finisce nel registro delle Decisioni "
+                       "già riferita a categoria, specialità e fase."),
+    "show_warnings": ("Stampa una W accanto a chi ha preso un'ammonizione in "
+                      "questa specialità: la porta con sé in tutte le fasi "
+                      "successive. Due ammonizioni nella stessa fase sono "
+                      "una squalifica."),
+    "include_warnings": ("Le ammonizioni (provvedimento A) nel registro "
+                         "stampato. Toglile per avere solo le decisioni che "
+                         "vanno pubblicate."),
+    "decision_codes": ("Apre il riquadro della decisione con il codice "
+                       "compatto sotto cui è stata presa (A1, C3). Di norma "
+                       "no: sul comunicato va la decisione scritta per "
+                       "esteso, il codice resta nel registro della giuria."),
+    "decision_code": ("Provvedimento e articolo UCI, in codice compatto: "
+                      "A1, C3, D5. Il provvedimento dà la tinta del riquadro "
+                      "sul comunicato, l'articolo la motivazione."),
+    "decision_bib": ("Il dorsale a cui si riferisce, scelto tra i partenti "
+                     "della fase. Più dorsali si scrivono separati da "
+                     "virgola."),
+    "decision_proposal": ("Il testo proposto dai campi qui sopra, nello stile "
+                          "delle decisioni già registrate. È una proposta: "
+                          "correggila, è quello che va sul comunicato."),
+    "decision_summary": ("Quello che è già stato deciso in questa specialità, "
+                         "fase per fase."),
 
     # -- check-in ------------------------------------------------------------
     "checked_in": "Licenza verificata: l'atleta è presente.",
@@ -785,6 +968,21 @@ HELP = {
     "event_flag_group": ("{event}: X iscritto, R riserva; una lettera "
                          "(A, B, C, ...) la {what} della regione, la stessa "
                          "lettera con R (AR, BR, ...) la sua riserva"),
+
+    # -- statistics ----------------------------------------------------------
+    "medal_table": ("Una specialità conta una volta sola, sulla sua classifica "
+                    "finale: l'omnium, la velocità e il keirin su tutte le "
+                    "fasi, le altre sull'ultima fase corsa."),
+    "include_unfinished": ("Le specialità la cui ultima fase non è ancora "
+                           "stata corsa restano fuori dal conteggio. Spuntando "
+                           "qui entrano, con il podio che risulta finora."),
+    "stats_print_detail": ("Sul foglio, sotto il medagliere, l'elenco dei podi "
+                           "da cui è contato: una riga si verifica sui "
+                           "comunicati senza riaprire l'app."),
+    "stats_no_printed_at": ("Toglie dal piè di pagina la riga «Emesso il…». Il "
+                            "medagliere si ristampa tutto il giorno: senza data "
+                            "e ora due copie identiche restano identiche. Il "
+                            "numero di pagina resta."),
 
     # -- programme -----------------------------------------------------------
     "save_programme": ("Riscrive `programme.yaml`. La versione precedente resta "
@@ -966,10 +1164,28 @@ MSG = {
     "team_caption": "Sui documenti la colonna si chiama «{name}» e contiene: {group}.",
     "no_race_for_category": "Nessuna gara in programma per questa categoria.",
     "no_pairs_entered": "Nessuna coppia iscritta in questa categoria.",
+    "no_riders_entered": "Nessun atleta iscritto a questa specialità.",
     "no_riders_for_filter": "Nessun atleta con questi filtri.",
     "no_riders_for_selection": "Nessun atleta per questa selezione.",
     "no_documents_for_selection": "Nessun documento per questa selezione.",
     "stale_patches": "Modifiche non più applicabili dopo il re-import:\n\n{list}",
+    "overlay_off": ("La Verifica scrive direttamente nel file iscritti. Le {n} "
+                    "modifiche già registrate restano da parte e non vengono "
+                    "applicate: verificati e NP tornano a essere quelli scritti "
+                    "nelle colonne del file, se ci sono."),
+    "edits_go_to_file": ("Le modifiche di questa pagina vengono scritte in "
+                         "{file} e il file viene riletto.{left_out}"),
+    "check_in_not_in_file": (" {what}: il file non ha una colonna per "
+                             "questo, quindi resta fuori."),
+    "written_to_file": "{n} celle scritte in {file}.",
+    "write_back_refused": "Non scritte nel file:\n\n{list}",
+    "write_back_not_xlsx": ("{file} non è un .xlsx: si può scrivere solo in "
+                            "quel formato."),
+    "write_back_no_column": "{name}: «{what}» non ha una colonna nel file.",
+    "write_back_no_event_column": ("{name}: il file non ha la colonna "
+                                   "{event} in questo foglio."),
+    "write_back_row_gone": ("{name}: la riga {source} non è più la sua, il "
+                            "file è cambiato. Ricarica e riprova."),
     "no_edits_to_save": "Nessuna modifica da salvare.",
     "reason_required": "Indica il motivo della modifica.",
     "edits_saved": "{n} modifiche registrate.",
@@ -985,7 +1201,11 @@ MSG = {
                         "nell'ordine di arrivo dell'ultima volata, oppure "
                         "dichiarati DNF / DNS / DSQ."),
     "pending_results": "{n} concorrenti ancora senza risultato.",
+    "pending_times": ("Tempi non ancora inseriti ({n} mancanti): l'ordine qui "
+                      "sopra è quello di partenza, non una classifica."),
     "times_missing": "{n} senza tempo: la classifica non li piazza.",
+    "tied_final_who": "{place}° a pari merito: {who}.",
+    "qual_final_who": "Sul tempo delle qualificazioni: {who}.",
     "no_previous_version": "Nessuna versione precedente.",
     "heat_wrong_size": ("{heat}ª batteria, corsia {lane}: {n} dorsali invece di "
                         "{size} ({bibs})."),
@@ -1010,6 +1230,7 @@ MSG = {
                                "con lo stesso numero non sono distinguibili "
                                "nell'ordine degli sprint."),
     "empty_heats": "Nessuna coppia nella {list}.",
+    "empty_heats_riders": "Nessun atleta nella {list}.",
     "heat_ordinal": "{n}ª batteria",
 
     # -- races: sending a race on --------------------------------------------
@@ -1029,6 +1250,11 @@ MSG = {
     "madison_no_qualified": ("Nessuna coppia qualificata: inserisci prima i "
                              "risultati delle batterie."),
     "madison_final_loaded": "«{round}»: {n} coppie in finale.",
+    "omnium_heat_no_result": ("«{round}»: nessun risultato, i suoi atleti non "
+                              "sono tra gli ammessi."),
+    "omnium_no_qualified": ("Nessun atleta ammesso: inserisci prima i "
+                            "risultati delle batterie."),
+    "omnium_final_loaded": "{round}: {n} atleti ammessi.",
 
     # -- races: what has not been loaded yet ---------------------------------
     "finals_not_loaded": ("Finali non caricate dalla qualificazione. Apri "
@@ -1037,6 +1263,12 @@ MSG = {
     "finals_not_loaded_keirin": ("Finali non caricate. Corri «{round}» → "
                                  "**Risultati** → **Carica Finali**: da lì "
                                  "arrivano le due finali con i loro partenti."),
+    # a velocità is seeded round by round: a fase opened before the round
+    # before it has composed shows the whole elenco iscritti and no batterie
+    "sprint_round_not_loaded": ("«{round}» non è ancora composta: apri "
+                                "«{prev}» → **{doc}** → **{button}**. "
+                                "Senza, la fase parte con tutti gli iscritti "
+                                "e senza batterie."),
     "qualifying_no_times": "«{round}» non ha ancora tempi salvati.",
     "teams_not_qualified": "squadre non qualificate",
     "riders_not_qualified": "atleti non qualificati",
@@ -1046,6 +1278,9 @@ MSG = {
     "repechages_from_losers": ("I recuperi si compongono dai perdenti del 1° "
                                "turno, appena ogni batteria ha un risultato."),
     "final_5_8_from_quarters": "La finale 5°-8° si compone dai quarti.",
+    "quarters_from_winners": ("I quarti si compongono dai vincitori delle "
+                              "batterie e dei recuperi, appena ogni batteria "
+                              "ha un risultato."),
 
     # -- sheet notes the jury starts from ------------------------------------
     "note_scheme_12": "Si qualificano per il 1° turno i migliori 12 tempi.",
@@ -1054,6 +1289,14 @@ MSG = {
     "note_madison_startlist": ("Non si qualificano per la finale le ultime {n} "
                                "coppie tra le partenti."),
     "note_madison_results": "Passano alla finale le prime {n} coppie classificate.",
+    "note_omnium_startlist_m": ("Non sono ammessi alle prove dell'omnium gli "
+                                "ultimi {n} classificati tra i partenti."),
+    "note_omnium_startlist_f": ("Non sono ammesse alle prove dell'omnium le "
+                                "ultime {n} classificate tra le partenti."),
+    "note_omnium_results_m": ("Sono ammessi alle prove dell'omnium i primi {n} "
+                              "classificati."),
+    "note_omnium_results_f": ("Sono ammesse alle prove dell'omnium le prime "
+                              "{n} classificate."),
     "note_sprint_round1_start": ("{winner} di ogni batteria passa ai quarti di "
                                  "finale, {others} ai recuperi."),
     "note_sprint_round1_results": ("{winner} di ogni batteria dei recuperi passa "
@@ -1097,12 +1340,36 @@ MSG = {
     "decision_day": "giornata {day}",
     "no_penalties_table": "Tabella delle penalità non disponibile.",
     "no_puis_table": "Prontuario PUIS non disponibile.",
+    # the W a rider carries through the specialità, and the second one
+    "warned_carried": "Ammoniti in questa specialità: {bibs}.",
+    "warned_twice": ("Due ammonizioni nella stessa fase: {bibs}. "
+                     "Il regolamento chiede la squalifica."),
+    "warned_none": "Nessuna ammonizione in questa specialità.",
+    # which race the sidebar panel is filing a decision about
+    "decision_of_this_race": "{cat} · {event} · {round}",
+    # the compact recap above the button, one line per fase
+    "decision_recap_line": "{code} dors. {bibs}",
+    "decision_recap_note": "nota",
+    # the line under a classifica that no longer lists them
+    "dns_note": "Non partiti: {bibs}.",
+    # the speaker's banner over a race against the clock
+    "provisional_time": "{n}° tempo provvisorio",
+
+    # -- statistics ----------------------------------------------------------
+    "stats_no_results": ("Nessuna specialità conclusa: il medagliere è ancora "
+                         "vuoto."),
+    "stats_nothing_selected": "Nessuna specialità nel filtro scelto.",
+    "stats_counting_unfinished": ("{n} specialità non concluse sono contate "
+                                  "con il podio che risulta finora."),
+    "stats_no_teams": ("Nessun podio ha una {what}: controlla l'elenco "
+                       "iscritti."),
 
     # -- printing ------------------------------------------------------------
     "chromium_missing": ("Chromium non installato: verrà salvato l'HTML "
                          "(stampabile con Ctrl+P)."),
     "pdf_no_browser": "Nessun browser Chromium trovato: impossibile creare il PDF.",
     "pdf_failed": "Chromium non ha prodotto il PDF. {error}",
+    "pdf_timeout": "Chromium bloccato da {seconds} s su {dir}.",
     "saved_as": "Salvato {name}",
     "saved_entry_lists": "Salvati {n} elenchi",
     "race_saved": "Gara salvata",
@@ -1125,6 +1392,10 @@ MSG = {
     "letterhead_caption": ("Immagini stampate in cima e in fondo a ogni foglio "
                            "dei comunicati (SVG, PNG o JPEG). A schermo non "
                            "compaiono."),
+    "note_colors_caption": ("Come ogni decisione compare sul comunicato della "
+                            "fase in cui è stata presa: il colore del "
+                            "riquadro, e se aprirlo con il codice UCI. La "
+                            "nota resta grigia: non sanziona nessuno."),
     "reset_caption": ("Cancella i risultati salvati di una specialità: **tutte "
                       "le fasi**, qualificazioni e batterie comprese. Non tocca "
                       "l'elenco iscritti né la verifica licenze; i comunicati "
@@ -1177,11 +1448,28 @@ MSG = {
     "count_entered_starters": "{entered} iscritti / {starters} partenti",
     "count_starters": "{n} partenti",
     "count_documents": "{n} documenti  ·  {issued} emessi",
+    "count_decisions": "{n} decisioni",
+    "count_medals": "{events} {concluded}  ·  {podiums} {podium}  ·  {teams} {team}",
+    # the four words the line above agrees with: a sheet that says "1
+    # specialità concluse" is read as a sheet nobody proof-read
+    "medals_concluded_one": "specialità conclusa",
+    "medals_concluded_many": "specialità concluse",
+    "medals_podium_one": "podio",
+    "medals_podium_many": "podi",
+    "medals_team_one": "squadra",
+    "medals_team_many": "squadre",
+    "medal_counting_note": ("Le specialità non ancora concluse sono contate "
+                            "con il podio che risulta finora: il foglio è "
+                            "provvisorio."),
+    "medal_open_events": "Specialità non ancora concluse:  {list}",
     "count_recap": "{riders} atleti  ·  {entries} iscrizioni",
-    "recap_legend": ("Sigle specialità:  {list}.    Nelle caselle: X iscritto, "
-                     "R riserva, A/B la coppia o la squadra negli "
-                     "accoppiamenti (AR = riserva della squadra A); il numero "
-                     "che segue è la batteria, dove è già stata comunicata."),
+    "recap_legend": ("Sigle specialità:  {list}.    {marks}"),
+    # what the cells say - it is read whatever the columns are headed by, so
+    # it stands on its own line of the dictionary
+    "recap_marks": ("Nelle caselle: X iscritto, R riserva, A/B la coppia o la "
+                    "squadra negli accoppiamenti (AR = riserva della squadra "
+                    "A); il numero che segue è la batteria, dove è già stata "
+                    "comunicata."),
     "no_teams": ("Nessuna squadra: gli atleti non hanno una regione o una "
                  "società."),
     "heats_count": "{n} batterie",
@@ -1261,6 +1549,11 @@ def status_name(code: str) -> str:
 def penalty_name(code: str) -> str:
     """Spelled-out degree of a penalty ('C' -> 'Retrocessione')."""
     return PENALTIES.get(str(code).upper(), str(code))
+
+
+def note_kind_name(kind: str) -> str:
+    """What a block on a sheet is ('relegation' -> 'Retrocessione')."""
+    return NOTE_KINDS.get(str(kind), str(kind))
 
 
 def plural(n: int, one: str, many: str) -> str:

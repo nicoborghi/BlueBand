@@ -4,7 +4,9 @@ Scratch, tempo race and elimination are scored by placing on the UCI scale
 (40 for the win, then -2 per place down to 2 for 20th, 1 from 21st on). The
 points race is different: the points actually scored in it are **added** to the
 running total, so a rider can still overturn the standings in the last race.
-Ties are broken by the placing in the points race.
+Ties are broken by the placing in the points race, and between two riders that
+race has not separated - a classifica parziale, where it has not been ridden -
+by the placing in the last prova ridden.
 """
 
 from __future__ import annotations
@@ -63,6 +65,7 @@ def omnium_classification(rounds: dict[str, Result], *,
     totals: dict[str, int] = {k: 0 for k in keys}
     per_round: dict[str, dict[str, int]] = {k: {} for k in keys}
     tiebreak: dict[str, int] = {}
+    last_place: dict[str, int] = {}       # placing in the last prova ridden
     detail: dict[str, dict] = {}
     carried: dict[str, Status] = {}
 
@@ -87,6 +90,10 @@ def omnium_classification(rounds: dict[str, Result], *,
                     carried[p.key] = p.status
             per_round[p.key][name] = pts
             totals[p.key] = totals.get(p.key, 0) + pts
+            # the prove are read in order, so what stays is the placing in the
+            # last one ridden: it is what separates two riders on the same
+            # points (below, in the sort)
+            last_place[p.key] = p.position or 10 ** 6
 
     placings = []
     for k in keys:
@@ -102,7 +109,13 @@ def omnium_classification(rounds: dict[str, Result], *,
             **{points_key(name): scored.get(name) for name in ROUNDS},
         }))
 
-    placings.sort(key=lambda p: (-p.data["total"], tiebreak.get(p.key, 10 ** 6)))
+    # points first; then, between riders on the same points, the placing in the
+    # last prova ridden - from the 21st place down a whole group of them scores
+    # 1 point, and a classifica that left them in startlist order would be read
+    # as saying they finished that way. The corsa a punti decides the
+    # classifica finale (3.2.109) and is asked first, being the last prova.
+    placings.sort(key=lambda p: (-p.data["total"], tiebreak.get(p.key, 10 ** 6),
+                                 last_place.get(p.key, 10 ** 6)))
     placings = sort_by_status(placings)
     n = 0
     for p in placings:

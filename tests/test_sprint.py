@@ -6,8 +6,10 @@ notation - which is what the jury does at the track.
 import pytest
 
 from core import race as R
+from core.config import DOC_RESULTS, DOC_RESULTS_REP
 from core.entries import import_master, save_import
 from core.formats import sprint as S
+from core.i18n import ui
 from core.models import Status
 from core.parse import parse_time
 
@@ -37,6 +39,30 @@ def test_the_repechages_split_the_losers_by_their_batteria():
     losers = [f"L{i}" for i in range(1, 7)]
     assert S.repechage_heats(losers) == [["L1", "L4", "L6"],
                                          ["L2", "L3", "L5"]]
+
+
+def test_the_jury_confirms_the_repechage_composition(ev, comp, entries):
+    """A recupero the jury re-composed is the one that is ridden - until the
+    turno 1 sends a different field to it, when it is seeded again."""
+    el = entries
+    qual = _qualify(ev, comp, el)
+    R.load_sprint_round(ev, comp, el, qual)
+    t1 = ev.load_race(R.race_key("AL", "velocita", S.TURNO1))
+    heats = R.bracket_heats(t1)
+    t1.payload["results"] = R.heats_text([[h[0], h[1]] for h in heats])
+
+    seeded = R.sprint_repechages(t1)
+    # two riders swapped between the two recuperi: same field, other batterie
+    mine = [[seeded[1][0]] + seeded[0][1:], [seeded[0][0]] + seeded[1][1:]]
+    t1.payload[R.REP_HEATS] = R.heats_text(mine)
+    assert R.sprint_repechages(t1) == mine
+
+    # the turno 1 is corrected and somebody else goes to the recuperi: the
+    # composition on the race is about a field that no longer exists
+    t1.payload["results"] = R.heats_text([[h[1], h[0]] for h in heats])
+    reseeded = R.sprint_repechages(t1)
+    assert {k for h in reseeded for k in h} == {h[0] for h in heats}
+    assert reseeded == S.repechage_heats([h[0] for h in heats])
 
 
 def test_the_repechés_are_the_last_two_of_the_quarti():
@@ -76,11 +102,17 @@ def test_below_the_eighth_place_the_200_m_decides():
 
 # ── the whole event, through the service ────────────────────────────────────
 
-def _qualify(ev, comp, el, cat="AL", event="velocita"):
-    """Ride the 200 m: a time for everybody, fastest bib first."""
+def _qualify(ev, comp, el, cat="AL", event="velocita", final_5_8=True):
+    """Ride the 200 m: a time for everybody, fastest bib first.
+
+    The scheme and the 5°-8° are both settled on this round, so a test that
+    starts here says which of the two velocità it is riding rather than
+    inheriting whatever the championship file happens to plan this year.
+    """
     key = R.sprint_qualifying(comp, cat, event)
     st = R.ensure_state(ev, comp, cat, event, key, el)
     st.payload[R.SCHEME] = "12"
+    st.payload[R.FINAL_58] = final_5_8
     st.payload["times"] = {k: parse_time(f"11,{i:03d}")
                            for i, k in enumerate(st.entrants)}
     ev.save_race(st)
@@ -93,7 +125,21 @@ def test_the_scheme_is_read_back_from_the_qualifying_round(ev, comp, entries):
     st.payload[R.SCHEME] = "8"
     ev.save_race(st)
     assert R.sprint_scheme(ev, comp, "AL", "velocita").qualify == 8
-    # ED has no first round in the programme: eight, without being told
+
+
+def test_a_programme_without_a_first_round_runs_to_eight(ev, comp, entries,
+                                                         monkeypatch):
+    """Nothing chosen yet: the programme decides, by the rounds it schedules.
+
+    Every category of CITA 26 rides the twelve - the ED went from the quarti to
+    the first round on 05.08.2026 - so the fallback is exercised on a programme
+    with the first round taken out, which is what a small category looks like.
+    """
+    rounds = type(comp).rounds
+    monkeypatch.setattr(type(comp), "rounds",
+                        lambda self, cat, event: [
+                            r for r in rounds(self, cat, event)
+                            if r.key != S.TURNO1])
     assert R.sprint_scheme(ev, comp, "ED", "velocita").key == "8"
 
 
@@ -169,6 +215,135 @@ def test_a_velocita_runs_from_the_200_m_to_the_champion(ev, comp, entries):
     assert res.placings[0].position == 1
 
 
+def _ridden_turno_1(ev, comp, el):
+    """A turno 1 with every batteria and every recupero ridden."""
+    qual = _qualify(ev, comp, el)
+    R.load_sprint_round(ev, comp, el, qual)
+    t1 = ev.load_race(R.race_key("AL", "velocita", S.TURNO1))
+    heats = R.bracket_heats(t1)
+    t1.payload["results"] = R.heats_text([[h[0], h[1]] for h in heats])
+    t1.payload[R.REP_RESULTS] = R.heats_text(R.sprint_repechages(t1))
+    ev.save_race(t1)
+    return t1
+
+
+def test_the_jury_can_redraw_the_quarti_before_they_are_loaded(ev, comp,
+                                                               entries):
+    """The seeding is a starting point: what the jury types is what starts.
+
+    The eight are the same eight - the composition only says who meets whom -
+    and it is what the quarti are loaded with, and what the block printed under
+    the risultati recuperi announces.
+    """
+    el = entries
+    t1 = _ridden_turno_1(ev, comp, el)
+    seeded = R.heats_from_text(R.sprint_next(ev, comp, el, t1)[1]["heats"])
+
+    # the jury swaps the two riders of the first quarto with those of the last
+    fixed = [seeded[3], seeded[1], seeded[2], seeded[0]]
+    t1.payload[R.NEXT_HEATS] = R.heats_text(fixed)
+
+    nxt, n = R.load_sprint_round(ev, comp, el, t1)
+    assert (nxt, n) == (S.QUARTI, 4)
+    q = ev.load_race(R.race_key("AL", "velocita", S.QUARTI))
+    assert R.bracket_heats(q) == fixed
+    # and the sheet that publishes it says the same thing
+    blocks = R.sprint_composition(ev, comp, el, t1, DOC_RESULTS_REP)
+    assert blocks[0][1] == fixed
+    # it is filed with the round that composed it: pressing the button again
+    # does not seed it back to the table
+    assert R.bracket_heats(ev.load_race(t1.race_id), R.NEXT_HEATS) == fixed
+
+
+def test_a_redrawn_quarto_is_seeded_again_when_the_field_changes(ev, comp,
+                                                                 entries):
+    """A composition holds only while it is about the same riders.
+
+    A recupero corrected sends somebody else to the quarti: the jury's pairing
+    is about riders who are no longer all in it, and starting it would leave
+    the newcomer out of the race.
+    """
+    el = entries
+    t1 = _ridden_turno_1(ev, comp, el)
+    seeded = R.heats_from_text(R.sprint_next(ev, comp, el, t1)[1]["heats"])
+    t1.payload[R.NEXT_HEATS] = R.heats_text(
+        [seeded[3], seeded[1], seeded[2], seeded[0]])
+
+    # the first recupero was won by the rider behind, who takes the place in
+    # the quarti of the one written down first
+    rep = R.bracket_orders(t1, R.REP_RESULTS)
+    was, comes_up = rep[0][0], rep[0][1]
+    rep[0] = [comes_up, was] + rep[0][2:]
+    t1.payload[R.REP_RESULTS] = R.heats_text(rep)
+
+    fresh = R.heats_from_text(R.sprint_next(ev, comp, el, t1)[1]["heats"])
+    flat = [k for h in fresh for k in h]
+    assert comes_up in flat and was not in flat
+    assert fresh == S.quarter_heats(
+        [k for k in R.heat_winners(R.bracket_orders(t1)) if k],
+        [k for k in R.heat_winners(
+            R.bracket_orders(t1, R.REP_RESULTS)) if k])
+
+
+def test_a_velocita_without_the_5_8_final_still_fills_those_places(ev, comp,
+                                                                   entries):
+    """The 5°-8° turned off: no race, no sheet, and the places still decided.
+
+    With the finals 1°-4° alone nothing after the quarti separated anybody
+    under the fourth place, and the classification goes on from the fifth with
+    the one race they all rode: the 200 m. The four beaten in the quarti are in
+    it like everybody else - they hold no place of their own, because no race
+    gave them one.
+    """
+    el, cat = entries, "AL"
+    qual = _qualify(ev, comp, el, final_5_8=False)
+    ranked = [p.key for p in R.classify(qual, el, comp).placings if p.position]
+    assert R.sprint_has_58(ev, comp, cat, "velocita") is False
+
+    R.load_sprint_round(ev, comp, el, qual)
+    t1 = ev.load_race(R.race_key(cat, "velocita", S.TURNO1))
+    heats = R.bracket_heats(t1)
+    t1.payload["results"] = R.heats_text([[h[0], h[1]] for h in heats])
+    t1.payload[R.REP_RESULTS] = R.heats_text(R.sprint_repechages(t1))
+    ev.save_race(t1)
+
+    R.load_sprint_round(ev, comp, el, t1)
+    q = ev.load_race(R.race_key(cat, "velocita", S.QUARTI))
+    qh = R.bracket_heats(q)
+    q.payload["results"] = R.heats_text([[h[0], h[1]] for h in qh])
+    ev.save_race(q)
+
+    # the quarti compose the semifinali and nothing else
+    R.load_sprint_round(ev, comp, el, q)
+    assert R.sprint_composition(ev, comp, el, q, DOC_RESULTS) == [
+        (R.composition_title(ui("semifinals_full")),
+         [[qh[0][0], qh[3][0]], [qh[1][0], qh[2][0]]])]
+
+    sf = ev.load_race(R.race_key(cat, "velocita", S.SEMI))
+    sh = R.bracket_heats(sf)
+    sf.payload["results"] = R.heats_text([[h[0], h[1]] for h in sh])
+    ev.save_race(sf)
+
+    R.load_sprint_round(ev, comp, el, sf)
+    fin = ev.load_race(R.race_key(cat, "velocita", S.FINALI))
+    assert R.bracket_heats(fin, R.HEATS_58) == []
+    assert len(fin.entrants) == 4          # the four finalists, nobody else
+    fh = R.bracket_heats(fin)
+    fin.payload["results"] = R.heats_text([[h[0], h[1]] for h in fh])
+    ev.save_race(fin)
+
+    res = R.sprint_standings(ev, comp, el, cat, "velocita")
+    order = [p.key for p in res.placings]
+    assert order[:4] == [fh[1][0], fh[1][1], fh[0][0], fh[0][1]]
+    # from the fifth place the classification is the 200 m, in that order and
+    # in no other: a rider out in the turno 1 who qualified faster than one
+    # beaten in the quarti is ahead of her
+    assert order[4:] == [k for k in ranked if k not in order[:4]]
+    assert res.placings[7].position == 8
+    beaten = [h[1] for h in qh]
+    assert set(order[4:]) >= set(beaten)
+
+
 def test_a_decision_taken_in_a_final_stands_in_the_classification(ev, comp,
                                                                   entries):
     """A rider squalificata in the 1°/2° final leaves the classification.
@@ -207,8 +382,8 @@ def test_a_decision_taken_in_a_final_stands_in_the_classification(ev, comp,
     assert out.key == fh[1][0] and out.status is Status.DSQ and not out.position
 
 
-def test_a_category_of_nine_goes_straight_to_the_quarti(ev, comp, entries):
-    """ED: eight qualify from the 200 m and the first round is not ridden.
+def test_the_eight_scheme_goes_straight_to_the_quarti(ev, comp, entries):
+    """Eight qualify from the 200 m and the first round is not ridden.
 
     Same machinery, one round shorter - which is the point of the scheme being
     a choice on the qualifying round instead of a branch in the code.
@@ -216,6 +391,8 @@ def test_a_category_of_nine_goes_straight_to_the_quarti(ev, comp, entries):
     el, cat = entries, "ED"
     key = R.sprint_qualifying(comp, cat, "velocita")
     st = R.ensure_state(ev, comp, cat, "velocita", key, el)
+    st.payload[R.SCHEME] = "8"
+    ev.save_race(st)
     assert R.sprint_scheme(ev, comp, cat, "velocita").note.startswith(
         "Si qualificano direttamente ai quarti")
     st.payload["times"] = {k: parse_time(f"12,{i:03d}")

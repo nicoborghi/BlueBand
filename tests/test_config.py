@@ -50,6 +50,27 @@ def test_distances_come_from_the_workbooks(comp):
     assert comp.distances("AL", "ins_squadre", "Finali") == (3.0, 9.0, 0)
 
 
+def test_a_tempo_race_sprints_every_lap_but_the_first_four(comp):
+    """Its volate are the laps less four, and the programme cannot say otherwise.
+
+    Everywhere else an explicit value wins; here it does not, because the count
+    is not a choice: the tempo race neutralises four laps and sprints on every
+    one after them.
+    """
+    for cat, laps in (("AL", 15.0), ("DA", 12.0), ("ES", 12.0), ("ED", 12.0)):
+        d, n_laps, sprints = comp.distances(cat, "omnium", "Tempo Race")
+        assert (n_laps, sprints) == (laps, int(laps) - 4)
+
+    from dataclasses import replace as _replace
+    item = comp.scheduled("AL", "omnium")
+    rounds = [_replace(r, sprints=12) if r.key == "Tempo Race" else r
+              for r in item.rounds]
+    doctored = _replace(comp, programme=[_replace(item, rounds=rounds)
+                                         if p is item else p
+                                         for p in comp.programme])
+    assert doctored.distances("AL", "omnium", "Tempo Race")[2] == 11
+
+
 def test_defaults_derived_from_track_length():
     # 3 km on a 333 m track = 9 laps; timed competitions keep half-lap resolution.
     # A nominal 0.33333 must not push these up to 9.5 / 2.0(old track.py bug).
@@ -65,17 +86,17 @@ def test_defaults_derived_from_track_length():
 
 def test_comunicato_register(comp):
     """The register is the 2026 numbering, verified against the jury workbooks."""
-    assert len(comp.communiques) == 138
+    assert len(comp.communiques) == 140
     by_n = {c.n: c for c in comp.communiques}
-    assert [c.n for c in comp.communiques] == list(range(1, 139))
+    assert [c.n for c in comp.communiques] == list(range(1, 141))
 
     assert by_n[1].title == "Iscritti ES"
     assert (by_n[5].cat, by_n[5].event, by_n[5].doc) == ("ES", "madison", "partenti")
     assert by_n[7].round_key == "Qualificazioni"  # AL Ins. Squadre StartList_Qual
     assert by_n[30].doc == "classifica"  # AL Ins. Squadre classifica
-    assert by_n[92].ret and by_n[92].label == "92 RET"
-    assert by_n[93].title.startswith("AL Omnium Qualificazioni Batteria 2")
-    assert (by_n[138].cat, by_n[138].event) == ("DA", "madison")
+    assert by_n[93].ret and by_n[93].label == "93 RET"
+    assert by_n[94].title.startswith("AL Omnium Qualificazioni Batteria 2")
+    assert (by_n[140].cat, by_n[140].event) == ("DA", "madison")
 
     # every entry resolves to a known category and event
     for c in comp.communiques:
@@ -87,7 +108,7 @@ def test_comunicato_register(comp):
 def test_days(comp):
     assert comp.days() == [1, 2, 3, 4]
     per_day = {d: sum(1 for c in comp.communiques if c.day == d) for d in comp.days()}
-    assert per_day == {1: 32, 2: 55, 3: 33, 4: 18}
+    assert per_day == {1: 32, 2: 56, 3: 34, 4: 18}
 
 
 # ── what a squadra is, at this competition ──────────────────────────────────

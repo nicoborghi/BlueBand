@@ -13,13 +13,14 @@ import streamlit as st
 from core.i18n import ui
 from ui import notify, state, style
 from ui.pages import (check_in, decisions, documents, programme, races,
-                      settings)
+                      settings, stats)
 
 PAGES = {
     ui("page_races"): races.render,
     ui("page_check_in"): check_in.render,
     ui("page_decisions"): decisions.render,
     ui("page_documents"): documents.render,
+    ui("page_stats"): stats.render,
     ui("page_programme"): programme.render,
     ui("page_settings"): settings.render,
 }

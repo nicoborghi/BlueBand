@@ -36,13 +36,14 @@ import pandas as pd
 import streamlit as st
 
 from core import config as C
+from core import decisions as DEC
 from core import entries as E
 from core import race as R
 from core import recap as RC
 from core.config import EVENT_ENTRY_LIST, Competition, validate
-from core.i18n import help_text, label, msg, ui
+from core.i18n import help_text, label, msg, note_kind_name, ui
 from core.store import Store, list_competitions
-from render.render import data_uri
+from render.render import darken, data_uri
 from ui import notify, state
 
 
@@ -139,6 +140,29 @@ def _entries(comp: Competition, store: Store) -> None:
     patches = E.load_overlay(store)
     if patches:
         st.caption(ui("overlay_kept", n=len(patches)))
+
+    _overlay_switch(store, len(patches))
+
+
+def _overlay_switch(store: Store, n_patches: int) -> None:
+    """Whether the jury's edits are a layer on top, or go into the file.
+
+    On, they are patches applied over each import - the app never writes the
+    workbook. Off, Verifica edits the workbook itself: the cell is written,
+    the file is re-imported, and the patches already recorded are set aside
+    rather than thrown away - they come back whole when this goes back on.
+    """
+    on = E.overlay_on(store)
+    new = st.toggle(ui("use_overlay"), value=on, key="use_overlay",
+                    help=help_text("use_overlay"))
+    if new != on:
+        E.set_overlay_on(store, new)
+        state.refresh()
+    if not new:
+        # verificati and NP live in the overlay and nowhere else: the workbook
+        # has no column for either, so with it off the licence check reads
+        # empty. It is not lost - it is not being applied.
+        notify.warn("overlay_off", n=n_patches)
 
 
 # ── 3. what a squadra is, and what it is called ─────────────────────────────
@@ -265,6 +289,58 @@ def _appearance(comp: Competition, store: Store) -> None:
         _signature(comp, store)
     with st.expander(ui("name_style"), expanded=False):
         _name_style(comp, store)
+    with st.expander(ui("note_colors"), expanded=False):
+        _note_colors(comp, store)
+
+
+def _note_colors(comp: Competition, store: Store) -> None:
+    """How a decision is printed on a comunicato: its tint, and its code.
+
+    One colour per kind and no more: the rule down the side of the box is
+    derived from it (`render.render.darken`), so the pair cannot drift apart
+    and there is one decision to make per provvedimento instead of two.
+
+    Written as a whole dict rather than key by key - a settings file holding
+    half a palette is one whose other half silently follows a default that may
+    change - and the preview under the pickers is the box as it prints.
+
+    The compact UCI code (`A1`, `C3`) is off: a comunicato carries the decision
+    written out, and the article it was taken under is in the jury's own
+    register. A panel that quotes it on paper turns it on here, once.
+    """
+    b = comp.branding
+    st.caption(msg("note_colors_caption"))
+    codes = st.checkbox(ui("decision_codes"), value=b.decision_codes,
+                        key="decision_codes",
+                        help=help_text("decision_codes"))
+    if codes != b.decision_codes:
+        store.set_setting("decision_codes", codes)
+        state.refresh()
+    picked = {}
+    for i, kind in enumerate(DEC.NOTE_KINDS):
+        col = st.columns([1, 3])
+        picked[kind] = col[0].color_picker(
+            note_kind_name(kind), b.note_colors.get(kind, ""),
+            key=f"note_color_{kind}")
+        col[1].html(_swatch(kind, picked[kind]))
+    c1, c2 = st.columns([1, 1])
+    if c1.button(ui("save"), key="save_note_colors",
+                 disabled=picked == b.note_colors):
+        store.set_setting("note_colors", picked)
+        state.refresh()
+    if c2.button(ui("note_colors_reset"), key="reset_note_colors",
+                 disabled=b.note_colors == C.NOTE_COLORS):
+        store.set_setting("note_colors", dict(C.NOTE_COLORS))
+        state.refresh()
+
+
+def _swatch(kind: str, color: str) -> str:
+    """The box as the sheet prints it - the one preview that answers the question."""
+    return (f'<div style="background:{color};'
+            f'border-left:3px solid {darken(color)};'
+            'padding:2px 8px;border-radius:2px;font-weight:600;'
+            'font-size:0.85rem;color:#222">'
+            f'{note_kind_name(kind)}</div>')
 
 
 SIG_MODE_LABELS = {C.SIG_IMAGE: ui("sig_mode_image"),
@@ -341,6 +417,17 @@ def _name_style(comp: Competition, store: Store) -> None:
     if style != b.name_style:
         store.set_setting("name_style", style)
         state.refresh()
+
+    if style == C.NAME_FULL:
+        # one column has to hold "ROSSI Mario Luigi" and no more: what it does
+        # not take goes to the columns the sheet is read for - le volate, i
+        # punti, la società - so it is worth being able to tune it here
+        width = st.slider(ui("name_width"), C.NAME_WIDTH_MIN,
+                          C.NAME_WIDTH_MAX, float(b.name_width), 0.02,
+                          key="name_width", help=help_text("name_width"))
+        if width != b.name_width:
+            store.set_setting("name_width", width)
+            state.refresh()
 
 
 def _image_setting(comp: Competition, store: Store, key: str, title: str,

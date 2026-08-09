@@ -1,28 +1,38 @@
-"""DECISIONS ("Decisioni") - the log the jury secretary keeps by hand.
+"""DECISIONS ("Decisioni") - the log the jury keeps, read back.
 
 Everything a panel decides that is not a result: a penalty, a reclamo, a
-derogation, a start refused. Until now it went on paper; here it goes in
-`decisions.json`, numbered, timestamped and kept with the competition.
+derogation, a start refused. Each one is a row of a register - categoria,
+specialità, fase, dorsale, the compact UCI code (`A1`, `C3`) - with the
+sentence that goes out to the teams under it.
 
-The page is a big text field and nothing in its way. What surrounds it only
-saves typing:
+It is normally written **in the race it was taken in**, from the Decisioni
+panel in the sidebar of Gare, and lands here already knowing which race it
+belongs to. It can also be written here, from the same form: the fase is picked
+instead of being the one on screen. What must not happen is a decision composed
+from memory with no race attached - that is one that has lost the categoria,
+the specialità and the fase that make it findable.
 
-* the row of pickers says *which race* a decision belongs to, so it can be
-  found again - it is not part of the text;
-* **Penalità rapide** composes the line a penalty goes out as (athlete,
-  degree, the UCI wording of the offence) and appends it to the text, where it
-  stays editable;
-* **Cosa prevede il PUIS** is the federal table, read-only, in the column of
-  the categories in gara.
+The page is the register read three ways:
 
-The structure is there for the day the races page files its own decisions here
-(a DSQ typed into a result is a decision the panel took): the fields are the
-ones a race would fill in.
+* **per specialità** - what was decided in each fase of a categoria's evento,
+  which is the recap the panel signs off;
+* **in the order taken** - the log itself, numbered, corrected in place;
+* **on paper** - the sheet the federation asks for afterwards.
+
+What surrounds it are the two reference tables, read-only:
+
+* **Penalità UCI** - the wording of the usual track offences, numbered as the
+  UCI numbers them;
+* **Cosa prevede il PUIS** - the federal table of what each infringement costs,
+  in the column of the categories in gara.
+
+The tick *Includi le ammonizioni* is what the printed register carries: an
+ammonizione (provvedimento A) is a decision like any other, but it is the one
+that is normally not published - it follows the rider on the sheets instead,
+as a W (see `core.decisions`).
 """
 
 from __future__ import annotations
-
-from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -30,181 +40,166 @@ import streamlit as st
 from core import decisions as D
 from core import entries as E
 from core.config import EVENT_ENTRY_LIST, Competition
-from core.i18n import help_text, label, msg, penalty_name, ui
-from core.parse import ParseError, parse_bibs
+from core.i18n import help_text, label, msg, note_kind_name, ui
 from core.store import Store
+from render import documents as DOC
+from ui import decisions_form as DF
 from ui import notify
+from ui.download import save_button
 from ui.state import sticky_select
 
-#: Widget keys cleared once a decision has been filed.
-COMPOSER_KEYS = ("dec_text", "dec_bibs", "dec_class")
-
-NONE = ""  # a decision that is not a penalty - the usual case
+ALL = ""  # every categoria / every specialità: the register as it stands
 
 
 def render(competition: str, comp: Competition, store: Store) -> None:
-    # names make the penalty line readable; without an import the page still
-    # works, on the bibs alone
-    el, _stale = E.effective_entries(store, comp)
-
-    _composer(comp, store, el)
+    taken = D.load(store)
+    cat, event, shown = _filters(comp, taken)
+    _new(comp, store, cat, event)
     st.divider()
-    _taken(comp, store)
+    _by_round(comp, store, taken, cat, event)
+    _register(comp, store, shown)
+    st.divider()
+    _taken(comp, store, shown)
+    st.divider()
+    _reference(comp)
 
 
-# ── writing one down ────────────────────────────────────────────────────────
+# ── what the page is about ──────────────────────────────────────────────────
 
-def _composer(comp: Competition, store: Store, el) -> None:
-    st.subheader(ui("decision_new"))
-    day, cat, event, bibs = _context(comp)
-    penalty = st.radio(ui("penalty"), [NONE, *D.CLASSES], horizontal=True,
-                       key="dec_class", format_func=_penalty_label,
-                       help=help_text("penalty_class"))
-    # above the text and not under it: it is what *writes* the text, and a
-    # panel that composes a line belongs before the line it composes
-    _quick_penalty(comp, el, cat, bibs)
-    text = st.text_area(ui("decision_body"), key="dec_text", height=260,
-                        help=help_text("decision_body"))
+def _filters(comp: Competition, taken: list[D.Decision]
+             ) -> tuple[str, str, list[D.Decision]]:
+    """Which decisions the page is about: the pickers over the register."""
+    c1, c2, c3 = st.columns([1, 2, 2])
+    cat = sticky_select(c1, ui("decisions_filter_cat"),
+                        [ALL, *comp.cat_order()], "dec_f_cat",
+                        format_func=lambda c: c or ui("decisions_all"))
+    events = [s for s in (comp.events_for(cat) if cat else comp.event_order())
+              if s != EVENT_ENTRY_LIST]
+    event = sticky_select(c2, ui("decisions_filter_event"), [ALL, *events],
+                          "dec_f_event",
+                          format_func=lambda s: comp.event(s).short if s
+                          else ui("decisions_all"))
+    warnings = c3.checkbox(ui("include_warnings"), value=True,
+                           key="dec_f_warn", help=help_text("include_warnings"))
+    shown = [d for d in taken
+             if (not cat or d.cat == cat)
+             and (not event or d.event == event)
+             and (warnings or str(d.penalty).upper() != D.WARNING)]
+    return cat, event, shown
 
-    if st.button(ui("decision_save"), type="primary", key="dec_save"):
-        if not text.strip():
-            notify.error("decision_empty")
-        else:
-            d = D.add(store, D.Decision(
-                day=day, cat=cat, event=event, bibs=bibs.strip(),
-                penalty=penalty, text=text.strip()))
-            notify.saved("decision_saved", n=d.n)
-            _clear_composer()
-            st.rerun()
 
+# ── filing one from here ────────────────────────────────────────────────────
+
+def _new(comp: Competition, store: Store, cat: str, event: str) -> None:
+    """The same form the sidebar of Gare draws, with the race left to pick.
+
+    It opens on whatever the filters above are set to, which is nearly always
+    the race the jury is looking at when it reaches for this page. Without an
+    entry list there is nothing to pick a dorsale from and the form falls back
+    to a typed field - which is the page still working, on a competition whose
+    iscritti have not been imported yet.
+    """
+    el, _stale = E.effective_entries(store, comp)
+    DF.insert(comp, store, el, key="dec_new", cat=cat, event=event)
+
+
+# ── the recap, per specialità ───────────────────────────────────────────────
+
+def _by_round(comp: Competition, store: Store, taken: list[D.Decision],
+              cat: str, event: str) -> None:
+    """What was decided in each fase of one specialità.
+
+    Only with a categoria and a specialità chosen: across the whole
+    competition, "fase per fase" is the register itself in a worse order. It is
+    the summary the panel reads before signing the sheet of the specialità off.
+    """
+    if not cat or not event:
+        return
+    st.subheader(ui("decision_summary"))
+    rounds = [r.key for r in comp.rounds(cat, event)]
+    groups = D.by_round(taken, cat, event, rounds)
+    if not groups:
+        st.caption(ui("decision_summary_none"))
+        return
+    for round_key, here in groups:
+        with st.container(border=True):
+            st.caption(ui("decision_of_round",
+                          round=round_key or comp.event(event).short,
+                          n=len(here)))
+            for d in here:
+                st.markdown(f"**{d.code or note_kind_name(d.kind)}** · {d.text}")
+
+
+# ── the register ────────────────────────────────────────────────────────────
+
+def _register(comp: Competition, store: Store, shown: list[D.Decision]) -> None:
+    """The table itself, and the one button that puts it on paper."""
+    st.subheader(ui("decisions_register"))
+    if not shown:
+        notify.info("no_decisions")
+        return
+    c1, c2 = st.columns([4, 1], vertical_alignment="bottom")
+    c1.dataframe(pd.DataFrame([{
+        label("register_col_n"): d.n,
+        label("register_col_day"): d.day or "",
+        label("cat"): d.cat,
+        label("event"): comp.event(d.event).short if d.event else "",
+        label("round"): d.round_key,
+        ui("bibs"): d.bibs,
+        label("penalty_col"): d.code,
+        label("decision"): d.text,
+    } for d in shown]), hide_index=True, use_container_width=True)
+    save_button(store, DOC.decisions_register(shown, comp), comp,
+                key="decisions", label=ui("save_decisions_pdf"), container=c2)
+
+
+# ── correcting what is already filed ────────────────────────────────────────
+
+def _taken(comp: Competition, store: Store, shown: list[D.Decision]) -> None:
+    st.subheader(ui("decisions_taken", n=len(shown)))
+    for d in reversed(shown):
+        with st.container(border=True):
+            st.caption(" · ".join(p for p in (DF.head(comp, d),
+                                              _where(comp, d)) if p))
+            st.write(d.text)
+            with st.expander(ui("decision_edit")):
+                DF.edit(store, d, f"reg_{d.n}", compact=False)
+
+
+def _where(comp: Competition, d: D.Decision) -> str:
+    """The race a decision is about, as one line - empty when it names none."""
+    parts = []
+    if d.day:
+        parts.append(msg("decision_day", day=d.day))
+    if d.cat or d.event:
+        parts.append(msg("decision_of_race", cat=d.cat,
+                         event=comp.event(d.event).short if d.event else "",
+                         round=f" {d.round_key}" if d.round_key else ""))
+    return " · ".join(p.strip(" ·") for p in parts if p.strip(" ·"))
+
+
+# ── the regulations, for looking up ─────────────────────────────────────────
+
+def _reference(comp: Competition) -> None:
+    _penalties()
     _puis(comp)
 
 
-def _context(comp: Competition) -> tuple[int, str, str, str]:
-    """Which race the decision is about. All of it optional, none of it printed.
-
-    Every picker is `sticky_select`: the specialità offered depend on the
-    categoria above them, and one held in the session after the categoria
-    changed is no longer among the options.
-    """
-    c1, c2, c3, c4 = st.columns([1, 1, 2, 1])
-    days = [0, *comp.days()]
-    day = sticky_select(c1, ui("day"), days, "dec_day", _today(comp),
-                        format_func=lambda d: msg("decision_day", day=d) if d
-                        else ui("decision_none"),
-                        help=help_text("decision_context"))
-    cat = sticky_select(c2, ui("category"), [""] + comp.cat_order(), "dec_cat",
-                        format_func=lambda c: c or ui("decision_none"))
-    events = [""] + [s for s in (comp.events_for(cat) if cat
-                                 else comp.event_order())
-                     if s != EVENT_ENTRY_LIST]
-    event = sticky_select(c3, ui("event"), events, "dec_event",
-                          format_func=lambda s: comp.event(s).short if s
-                          else ui("decision_none"))
-    bibs = c4.text_input(ui("bibs"), key="dec_bibs",
-                         help=help_text("decision_bibs"))
-    return int(day or 0), cat, event, bibs
-
-
-def _today(comp: Competition) -> int:
-    """The day of the competition being ridden, so the picker opens on it."""
-    today = date.today().isoformat()
-    for n, when in enumerate(comp.dates, start=1):
-        if str(when)[:10] == today:
-            return n
-    return 0
-
-
-def _penalty_label(code: str) -> str:
-    return f"{code} {penalty_name(code)}" if code else ui("decision_none")
-
-
-def _clear_composer() -> None:
-    """Drop the fields of the decision just filed, keeping the pickers set.
-
-    The context (giornata, categoria, specialità) is where the jury still is:
-    the next decision is usually about the same race.
-    """
-    for k in COMPOSER_KEYS:
-        if k in st.session_state:
-            del st.session_state[k]
-
-
-# ── the two panels behind it ────────────────────────────────────────────────
-
-def _quick_penalty(comp: Competition, el, cat: str, bibs: str) -> None:
-    """Compose the sentence a penalty goes out as, and append it to the text."""
+def _penalties() -> None:
+    """The UCI wording of the offences: what a decision is quoted from."""
     with st.expander(ui("penalty_quick")):
-        wording = dict(D.reasons())
+        wording = D.reasons()
         if not wording:
             notify.warn("no_penalties_table")
             return
         st.caption(help_text("penalty_quick"))
-        c1, c2 = st.columns([4, 1])
-        # picked by its UCI number, shown with the wording: the number is what
-        # is quoted, and a list of plain values is what a test can drive
-        pick = c1.selectbox(ui("penalty_reason"), list(wording),
-                            key="dec_reason",
-                            format_func=lambda n: f"{n}. {wording[n]}")
-        klass = c2.selectbox(ui("penalty_class"), D.CLASSES, key="dec_qclass",
-                             format_func=_penalty_label)
-        line = _penalty_line(_who(el, comp, cat, bibs), klass, wording[pick])
-        st.code(line, language=None, wrap_lines=True)
-        st.button(ui("penalty_add"), key="dec_add", on_click=_append,
-                  args=(line, klass))
+        st.dataframe(pd.DataFrame([{
+            label("register_col_n"): n, label("decision"): text}
+            for n, text in wording]), hide_index=True,
+            use_container_width=True)
         if D.updated_at(D.PENALTIES_FILE):
             st.caption(ui("penalties_updated",
                           when=D.updated_at(D.PENALTIES_FILE)))
-
-
-def _append(line: str, klass: str) -> None:
-    """Add the composed line to the decision text (a callback: it runs first)."""
-    current = str(st.session_state.get("dec_text", "")).rstrip()
-    st.session_state["dec_text"] = f"{current}\n{line}" if current else line
-    # the degree of the penalty is the same statement as the line: the radio
-    # above follows the pick rather than being set again by hand
-    st.session_state["dec_class"] = klass
-
-
-def _penalty_line(who: str, klass: str, reason: str) -> str:
-    """'ES 12 ROSSI Mario: RETROCESSIONE (C) per aver ...' - as it goes on the sheet."""
-    parts = []
-    if who:
-        parts.append(msg("penalty_for", who=who))
-    if klass:
-        parts.append(f"{penalty_name(klass).upper()} ({klass})")
-    if reason:
-        parts.append(reason)
-    return " ".join(parts)
-
-
-def _who(el, comp: Competition, cat: str, bibs: str) -> str:
-    """The riders a penalty is about, named where the entry list knows them."""
-    text = (bibs or "").strip()
-    if not text:
-        return ""
-    try:
-        numbers = parse_bibs(text)
-    except ParseError:
-        return text          # unreadable: keep what was typed, name nobody
-    named = []
-    for bib in numbers:
-        rider = _rider(el, comp, cat, bib)
-        named.append(msg("penalty_rider", cat=rider.cat, bib=rider.bib,
-                         name=rider.full_name) if rider
-                     else f"{label('bib')} {bib}")
-    return ", ".join(named)
-
-
-def _rider(el, comp: Competition, cat: str, bib: int):
-    """The rider wearing `bib`. Without a category the number is not unique:
-    the same dorsale is worn in every categoria, so an unfiltered search only
-    answers when exactly one rider wears it."""
-    if el is None:
-        return None
-    found = [r for r in el.riders.values()
-             if r.bib == bib and (not cat or r.cat == cat)]
-    return found[0] if len(found) == 1 else None
 
 
 def _puis(comp: Competition) -> None:
@@ -230,60 +225,3 @@ def _puis(comp: Competition) -> None:
         if D.updated_at(D.PUIS_FILE):
             st.caption(ui("puis_updated", when=D.updated_at(D.PUIS_FILE),
                           n=len(rows)))
-
-
-# ── what has been decided so far ────────────────────────────────────────────
-
-def _taken(comp: Competition, store: Store) -> None:
-    taken = D.load(store)
-    st.subheader(ui("decisions_taken", n=len(taken)))
-    if not taken:
-        notify.info("no_decisions")
-        return
-    for d in reversed(taken):
-        head = ui("decision_head", n=d.n, when=d.ts.replace("T", " "))
-        with st.container(border=True):
-            c1, c2 = st.columns([5, 1])
-            c1.caption(" · ".join(p for p in (head, _where(comp, d),
-                                              _penalty_label(d.penalty)
-                                              if d.penalty else "") if p))
-            if c2.button(ui("decision_delete"), key=f"dec_del_{d.n}"):
-                D.remove(store, d.n)
-                notify.saved("decision_removed", n=d.n)
-                st.rerun()
-            st.write(d.text)
-            _rewrite(store, d)
-
-
-def _rewrite(store: Store, d: D.Decision) -> None:
-    """Correct a decision already filed, without retyping it.
-
-    Folded away: the page is read far more often than it is corrected, and a
-    text field per decision would turn the log into a form.
-    """
-    with st.expander(ui("decision_edit")):
-        text = st.text_area(ui("decision_body"), value=d.text,
-                            key=f"dec_edit_{d.n}", height=160,
-                            label_visibility="collapsed")
-        if st.button(ui("decision_save"), key=f"dec_upd_{d.n}"):
-            if not text.strip():
-                notify.error("decision_empty")
-                return
-            d.text = text.strip()
-            D.update(store, d)
-            notify.saved("decision_updated", n=d.n)
-            st.rerun()
-
-
-def _where(comp: Competition, d: D.Decision) -> str:
-    """The race a decision is about, as one line - empty when it names none."""
-    parts = []
-    if d.day:
-        parts.append(msg("decision_day", day=d.day))
-    if d.cat or d.event:
-        parts.append(msg("decision_of_race", cat=d.cat,
-                         event=comp.event(d.event).short if d.event else "",
-                         round=f" {d.round_key}" if d.round_key else ""))
-    if d.bibs:
-        parts.append(f"{label('bib')} {d.bibs}")
-    return " · ".join(p.strip(" ·") for p in parts if p.strip(" ·"))

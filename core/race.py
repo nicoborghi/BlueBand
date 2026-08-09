@@ -16,7 +16,7 @@ from .formats import group as G
 from .formats import keirin as K
 from .formats import omnium as O
 from .formats import timed as T
-from .formats.base import CLASSIFIED, Result
+from .formats.base import CLASSIFIED, Result, assign_positions, sort_by_status
 from .i18n import label, ui
 from .models import (EntryList, RaceState, Rider, Status, split_heat,
                      status_of)
@@ -32,6 +32,12 @@ TIMED = "timed"
 TIMED_TEAM = "timed_team"
 BRACKET = "bracket"  # sprint / keirin rounds (see formats.sprint)
 SETUP = "setup"  # composed, not ridden: the madison pairing (see § pairing)
+
+#: The prove di gruppo: everybody on the track at once, ranked on what happens
+#: there. They share the decisions a bunch race takes - a rider who comes down
+#: (ABD), one who is left in it (DNF), one who never started - and the sheets
+#: that read them (`documents.race_classification`).
+BUNCH = (POINTS, TEMPO, SCRATCH, MADISON, ELIMINATION)
 
 # Omnium: the round_key name decides the scoring, not the event. The names are
 # the ones `formats.omnium` schedules the prove under - spelled once, there.
@@ -104,20 +110,19 @@ def entrants(el: EntryList, comp: Competition, cat: str, event: str,
             if r.bib is not None]
 
 
-def entrant_label(key: str, el: EntryList, *, letter: bool = False) -> str:
-    """The name an entrant rides under.
+def entrant_label(key: str, el: EntryList) -> str:
+    """The name an entrant rides under - 'LOMBARDIA A', number or no number.
 
-    A madison coppia rides under the name of its rappresentativa alone. The
-    A/B letter is the composition round's own business - there it is the only
-    thing that tells one coppia of a region from the other, and the numbers
-    are not assigned yet. From the batterie on the coppia *is* its number,
-    and a letter next to the region only reads as a second squadra.
+    A region that fields two coppie tells them apart with a letter, the way it
+    tells its two quartetti apart, and it keeps it everywhere: on the sheets of
+    the batterie as on the composition round. The coppia number answers "who is
+    that on the track"; the letter answers "which of their two coppie is it",
+    and the jury reads the second question off the same line.
     """
     if key in el.teams:
         return el.teams[key].label
     if key in el.pairs:
-        p = el.pairs[key]
-        return p.label if letter else p.region
+        return el.pairs[key].label
     return str(key)
 
 
@@ -156,6 +161,41 @@ def riders_by_bib(el: EntryList, cat: str = "") -> dict[str, Rider]:
 # first letters, so "Finale", "Finali", "Qualificazioni Batteria 1" all read.
 PREFIX_QUALIFYING = "qualificazioni"
 PREFIX_FINALS = "final"
+
+
+#: How a timed round is ridden, as the jury decided it on the day: one start
+#: at a time (an *ordine di partenza*) or two (batterie). The programme states
+#: the usual shape of the event (`Event.teams_per_start`); this is the call
+#: taken at the track, kept on the race so the sheets say what was ridden.
+SOLO_STARTS = "solo_starts"
+
+
+def can_choose_starts(comp: Competition, event: str, kind: str,
+                      round_key: str) -> bool:
+    """Whether this round can be ridden one start at a time at all.
+
+    Only a round against the clock: a finals round and a bracket are ridden
+    man against man whatever anybody chooses.
+    """
+    return kind in (TIMED, TIMED_TEAM) and not is_finals(round_key)
+
+
+def solo_starts(comp: Competition, state) -> bool:
+    """True when this round runs as a start order rather than as batterie.
+
+    The programme's `teams_per_start` is the default - a velocità a squadre
+    starts one squadra at a time, an inseguimento two - and the jury may say
+    otherwise on the race itself: an inseguimento individuale with an odd or a
+    thin field is often ridden one atleta at a time.
+    """
+    kind = state.fmt or round_format(comp, state.cat, state.event,
+                                     state.round_key)
+    if not can_choose_starts(comp, state.event, kind, state.round_key):
+        return False
+    choice = (state.payload or {}).get(SOLO_STARTS)
+    if choice is None:
+        return comp.event(state.event).teams_per_start == 1
+    return bool(choice)
 
 
 def is_qualifying(round_key: str) -> bool:
@@ -197,10 +237,14 @@ def ensure_state(store, comp: Competition, cat: str, event: str, round_key: str,
     kind = round_format(comp, cat, event, round_key)
     st = store.get_race(cat, event, round_key, fmt=kind)
     st.fmt = kind
-    if kind in (MADISON, SETUP):
-        # the pairing round rules the madison: a coppia rides the batteria it
-        # was assigned there, and the final starts whoever the heats qualified
-        _resync_entrants(st, madison_entrants(store, comp, cat, event, round_key, el))
+    # the setup round rules the whole event: an entrant rides the batteria it
+    # was assigned there, and what follows the batterie starts whoever they
+    # qualified. True of a madison at every round, and of an omnium as soon as
+    # the programme schedules a qualification for it
+    composed = kind in (MADISON, SETUP) or is_composed(comp, cat, event)
+    if composed:
+        _resync_entrants(st, composed_entrants(store, comp, cat, event,
+                                               round_key, el, state=st))
         if heat_number(round_key):
             # the cut in force when this batteria is ridden, kept on the race
             # itself: it is what its own sheets say, and what they said stays
@@ -213,8 +257,8 @@ def ensure_state(store, comp: Competition, cat: str, event: str, round_key: str,
         (st.payload or {}).pop("final_heats", None)
     if not st.entrants:
         st.entrants = entrants(el, comp, cat, event, round_key)
-    elif kind in (MADISON, SETUP):
-        pass  # already resynced above, against the pairing
+    elif composed:
+        pass  # already resynced above, against the composition
     elif is_team_format(kind) or pursuit:
         if not (st.payload or {}).get("final_heats"):
             # a finals race starts the four the qualification sent through, not
@@ -372,6 +416,27 @@ def set_statuses_from_text(state: RaceState, text: str, status: Status,
     return out
 
 
+# ── ammonizioni, read back onto the sheets ──────────────────────────────────
+#
+# A warning is filed in the jury's log (`core.decisions`), not in the race: it
+# is a decision about a rider and it outlives the fase it was taken in. The
+# sheets ask for it here, so that the Gare page and Stampa read the same thing.
+
+
+def warnings_carried(store, comp: Competition, cat: str, event: str,
+                     round_key: str = "") -> dict[int, str]:
+    """dorsale -> the fase its ammonizione was taken in, up to `round_key`.
+
+    What prints as a W beside the name. Empty when the log holds nothing for
+    this specialità, which is what a sheet without the column means.
+    """
+    from . import decisions as DEC
+
+    return DEC.warned_bibs(DEC.load(store), cat, event,
+                           rounds=[r.key for r in comp.rounds(cat, event)],
+                           upto=round_key)
+
+
 def status_keys(state: RaceState, el: EntryList, kind: str) -> dict[str, str]:
     """What the jury types -> the key the status is stored under.
 
@@ -412,7 +477,8 @@ def classify(state: RaceState, el: EntryList, comp: Competition) -> Result:
                 return T.finals_classification(
                     finals, times, statuses=statuses,
                     qualification=p.get("qual_ranking") or [], qual_times=qual,
-                    qual_out=out)
+                    qual_out=out, tied=p.get("finals_tied") or (),
+                    on_qual=p.get("finals_on_qual") or ())
             return T.timed_classification(state.entrants, times,
                                           statuses=statuses, qualification=qual)
 
@@ -675,12 +741,19 @@ def heat_result(state: RaceState, heats: list[list[str]],
 #   Finali   - the 5°-8° final, ridden by the four beaten in the quarti
 # They live on the race whose comunicato prints them, which is where the jury
 # looks for them, and each has its own composition, results and sheet.
+#
+# The 5°-8° is the one of the two that is not always ridden: the programme
+# says whether it is planned and the jury settles it on the qualifying round
+# (`sprint_has_58`). Not ridden, the four beaten in the quarti take 5°-8° on
+# their 200 m time and no sheet is filed for them.
 
 SCHEME = "scheme"            # qualifying payload: which scheme is being run
+FINAL_58 = "final_5_8"       # qualifying payload: is the 5°-8° final ridden
 REP_RESULTS = "rep_results"  # first round: the repechages' finishing order
 RESULTS_58 = "results_5_8"   # finals: the 5°-8° final's finishing order
 HEATS_58 = "heats_5_8"       # finals: who rides it, from the quarti
 RUNS = "runs"                # {heat index: winner of each prova}
+NEXT_HEATS = "next_heats"    # the round this one sends out, as the jury fixed it
 
 
 def is_sprint(comp: Competition, event: str) -> bool:
@@ -748,7 +821,8 @@ def sprint_scheme(store, comp: Competition, cat: str, event: str):
 
     Nothing chosen yet: the programme decides, by whether it schedules a first
     round at all - with one the event runs twelve, without it the eight of a
-    category too small for the repechages (ED, nine entered).
+    category too small for the repechages. Every CITA 26 category rides the
+    twelve; the ED was moved onto it on 05.08.2026, with 14 iscritte.
     """
     from .formats import sprint as S
 
@@ -761,6 +835,26 @@ def sprint_scheme(store, comp: Competition, cat: str, event: str):
         rounds = [r.key for r in comp.rounds(cat, event)]
         key = S.DEFAULT_SCHEME if S.TURNO1 in rounds else "8"
     return S.scheme(key)
+
+
+def sprint_has_58(store, comp: Competition, cat: str, event: str) -> bool:
+    """Whether this velocità rides its 5°-8° final.
+
+    The programme says what was planned - the finals round files a *risultati
+    5°-8°* or it does not - and the jury can still turn it round on the day,
+    on the qualifying round where it picks the scheme too. It is one decision
+    for the whole specialità: the four beaten in the quarti either have a race
+    left or they are classified 5°-8° on how they got there.
+    """
+    from .formats import sprint as S
+
+    qual = sprint_qualifying(comp, cat, event)
+    st = store.load_race(race_key(cat, event, qual)) if qual else None
+    chosen = (st.payload or {}).get(FINAL_58) if st is not None else None
+    if chosen is not None:
+        return bool(chosen)
+    fin = next((r for r in comp.rounds(cat, event) if r.key == S.FINALI), None)
+    return bool(fin and DOC_RESULTS_58 in (fin.docs or []))
 
 
 def sprint_ranking(store, comp: Competition, el: EntryList, cat: str,
@@ -776,14 +870,51 @@ def sprint_ranking(store, comp: Competition, el: EntryList, cat: str,
 def sprint_repechages(state: RaceState) -> list[list[str]]:
     """The repechage batterie of a first round, from its own results.
 
-    Composed, not stored: they are the losers of the batterie above, and a
-    result corrected upstairs has to reach them. What *is* stored is who won
-    them (`rep_results`), which is a race and not an arithmetic.
+    Composed and not stored, unless the jury has said otherwise: they are the
+    losers of the batterie above, and a result corrected upstairs has to reach
+    them. What *is* stored is who won them (`rep_results`), which is a race and
+    not an arithmetic - and the composition itself once the jury has confirmed
+    it (`REP_HEATS`), because the seeding does not know that three of the
+    riders it drew together are of the same region.
+
+    The confirmed composition holds only while it is about the same riders: the
+    moment the turno 1 sends a different field to the recuperi, it is seeded
+    again - a stored composition would otherwise quietly leave somebody out of
+    the race, or start somebody who is no longer in it.
     """
     from .formats import sprint as S
 
     losers = [k for k in heat_losers(bracket_orders(state)) if k]
-    return S.repechage_heats(losers) if losers else []
+    if not losers:
+        return []
+    fixed = bracket_heats(state, REP_HEATS)
+    if fixed and {k for h in fixed for k in h} == set(losers):
+        return fixed
+    return S.repechage_heats(losers)
+
+
+def sprint_fixed_heats(state: RaceState, auto: list[list[str]]
+                       ) -> list[list[str]]:
+    """The batterie this round sends out, as the jury composed them.
+
+    Same idea as the recuperi (`sprint_repechages`), one round further on: the
+    seeding pairs the qualified by the table - the winner of the first batteria
+    against the last of the eight - and knows nothing about a rider who has
+    just been carried off the track, two of the same società drawn together, or
+    a jury decision that puts somebody elsewhere. What is typed on the round
+    that composes them is kept on it (`NEXT_HEATS`) and is what everything
+    downstream reads: the start order of the next round, the block printed
+    under the risultati, and the race the button loads.
+
+    It holds only while it is about the same riders: the moment the round that
+    feeds it sends a different field through - a result corrected, a DSQ - the
+    stored composition is dropped and the table seeds them again, rather than
+    quietly starting somebody who is no longer qualified.
+    """
+    fixed = bracket_heats(state, NEXT_HEATS)
+    if fixed and {k for h in fixed for k in h} == {k for h in auto for k in h}:
+        return fixed
+    return auto
 
 
 def sprint_next(store, comp: Competition, el: EntryList, state: RaceState
@@ -802,7 +933,7 @@ def sprint_next(store, comp: Competition, el: EntryList, state: RaceState
 
     if round_key == sprint_qualifying(comp, cat, event):
         ranked = [p.key for p in classify(state, el, comp).placings if p.position]
-        heats = S.mirror_pairs(ranked[:sch.qualify])
+        heats = sprint_fixed_heats(state, S.mirror_pairs(ranked[:sch.qualify]))
         return (sch.rounds[0] if heats else ""), {"heats": heats_text(heats)}
 
     orders = bracket_orders(state)
@@ -814,15 +945,15 @@ def sprint_next(store, comp: Competition, el: EntryList, state: RaceState
 
     if round_key == S.TURNO1:
         rep = [k for k in heat_winners(bracket_orders(state, REP_RESULTS)) if k]
-        heats = S.quarter_heats(winners, rep)
+        heats = sprint_fixed_heats(state, S.quarter_heats(winners, rep))
         return (nxt if heats else ""), {"heats": heats_text(heats)}
     if round_key == S.QUARTI:
         # the quarti decide two races: the semifinals, and - for those they
         # knocked out - the 5°-8° final, which is ridden in the finals round
-        heats = S.semifinal_heats(winners)
+        heats = sprint_fixed_heats(state, S.semifinal_heats(winners))
         return (nxt if heats else ""), {"heats": heats_text(heats)}
     if round_key == S.SEMI:
-        heats = S.final_heats(winners, losers)
+        heats = sprint_fixed_heats(state, S.final_heats(winners, losers))
         return (nxt if heats else ""), {"heats": heats_text(heats)}
     return "", {}
 
@@ -871,19 +1002,20 @@ def sprint_composition(store, comp: Competition, el: EntryList,
             return [(title, rep)] if rep else []
         rep_win = [k for k in heat_winners(bracket_orders(state, REP_RESULTS))
                    if k]
-        heats = S.quarter_heats(winners, rep_win)
+        heats = sprint_fixed_heats(state, S.quarter_heats(winners, rep_win))
         return [(composition_title(ui("quarters_full")), heats)] if heats else []
     if round_key == S.QUARTI:
         out = []
-        semi = S.semifinal_heats(winners)
+        semi = sprint_fixed_heats(state, S.semifinal_heats(winners))
         if semi:
             out.append((composition_title(ui("semifinals_full")), semi))
-        f58 = S.final_5_8_heat(losers)
+        f58 = (S.final_5_8_heat(losers)
+               if sprint_has_58(store, comp, state.cat, state.event) else [])
         if f58:
             out.append((composition_title(label("final_5_8")), f58))
         return out
     if round_key == S.SEMI:
-        heats = S.final_heats(winners, losers)
+        heats = sprint_fixed_heats(state, S.final_heats(winners, losers))
         if not heats:
             return []
         # one table: what each final rides for is the batteria column, and two
@@ -899,23 +1031,26 @@ def load_sprint_round(store, comp: Competition, el: EntryList,
 
     The finals are loaded once, from the semifinals; the 5°-8° final they also
     ride was decided in the quarti, so it is written there - onto the finals
-    race - the moment the semifinals are composed.
+    race - the moment the semifinals are composed. A year that does not ride
+    it (`sprint_has_58`) composes nothing: the finals are the two races for
+    the first four places and nobody else is loaded into them.
     """
     from .formats import sprint as S
 
     nxt, data = sprint_next(store, comp, el, state)
     if not nxt:
         return "", 0
+    has_58 = sprint_has_58(store, comp, state.cat, state.event)
     target = ensure_state(store, comp, state.cat, state.event, nxt, el)
     heats = heats_from_text(data["heats"])
     target.payload["heats"] = data["heats"]
     target.entrants = [k for h in heats for k in h]
-    if target.round_key == S.FINALI:
+    if target.round_key == S.FINALI and has_58:
         # the finals round rides two races: the 3°/4° and 1°/2° composed here,
         # and the 5°-8° the quarti decided - everybody in it is a starter
         target.entrants += [k for h in bracket_heats(target, HEATS_58)
                             for k in h if k not in target.entrants]
-    if state.round_key == S.QUARTI:
+    if state.round_key == S.QUARTI and has_58:
         # the four beaten in the quarti ride the 5°-8° final, in the finals
         losers = [k for k in heat_losers(bracket_orders(state)) if k]
         fin = (target if target.round_key == S.FINALI
@@ -929,6 +1064,11 @@ def load_sprint_round(store, comp: Competition, el: EntryList,
                 [k for k in losers if k]
             if fin is not target:
                 store.save_race(fin, action="load_final_5_8")
+    if bracket_heats(state, NEXT_HEATS):
+        # the jury composed this round by hand: what loaded the next race is
+        # filed with the race that composed it, or pressing the button again
+        # would seed it back to the table
+        store.save_race(state, action="sprint_composition")
     store.save_race(target, action="load_sprint_round")
     return nxt, len(heats)
 
@@ -946,17 +1086,27 @@ def sprint_finals_race(store, comp: Competition, el: EntryList, cat: str,
 
 def sprint_standings(store, comp: Competition, el: EntryList, cat: str,
                      event: str) -> Result:
-    """Classification of the whole velocità: 1-8 from the finals, then the 200 m.
+    """Classification of the whole velocità: the finals, then the 200 m.
 
-    Below the eighth place the only race everybody rode is the qualifying, and
-    that is what separates them - a rider out in the first round and one out in
-    the quarti are ranked on their time, not on how far they got.
+    Below the places the finals ride for, the only race everybody rode is the
+    qualifying, and that is what separates them - a rider out in the first
+    round and one out in the quarti are ranked on their time, not on how far
+    they got.
+
+    Ridden, the 5°-8° gives places 5 to 8 and the 200 m ranks everybody from
+    the ninth down. Turned off - the finals are the 1°-4° and nothing else -
+    the classification follows the 200 m from the fifth place on: no race after
+    the quarti separated those riders, so there is nothing else to rank them on
+    and the four beaten in the quarti hold no place of their own.
     """
     from .formats import sprint as S
 
     fin = store.load_race(race_key(cat, event, S.FINALI))
     finals = bracket_orders(fin) if fin is not None else []
-    f58 = bracket_orders(fin, RESULTS_58) if fin is not None else []
+    f58 = (bracket_orders(fin, RESULTS_58)
+           if fin is not None and sprint_has_58(store, comp, cat, event)
+           else [])
+    qual_ranking = sprint_ranking(store, comp, el, cat, event)
     statuses: dict[str, Status] = {}
     for name in [r.key for r in comp.rounds(cat, event)]:
         st = store.load_race(race_key(cat, event, name))
@@ -966,7 +1116,7 @@ def sprint_standings(store, comp: Competition, el: EntryList, cat: str,
             statuses.update(all_statuses(st))
     return S.scheme_classification(
         finals=finals, final_5_8=f58[0] if f58 else [],
-        qual_ranking=sprint_ranking(store, comp, el, cat, event),
+        qual_ranking=qual_ranking,
         # whoever rode the 200 m and then missed a round lost that round: her
         # DNS stays on its sheet and she is ranked on her time (`sprint_statuses`)
         statuses=sprint_statuses(store, comp, cat, event, statuses))
@@ -989,10 +1139,18 @@ def sprint_standings(store, comp: Competition, el: EntryList, cat: str,
 #                             send to the first final
 # Each keeps its own composition, results and statuses in the payload of the
 # round it is ridden in, which is the comunicato that publishes it.
+#
+# The second final is the one of the two that is not always ridden - exactly as
+# the 5°-8° of a velocità is not. The programme says what was planned and the
+# jury settles it on the first round, before the tournament has sent anybody
+# anywhere (`keirin_has_final_b`). Not ridden, there is one final: the riders
+# the last round qualified ride it, and everybody else keeps the place how far
+# she got gives her.
 
 REP_HEATS = "rep_heats"          # a round's recuperi: their composition
 HEATS_B = "heats_final_b"        # finali: who rides the final under the title
 RESULTS_B = "results_final_b"    # finali: its finishing order
+FINAL_B = "final_b"              # first round: is the second final ridden
 
 
 def is_keirin(comp: Competition, event: str) -> bool:
@@ -1023,6 +1181,27 @@ def keirin_scheme(comp: Competition, el: EntryList, cat: str,
     waiting.
     """
     return K.scheme_for(len(keirin_entrants(el, comp, cat, event)))
+
+
+def keirin_has_final_b(store, comp: Competition, cat: str, event: str) -> bool:
+    """Whether this keirin rides the final under the one for the title.
+
+    UCI 3.2.135 ends every tournament with two finals - 1°-6° and 7°-12° with
+    twelve riders in the semifinali - but a programme is free to ride only the
+    first and classify the others by how far they got, which is the same
+    decision a velocità takes about its 5°-8°. The register says what was
+    planned (a *risultati finale B* on the finals round, or not) and the jury
+    can turn it round on the day, on the first round: it has to be settled
+    before the last round composes anything, because it is that composition
+    that either splits the qualifiers into two races or does not.
+    """
+    first = keirin_first_round(comp, cat, event)
+    st = store.load_race(race_key(cat, event, first)) if first else None
+    chosen = (st.payload or {}).get(FINAL_B) if st is not None else None
+    if chosen is not None:
+        return bool(chosen)
+    fin = next((r for r in comp.rounds(cat, event) if r.key == K.FINALI), None)
+    return bool(fin and DOC_RESULTS_B in (fin.docs or []))
 
 
 def keirin_stage(comp: Competition, el: EntryList, state: RaceState
@@ -1066,13 +1245,18 @@ def keirin_compose_repechages(comp: Competition, el: EntryList,
     return K.in_bib_order(K.repechage_heats(left, stage.rep_heats))
 
 
-def keirin_compose_next(comp: Competition, el: EntryList, state: RaceState
+def keirin_compose_next(comp: Competition, el: EntryList, state: RaceState, *,
+                        final_b: bool = True
                         ) -> tuple[str, list[list[str]], list[list[str]]]:
     """(round to compose, its batterie, the second race's) from this round.
 
     The last round ridden sends riders to two finals at once - the one for the
     title and the one under it - which is why this returns two blocks: they are
     published together, on the sheet of the round that decided them.
+
+    `final_b` off, that second block is empty: the tournament rides one final,
+    and the riders it does not qualify are classified where the last round left
+    them instead of lining up again (`keirin_has_final_b`).
     """
     sch = keirin_scheme(comp, el, state.cat, state.event)
     stage = sch.stage(state.round_key)
@@ -1082,6 +1266,8 @@ def keirin_compose_next(comp: Competition, el: EntryList, state: RaceState
     orders = bracket_orders(state)
     if nxt == K.FINALI:
         top, rest = K.final_heats(orders, stage.qualify, statuses_of(state))
+        if not final_b:
+            rest = []
         return nxt, K.in_bib_order([top] if top else []), \
             K.in_bib_order([rest] if rest else [])
     heats = K.next_heats(stage, orders, bracket_orders(state, REP_RESULTS),
@@ -1133,12 +1319,19 @@ def load_keirin_round(store, comp: Competition, el: EntryList,
         store.save_race(state, action="load_keirin_repechages")
         return what, len(heats)
 
-    nxt, heats, low = keirin_compose_next(comp, el, state)
+    final_b = keirin_has_final_b(store, comp, state.cat, state.event)
+    nxt, heats, low = keirin_compose_next(comp, el, state, final_b=final_b)
     if not nxt or not heats:
         return "", 0
     target = ensure_state(store, comp, state.cat, state.event, nxt, el)
     target.payload["heats"] = heats_text(heats)
     target.entrants = [k for h in heats for k in h]
+    if nxt == K.FINALI and not final_b:
+        # the jury turned the second final off after it had been composed: the
+        # round rides one final, and what is left of the other one on the race
+        # would still print its sheet and hold its decisions
+        for key in (HEATS_B, RESULTS_B, STATUSES_B):
+            target.payload.pop(key, None)
     if low:
         # the finals: the second final is a race of its own on the same round,
         # and everybody in it is a starter of that round
@@ -1157,7 +1350,7 @@ def keirin_final_labels(state: RaceState) -> tuple[str, str]:
 
 
 def keirin_composition(comp: Competition, el: EntryList, state: RaceState,
-                       doc_kind: str) -> list[tuple]:
+                       doc_kind: str, *, final_b: bool = True) -> list[tuple]:
     """The batterie a keirin sheet publishes under its own results.
 
     Only the sheet that composes the finals carries them: the recuperi and the
@@ -1168,7 +1361,7 @@ def keirin_composition(comp: Competition, el: EntryList, state: RaceState,
         return []
     if keirin_loads(comp, el, state, doc_kind) != K.FINALI:
         return []
-    _nxt, top, low = keirin_compose_next(comp, el, state)
+    _nxt, top, low = keirin_compose_next(comp, el, state, final_b=final_b)
     labels = K.final_labels(len(top[0]) if top else 0,
                             len(low[0]) if low else 0)
     out = []
@@ -1272,7 +1465,26 @@ def omnium_standings(store, comp: Competition, el: EntryList, cat: str,
         state = store.load_race(_rid(cat, event, name))
         if state and (state.payload or {}):
             done[name] = classify(state, el, comp)
-    return O.omnium_classification(done, entrants=entrants(el, comp, cat, event))
+    return O.omnium_classification(done, entrants=omnium_field(store, comp, el,
+                                                               cat, event))
+
+
+def omnium_field(store, comp: Competition, el: EntryList, cat: str,
+                 event: str = "omnium") -> list[str]:
+    """Who the omnium is ridden by: the whole entry, or who qualified for it.
+
+    Where the programme schedules batterie di qualificazione, the omnium is the
+    four prove and the classification is over the riders they sent through -
+    whoever went out in the qualification is not in the standings, exactly as
+    an eliminated coppia is not in the classifica of a madison.
+    """
+    rounds = final_rounds(comp, cat, event) if is_composed(comp, cat, event) \
+        else []
+    if not rounds:
+        return entrants(el, comp, cat, event)
+    # the first prova is the one the qualification was carried into: the four
+    # are loaded together, so any of them says the same thing
+    return composed_entrants(store, comp, cat, event, rounds[0], el)
 
 
 def omnium_carried(store, comp: Competition, el: EntryList, cat: str,
@@ -1313,13 +1525,26 @@ def omnium_points_race(result: Result, carried: dict[str, int]) -> Result:
     Each rider starts the race from the points already scored in the three
     prove, and every volata is added to those: the total on this sheet is the
     omnium total, not what the single race was worth.
+
+    And the sheet is read in that order. The corsa a punti is the last prova,
+    so its risultati *are* the classifica of the omnium: the riders print by
+    total, and two on the same total are separated by their placing in this
+    race - the tiebreak of 3.2.109, the same one the classifica finale applies
+    (`formats.omnium.omnium_classification`). Printed in the order the race
+    was called, the sheet said the winner of the corsa a punti had won the
+    omnium.
     """
+    own = {p.key: p.position or 10 ** 6 for p in result.placings}
     for p in result.placings:
         p.data = dict(p.data or {})
         start = int(carried.get(p.key) or 0)
         p.data["carried"] = start
         if p.status in CLASSIFIED:
             p.data["total"] = int(p.data.get("total") or 0) + start
+    placings = sorted(result.placings,
+                      key=lambda p: (-int((p.data or {}).get("total") or 0),
+                                     own.get(p.key, 10 ** 6)))
+    result.placings = assign_positions(sort_by_status(placings))
     return result
 
 
@@ -1354,18 +1579,28 @@ def bracket_standings(store, comp: Competition, el: EntryList, cat: str,
                                     qual_ranking=qual_ranking)
 
 
-# ── madison: pairing, heats, qualification ──────────────────────────────────
+# ── composition: batterie and qualification ─────────────────────────────────
 #
-# A madison is ridden by numbered coppie, and when there are more of them than
-# the track takes they ride qualifying heats (3.2.157). Both decisions - which
-# number a coppia wears and which batteria it rides - are taken once, before
-# the event, in the round the programme declares as `kind: setup`. Every other
-# round of the event reads them from there: the batteria races start only their
-# own coppie, and the final starts whoever the heats qualified.
+# Two events are ridden in qualifying batterie whose composition is a decision
+# of the jury, not something a result produces: the madison and the omnium.
+#
+#   * a madison is ridden by numbered coppie, and when there are more of them
+#     than the track takes they ride qualifying heats (3.2.157): the jury
+#     hands out the numbers *and* splits the coppie;
+#   * an omnium with more riders than the finale takes rides a corsa a punti
+#     di qualificazione in two batterie: the riders keep their dorsale, so the
+#     only decision is who rides where.
+#
+# Both are taken once, before the event, in the round the programme declares as
+# `kind: setup`. Every other round of the event reads them from there: a
+# batteria starts only its own entrants, and what follows the batterie - the
+# final of a madison, the four prove of an omnium - starts whoever they
+# qualified. The vocabulary below is the madison's, because that is the event
+# it was written for; `Pairing.numbered` is what tells the two apart.
 
 PAIR_NUMBERS = "pair_numbers"   # payload: entrant key -> number worn
 PAIR_HEATS = "pair_heats"       # payload: entrant key -> batteria (1-based)
-ELIMINATE = "eliminate"         # payload: coppie eliminated from each batteria
+ELIMINATE = "eliminate"         # payload: entrants eliminated from each batteria
 QUALIFIED = "qualified"         # payload of the final: keys that came through
 
 
@@ -1375,6 +1610,28 @@ def setup_round(comp: Competition, cat: str, event: str) -> str:
         if r.kind == ROUND_SETUP:
             return r.key
     return ""
+
+
+def is_composed(comp: Competition, cat: str, event: str) -> bool:
+    """True for an event the jury composes: its batterie are not a result.
+
+    What hangs off this is where a round's startlist comes from - the
+    composition round and the batterie it decided, not the entry list read
+    straight through (`composed_entrants`).
+    """
+    return bool(setup_round(comp, cat, event))
+
+
+def final_rounds(comp: Competition, cat: str, event: str) -> list[str]:
+    """The rounds the batterie qualify for, in programme order.
+
+    Everything that is neither the composition round nor a batteria: the
+    *Finale* of a madison, the four prove of an omnium. They are the races the
+    qualified field is carried into, and the ones the entry list must stop
+    ruling once it has been.
+    """
+    return [r.key for r in comp.rounds(cat, event)
+            if r.kind != ROUND_SETUP and not heat_number(r.key)]
 
 
 def heat_number(round_key: str) -> int:
@@ -1391,13 +1648,19 @@ def heat_rounds(comp: Competition, cat: str, event: str) -> list[tuple[int, str]
 
 @dataclass
 class Pairing:
-    """How one madison is composed: who wears what, who rides where."""
+    """How one event is composed: who wears what, who rides where.
+
+    `numbered` says whether the numbers are a decision of the jury (a madison:
+    the coppia *is* its number) or simply the dorsali the riders already wear
+    (an omnium: nothing to hand out, only batterie to fill).
+    """
 
     numbers: dict[str, int] = field(default_factory=dict)  # entrant -> number
     heats: dict[str, int] = field(default_factory=dict)    # entrant -> batteria
-    eliminate: int = 0            # coppie out of *each* batteria (3.2.157)
+    eliminate: int = 0            # entrants out of *each* batteria (3.2.157)
     n_heats: int = 1              # batterie the programme schedules
-    pairs: list[str] = field(default_factory=list)  # every coppia, in order
+    pairs: list[str] = field(default_factory=list)  # every entrant, in order
+    numbered: bool = True         # the jury hands out the numbers
 
     def number(self, key: str, default: int = 0) -> int:
         return self.numbers.get(key, default)
@@ -1420,6 +1683,15 @@ def default_numbers(keys: list[str]) -> dict[str, int]:
     return {k: i for i, k in enumerate(keys, start=1)}
 
 
+def bib_numbers(keys: list[str]) -> dict[str, int]:
+    """The dorsale is the number, where the jury hands out none.
+
+    An omnium composes batterie and nothing else: every rider already races
+    under a number, and it is the one the batterie are read by.
+    """
+    return {k: int(k) for k in keys if k.isdigit()}
+
+
 def spread_heats(keys: list[str], n_heats: int) -> dict[str, int]:
     """Deal the coppie into the batterie one by one, 1, 2, 1, 2, ...
 
@@ -1433,16 +1705,20 @@ def spread_heats(keys: list[str], n_heats: int) -> dict[str, int]:
 
 def pairing(store, comp: Competition, cat: str, event: str,
             el: EntryList | None = None) -> Pairing:
-    """The composition of one madison, as the setup round has it.
+    """The composition of one event, as its setup round has it.
 
     Falls back to the plain numbering when nothing has been composed yet, so a
     sheet printed before the jury got to it still carries a number per coppia.
+    Where the numbers are not the jury's to give - an omnium - they are the
+    dorsali, and the saved `PAIR_NUMBERS` are not read at all.
     """
     keys = (entrants(el, comp, cat, event) if el is not None else [])
     n_heats = len(heat_rounds(comp, cat, event)) or 1
     rnd = comp.round_of(cat, event, setup_round(comp, cat, event))
-    out = Pairing(numbers=default_numbers(keys), n_heats=n_heats, pairs=keys,
-                  eliminate=rnd.eliminate or 0)
+    numbered = comp.event(event).fmt == "madison"
+    numbering = default_numbers if numbered else bib_numbers
+    out = Pairing(numbers=numbering(keys), n_heats=n_heats, pairs=keys,
+                  eliminate=rnd.eliminate or 0, numbered=numbered)
 
     state = store.load_race(race_key(cat, event, setup_round(comp, cat, event)))
     if state is None:
@@ -1450,9 +1726,11 @@ def pairing(store, comp: Competition, cat: str, event: str,
     p = state.payload or {}
     if not keys:  # no entry list at hand: the saved composition is all there is
         out.pairs = list(state.entrants)
-        out.numbers = default_numbers(out.pairs)
-    out.numbers.update({k: int(v) for k, v in (p.get(PAIR_NUMBERS) or {}).items()
-                        if k in out.numbers or not keys})
+        out.numbers = numbering(out.pairs)
+    if numbered:
+        out.numbers.update({k: int(v) for k, v
+                            in (p.get(PAIR_NUMBERS) or {}).items()
+                            if k in out.numbers or not keys})
     out.heats = {k: int(v) for k, v in (p.get(PAIR_HEATS) or {}).items()
                  if not keys or k in out.numbers}
     if p.get(ELIMINATE) is not None:
@@ -1479,13 +1757,18 @@ def apply_pair_numbers(store, comp: Competition, el: EntryList) -> EntryList:
     return el
 
 
-def madison_entrants(store, comp: Competition, cat: str, event: str,
-                     round_key: str, el: EntryList) -> list[str]:
-    """Who starts one round of a madison.
+def composed_entrants(store, comp: Competition, cat: str, event: str,
+                      round_key: str, el: EntryList,
+                      state: RaceState | None = None) -> list[str]:
+    """Who starts one round of an event the jury composes.
 
-    The setup round holds every coppia; a batteria holds the coppie assigned to
-    it; the final holds the coppie the heats qualified, or - where the event is
-    ridden straight off, as ED and DA are - everybody.
+    The setup round holds everybody; a batteria holds who was assigned to it;
+    what comes after the batterie - the final of a madison, every prova of an
+    omnium - holds who they qualified, or, where the event is ridden straight
+    off (ED and DA madison), everybody.
+
+    `state` is the round's own race where the caller already has it: the
+    qualified field is read off its payload.
     """
     everyone = entrants(el, comp, cat, event)
     kind = round_format(comp, cat, event, round_key)
@@ -1493,12 +1776,17 @@ def madison_entrants(store, comp: Competition, cat: str, event: str,
     if kind == SETUP:
         return everyone
 
-    state = store.load_race(race_key(cat, event, round_key))
+    if state is None:
+        state = store.load_race(race_key(cat, event, round_key))
     qualified = ((state.payload or {}).get(QUALIFIED) if state else None)
     if qualified:
-        # the final was loaded from the heats: that startlist is a result, and
-        # the entry list must not quietly add a coppia back to it
-        return _by_number([k for k in qualified if k in everyone], pr)
+        # the batterie were carried into this race: that startlist is a result,
+        # and the entry list must not quietly add an entrant back to it. It is
+        # called by the number the field wears - the coppia number of a
+        # madison, the dorsale of an omnium - not by the order the batterie
+        # sent them through: the speaker reads a startlist that runs by number.
+        through = [k for k in qualified if k in everyone]
+        return _by_number(through, pr)
 
     n = heat_number(round_key)
     if n and pr.assigned:
@@ -1516,11 +1804,11 @@ def _by_number(keys: list[str], pr: Pairing) -> list[str]:
     return sorted(keys, key=lambda k: (pr.number(k, 10_000), k))
 
 
-def madison_qualifiers(result: Result, eliminate: int,
-                       ) -> tuple[list[str], list[str]]:
+def heat_cut(result: Result, eliminate: int,
+             ) -> tuple[list[str], list[str]]:
     """(qualified, eliminated) for one batteria, per 3.2.157.
 
-    `eliminate` coppie go out of each heat, counted *among those who started*:
+    `eliminate` entrants go out of each heat, counted *among those who started*:
     a coppia that never took the start is not one of the eliminated, it is
     simply not there. Whoever did not finish does not go through either
     (classification rule A: they do not progress to the next round), so what
@@ -1533,13 +1821,13 @@ def madison_qualifiers(result: Result, eliminate: int,
     return qualified, [p.key for p in started if p.key not in qualified]
 
 
-def madison_qualify_count(state: RaceState, eliminate: int) -> int:
-    """How many coppie of one batteria go through to the final.
+def qualify_count(state: RaceState, eliminate: int) -> int:
+    """How many entrants of one batteria go through it.
 
     Counted on the startlist as it stands, not on the classification, so the
-    number is there before a single sprint is entered - and counted among the
-    coppie that *started* (3.2.157): a DNS is not one of the eliminated, so it
-    does not take a place away from anybody.
+    number is there before a single sprint is entered - and counted among those
+    that *started* (3.2.157): a DNS is not one of the eliminated, so it does
+    not take a place away from anybody.
     """
     statuses = statuses_of(state)
     started = sum(1 for k in state.entrants
@@ -1547,29 +1835,34 @@ def madison_qualify_count(state: RaceState, eliminate: int) -> int:
     return max(0, started - max(0, eliminate))
 
 
-def madison_heat_qualifiers(state: RaceState, el: EntryList, comp: Competition,
-                            eliminate: int) -> tuple[list[str], list[str]]:
+def heat_qualifiers(state: RaceState, el: EntryList, comp: Competition,
+                    eliminate: int) -> tuple[list[str], list[str]]:
     """(qualified, eliminated) of one batteria, as entrant keys.
 
-    A madison is scored by the number the coppia wears, so the classification
+    A madison is scored by the number the coppia wears, so its classification
     comes back keyed by number: here it is read back into the coppie the rest
-    of the app works with.
+    of the app works with. Everywhere else the key already *is* the dorsale.
     """
     result = classify(state, el, comp)
-    key_of = {v: k for k, v in pair_bib_map(state, el).items()}
-    through, out = madison_qualifiers(result, eliminate)
+    key_of = ({v: k for k, v in pair_bib_map(state, el).items()}
+              if state.fmt == MADISON else {})
+    through, out = heat_cut(result, eliminate)
     return ([key_of.get(k, k) for k in through],
             [key_of.get(k, k) for k in out])
 
 
-def load_madison_final(store, comp: Competition, el: EntryList, cat: str,
-                       event: str, final_round: str,
-                       current: RaceState | None = None) -> dict:
-    """Send the coppie every batteria qualified into the final.
+def load_qualified(store, comp: Competition, el: EntryList, cat: str,
+                   event: str, rounds: list[str] | None = None,
+                   current: RaceState | None = None) -> dict:
+    """Send whoever every batteria qualified into the rounds that follow them.
 
-    The final is a race of its own: it starts the qualifiers and nobody else,
-    and it is seeded across the heats - the winners of every batteria first,
-    then the seconds, and so on - so that no batteria is favoured by the order.
+    Those rounds are races of their own: they start the qualifiers and nobody
+    else, seeded across the heats - the winners of every batteria first, then
+    the seconds, and so on - so that no batteria is favoured by the order.
+
+    A madison has one of them, its finale. An omnium has four: the qualified
+    field rides all of the prove, so the four are loaded together and the
+    classifica of the specialità is over them alone.
 
     `current` is the heat open in front of the jury, whose latest entry may not
     be on disk yet. Returns what happened, for the page to report.
@@ -1582,27 +1875,34 @@ def load_madison_final(store, comp: Competition, el: EntryList, cat: str,
         if state is None:
             missing.append(key)
             continue
-        through, out = madison_heat_qualifiers(state, el, comp, pr.eliminate)
+        through, out = heat_qualifiers(state, el, comp, pr.eliminate)
         if not through:
             missing.append(key)
             continue
         heats[n] = (through, out)
         order.append(through)
 
-    # 1° batt. 1, 1° batt. 2, 2° batt. 1, ... - the qualifying order, dealt out
-    qualified = [k for row in zip_longest(*order) for k in row if k]
+    # 1° batt. 1, 1° batt. 2, 2° batt. 1, ... - the qualifying order, dealt
+    # out, then read back by the number the field wears: it is the startlist
+    # of every round that follows, and those are called by number
+    # (`composed_entrants`), not by how the batterie sent them through.
+    qualified = _by_number([k for row in zip_longest(*order) for k in row if k],
+                           pr)
     info = {"missing": missing, "heats": heats, "qualified": qualified,
-            "eliminate": pr.eliminate}
+            "eliminate": pr.eliminate, "rounds": []}
     if not qualified:
         return info
 
-    fin = ensure_state(store, comp, cat, event, final_round, el)
-    fin.payload[QUALIFIED] = qualified
-    fin.payload["qual_heat"] = {k: n for n, (through, _) in heats.items()
-                                for k in through}
-    fin.entrants = qualified
-    store.save_race(fin, action="load_madison_final")
-    info["final"] = fin
+    for key in (rounds if rounds is not None
+                else final_rounds(comp, cat, event)):
+        fin = ensure_state(store, comp, cat, event, key, el)
+        fin.payload[QUALIFIED] = qualified
+        fin.payload["qual_heat"] = {k: n for n, (through, _) in heats.items()
+                                    for k in through}
+        fin.entrants = qualified
+        store.save_race(fin, action="load_qualified")
+        info["rounds"].append(key)
+        info.setdefault("final", fin)
     return info
 
 
@@ -1611,7 +1911,9 @@ def eliminated_suggestion(comp: Competition, heats: list[int]) -> int:
 
     The heats qualify *up to* the track maximum without having to fill it, and
     never eliminate fewer than two per heat - so this is a floor the jury can
-    raise, not a number the app imposes.
+    raise, not a number the app imposes. The limit is the madison's own, per
+    track length; an omnium has no table to read, so its floor is all there is
+    and the number comes from the programme.
     """
     limit = madison_track_teams(comp.track_len)
     started = sum(heats)

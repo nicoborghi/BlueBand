@@ -43,6 +43,10 @@ MODES = [ui("mode_by_category"), ui("mode_by_event"), ui("mode_by_day"),
 #: The batches that publish what the register says, not a pick of documents.
 FIXED_DOCS = (BY_COMMUNIQUE, BY_TEAM, SPECIALITY_TABLE)
 
+#: The batches whose sheets carry a column per specialità, and so a choice
+#: between the UCI sigla and the short name at the head of it.
+EVENT_HEADED = (BY_TEAM, SPECIALITY_TABLE)
+
 
 def render(competition: str, comp: Competition, store: Store) -> None:
     el, _stale = E.effective_entries(store, comp)
@@ -64,8 +68,13 @@ def render(competition: str, comp: Competition, store: Store) -> None:
         # riepilogo is one sheet per squadra: picking the kinds again here
         # would be a second, contradictory answer
         disabled=mode in FIXED_DOCS)
+    # only the two sheets with a column per specialità have anything to head
+    short_headers = mode in EVENT_HEADED and st.sidebar.checkbox(
+        ui("short_headers"), key="stp_short_heads",
+        help=help_text("short_headers"))
 
-    docs = _build(mode, comp, el, store, docs_wanted, font)
+    docs = _build(mode, comp, el, store, docs_wanted, font,
+                  short_headers=short_headers)
     if not docs:
         notify.warn("no_documents_for_selection")
         return
@@ -88,7 +97,8 @@ def render(competition: str, comp: Competition, store: Store) -> None:
 # ── batches ─────────────────────────────────────────────────────────────────
 
 def _build(mode: str, comp: Competition, el, store: Store,
-           docs_wanted: list[str], font: int) -> list:
+           docs_wanted: list[str], font: int, *,
+           short_headers: bool = False) -> list:
     if mode == BY_CATEGORY:
         cat = st.sidebar.selectbox(ui("category"), comp.cat_order(),
                                    key="stp_cat")
@@ -102,11 +112,13 @@ def _build(mode: str, comp: Competition, el, store: Store,
     if mode == BY_COMMUNIQUE:
         return _communique(comp, el, store, font)
     if mode == BY_TEAM:
-        return _team_recaps(comp, el, store, font)
+        return _team_recaps(comp, el, store, font,
+                            short_headers=short_headers)
     if mode == SPECIALITY_TABLE:
         # one sheet, and it says the same as the Verifica page: it is printed,
         # not composed, so there is nothing to pick in the sidebar
-        return [D.speciality_table(el, comp, font_size=font)]
+        return [D.speciality_table(el, comp, font_size=font,
+                                   short_headers=short_headers)]
     day = st.sidebar.selectbox(ui("day"), comp.days(), key="stp_day")
     out = []
     for r in [r for r in comp.programme if r.day == day]:
@@ -116,7 +128,8 @@ def _build(mode: str, comp: Competition, el, store: Store,
 
 # ── one sheet per squadra ───────────────────────────────────────────────────
 
-def _team_recaps(comp: Competition, el, store: Store, font: int) -> list:
+def _team_recaps(comp: Competition, el, store: Store, font: int, *,
+                 short_headers: bool = False) -> list:
     """The riepilogo of every squadra, one page each, in one PDF.
 
     The whole point is *tutte insieme*: a team manager is handed their own
@@ -137,7 +150,7 @@ def _team_recaps(comp: Competition, el, store: Store, font: int) -> list:
     # read once for the whole batch: every saved race is opened to find it
     heats = RC.heat_index(store, comp, el)
     docs = [D.team_recap(el, comp, name, group=group, heats=heats,
-                         font_size=font)
+                         font_size=font, short_headers=short_headers)
             for name in (names if pick == all_of_them else [pick])]
     if len(docs) > 1:
         # one file carries the whole pile, and `out_name` names it after the
@@ -194,11 +207,22 @@ def _sheet_document(comp: Competition, el, store: Store, sheet, com: str,
             return D.event_entry_list(el, comp, sheet.cat, sheet.event,
                                       communique=com, font_size=font)
         return None
+    # the W of an ammonizione belongs to the sheet, not to the page that prints
+    # it: what Gare puts on the paper, Stampa puts on the same paper
+    warned = R.warnings_carried(store, comp, sheet.cat, sheet.event,
+                                sheet.round_key or "")
+    # not on the classifica: the W says a rider carries an ammonizione into the
+    # race on this sheet, and a final ranking is no race. It went out on the
+    # comunicato of the fase where it was given (see `races._decisions_on`).
+    if sheet.doc == DOC_CLASSIFICATION:
+        warned = {}
     if sheet.doc == DOC_STARTLIST:
-        return D.race_startlist(state, el, comp, communique=com, font_size=font)
+        return D.race_startlist(state, el, comp, communique=com, font_size=font,
+                                warned=warned)
     result = R.classify(state, el, comp)
     return D.race_classification(state, result, el, comp, communique=com,
-                                 font_size=font, doc_kind=sheet.doc)
+                                 font_size=font, doc_kind=sheet.doc,
+                                 warned=warned)
 
 
 def _category(comp: Competition, el, store: Store, cat: str,
@@ -237,14 +261,17 @@ def _speciality(comp: Competition, el, store: Store, cat: str, event: str,
                 continue
             if state is None:
                 continue
+            warned = ({} if doc == DOC_CLASSIFICATION
+                      else R.warnings_carried(store, comp, cat, event,
+                                              round_key.key))
             if doc == DOC_STARTLIST:
                 out.append(D.race_startlist(state, el, comp, communique=com,
-                                            font_size=font))
+                                            font_size=font, warned=warned))
             else:
                 result = R.classify(state, el, comp)
                 out.append(D.race_classification(state, result, el, comp,
                                                  communique=com, font_size=font,
-                                                 doc_kind=doc))
+                                                 doc_kind=doc, warned=warned))
     return out
 
 

@@ -45,6 +45,18 @@ def _round_trip(comp, tmp_path):
     return load_competition(p)
 
 
+def _com(comp, cat, event, round_key, doc):
+    """The register entry that files a sheet, found by what it is.
+
+    Never by its number: the numbers move whenever a race is added to the
+    programme or taken out of it, and a test that named one would fail on a
+    change that has nothing to do with what it is checking.
+    """
+    return next(c for c in comp.communiques
+                if (c.cat, c.event, c.round_key, c.doc)
+                == (cat, event, round_key, doc))
+
+
 # ── the guarantee ───────────────────────────────────────────────────────────
 
 def test_the_real_programme_survives_being_written_out(comp, tmp_path):
@@ -52,7 +64,7 @@ def test_the_real_programme_survives_being_written_out(comp, tmp_path):
 
     This is the whole contract of the emitter. The file it is checked against
     is the one the championship is actually run from - 4 categorie, 7
-    specialità, 30 gare in programma e 138 comunicati.
+    specialità, 30 gare in programma e 140 comunicati.
     """
     assert _same(comp, _round_trip(comp, tmp_path))
 
@@ -108,7 +120,7 @@ def test_a_second_sheet_rides_in_the_same_fase(prog, tmp_path):
     That is what a velocità has always printed: the risultati of the turno and,
     under them, the ordine di partenza of the recuperi it just composed.
     """
-    c = next(c for c in prog.communiques if c.n == 95)
+    c = _com(prog, "AL", "velocita", "Turno 1", "risultati")
     c.extra = [Sheet(doc="partenti_recuperi")]
     assert [s.key for s in c.sheets] == [
         ("AL", "velocita", "Turno 1", "risultati"),
@@ -116,7 +128,7 @@ def test_a_second_sheet_rides_in_the_same_fase(prog, tmp_path):
     back = _round_trip(prog, tmp_path)
     assert _same(prog, back)
     assert C.number_for(back, "AL", "velocita", "Turno 1",
-                        "partenti_recuperi") == "95"
+                        "partenti_recuperi") == str(c.n)
 
 
 def test_a_sheet_can_say_it_belongs_to_no_fase(prog, tmp_path):
@@ -215,22 +227,22 @@ def test_the_register_is_a_table_of_documents(prog):
     That is what makes the multi-document case editable at all - the jury sees
     the number repeated and knows the two print together.
     """
-    c = next(c for c in prog.communiques if c.n == 95)
+    c = _com(prog, "AL", "velocita", "Turno 1", "risultati")
     c.extra = [Sheet(doc="partenti_recuperi")]
     rows = P.rows_from_specs(prog.communiques)
-    ninety_five = [r for r in rows if r["n"] == 95]
-    assert [r["doc"] for r in ninety_five] == ["risultati", "partenti_recuperi"]
+    both = [r for r in rows if r["n"] == c.n]
+    assert [r["doc"] for r in both] == ["risultati", "partenti_recuperi"]
     # the fase is filled in on both rows: the table shows what actually prints
-    assert {r["round"] for r in ninety_five} == {"Turno 1"}
+    assert {r["round"] for r in both} == {"Turno 1"}
     # the title belongs to the sheet, not to each of its documents
-    assert ninety_five[1]["title"] == ""
+    assert both[1]["title"] == ""
 
 
 def test_the_table_reads_back_into_the_same_register(prog):
     """Table -> model -> table is the page's own round trip."""
-    next(c for c in prog.communiques if c.n == 95).extra = [
+    _com(prog, "AL", "velocita", "Turno 1", "risultati").extra = [
         Sheet(doc="partenti_recuperi")]
-    next(c for c in prog.communiques if c.n == 25).extra = [
+    _com(prog, "AL", "vel_squadre", "Finali", "risultati").extra = [
         Sheet(round_key="", doc="classifica")]
     rows = P.rows_from_specs(prog.communiques)
     back = P.specs_from_rows(rows)

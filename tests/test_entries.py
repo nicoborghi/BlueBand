@@ -7,6 +7,7 @@ are the contract the importer must keep across refactors.
 import pytest
 
 from dataclasses import replace
+from pathlib import Path
 
 from core import entries as E
 from core.config import Quotas
@@ -154,6 +155,66 @@ def test_a_lettered_squadra_wants_exactly_four_starters(entries, comp):
         build_teams_and_pairs(entries, comp)
 
 
+# ── two rappresentative riding as one squadra (deroga) ──────────────────────
+
+def _merged(comp, events=("ins_squadre",)):
+    """The competition with the Piemonte / Valle d'Aosta deroga in force."""
+    sheet = replace(comp.entry_sheet,
+                    team_merge={"PIEMONTE": "PIEMONTE - V.D.A",
+                                "VALLE D'AOSTA": "PIEMONTE - V.D.A"},
+                    team_merge_events=list(events))
+    return replace(comp, entry_sheet=sheet)
+
+
+def _two_regions() -> EntryList:
+    """Two riders of Piemonte and two of Valle d'Aosta, in both team events."""
+    el = EntryList()
+    for i, region in enumerate(("PIEMONTE", "VALLE D'AOSTA")):
+        for j in range(2):
+            bib = 10 * (i + 1) + j
+            el.riders[str(bib)] = Rider(
+                key=str(bib), bib=bib, cat="DA", region=region,
+                last_name=f"R{bib}",
+                events={"ins_squadre": EventEntry(starter=True),
+                        "madison": EventEntry(starter=True)})
+    return el
+
+
+def test_two_regions_ride_as_one_squadra_where_authorised(comp):
+    """The deroga composes one quartetto out of two rappresentative."""
+    el = _two_regions()
+    build_teams_and_pairs(el, _merged(comp))
+    teams = [t for t in el.teams.values() if t.event == "ins_squadre"]
+    assert [t.label for t in teams] == ["PIEMONTE - V.D.A"]
+    assert len(teams[0].riders) == 4        # and so no wrong-size error
+    assert not el.errors
+    # the riders keep their own regione: only the squadra is joint
+    assert {r.region for r in el.riders.values()} == {"PIEMONTE",
+                                                      "VALLE D'AOSTA"}
+
+
+def test_the_deroga_holds_only_where_it_was_granted(comp):
+    """Authorised for the inseguimento: the madison still pairs by region."""
+    el = _two_regions()
+    build_teams_and_pairs(el, _merged(comp))
+    assert {p.region for p in el.pairs.values()} == {"PIEMONTE",
+                                                     "VALLE D'AOSTA"}
+    # no event listed means every team event, the madison with them
+    el = _two_regions()
+    build_teams_and_pairs(el, _merged(comp, events=()))
+    assert {p.region for p in el.pairs.values()} == {"PIEMONTE - V.D.A"}
+
+
+def test_without_the_deroga_a_region_is_itself(comp):
+    """No `team_merge`: two regions of two, and two undersized squadre."""
+    el = _two_regions()
+    plain = replace(comp, entry_sheet=replace(comp.entry_sheet, team_merge={}))
+    build_teams_and_pairs(el, plain)
+    assert {t.region for t in el.teams.values() if t.event == "ins_squadre"} \
+        == {"PIEMONTE", "VALLE D'AOSTA"}
+    assert len(el.errors) == 2
+
+
 def test_madison_pairs(entries):
     pairs = [p for p in entries.pairs.values() if p.cat == "ED"]
     assert pairs
@@ -218,6 +279,155 @@ def test_overlay_survives_reimport(store, iscritti_path, comp):
     assert eff.riders[key].not_starting is True
     assert len(eff.riders) == 238
     assert eff.teams and eff.pairs  # rebuilt after the overlay
+
+
+def test_the_overlay_can_be_switched_off_and_the_file_rules(store, iscritti_path,
+                                                            comp):
+    """Impostazioni: the entry list is the workbook and nothing else.
+
+    The way to work when the file is the master - iscritti, dorsali and
+    specialità are changed there and re-imported. The patches are set aside,
+    not thrown away: switched back on, the same decision is in force again.
+    """
+    el = import_master(iscritti_path, comp)
+    key = next(r.key for r in el.by_cat("DA") if r.bib)
+    save_import(store, el)
+    save_overlay(store, [Patch(target=key, op="set_np", value=True,
+                               reason="malato")])
+
+    E.set_overlay_on(store, False)
+    off, stale = effective_entries(store, comp)
+    assert E.overlay_on(store) is False
+    assert off.riders[key].not_starting is False and stale == []
+    # the squadre and the coppie are read off the entries either way
+    assert off.teams and off.pairs
+
+    E.set_overlay_on(store, True)
+    on, _ = effective_entries(store, comp)
+    assert E.overlay_on(store) is True
+    assert on.riders[key].not_starting is True
+    # and it is on unless it was turned off: nothing set, nothing changes
+    assert E.overlay_on(_NoSettings()) is True
+
+
+class _NoSettings:
+    settings: dict = {}
+
+
+def test_the_edits_can_be_written_into_the_workbook_itself(store, iscritti_path,
+                                                           comp, tmp_path):
+    """With the overlay off the app edits the file: the cell, not a patch.
+
+    Written through `Rider.source` - the sheet and row each rider was read
+    from - and read back to prove the file itself says it now.
+    """
+    import shutil
+
+    path = tmp_path / iscritti_path.name
+    shutil.copy2(iscritti_path, path)
+    el = import_master(path, comp)
+    rider = next(r for r in el.by_cat("AL") if r.bib and r.events)
+    event = next(iter(rider.events))
+
+    written, refused = E.write_back(path, comp, el, [
+        Patch(target=rider.key, op="set_field", field="bib", value=999,
+              reason="dorsale rifatto"),
+        Patch(target=rider.key, op="clear_event", field=event,
+              reason="ritirata l'iscrizione"),
+    ], store=store)
+    assert (written, refused) == (2, [])
+
+    again = import_master(path, comp)
+    assert again.riders[rider.key].bib == 999
+    assert event not in again.riders[rider.key].events
+    # the file the app does not own is never written without a copy aside
+    assert list((Path(store.root) / ".snapshots" / E.SOURCE_BACKUP).iterdir())
+
+
+def test_the_licence_check_is_written_where_the_file_has_a_column(store, comp,
+                                                                  iscritti_path,
+                                                                  tmp_path):
+    """Verificato and NP go into the columns the giuria added, in both sheets.
+
+    The federation's layout has neither: they are declared in
+    `entries.check_in` and written on the foglio di categoria *and* on the
+    KSPORT sheet, so a re-import reads the same answer from either one.
+    """
+    import shutil
+
+    if not E.check_in_columns(comp):
+        pytest.skip("this programme declares no check-in columns")
+    path = tmp_path / iscritti_path.name
+    shutil.copy2(iscritti_path, path)
+    el = import_master(path, comp)
+    rider = next(r for r in el.riders.values() if r.ksport_source)
+    assert rider.checked_in is False
+
+    written, refused = E.write_back(path, comp, el, [
+        Patch(target=rider.key, op="set_checked_in", value=True),
+        Patch(target=rider.key, op="set_not_starting", value=True)], store=store)
+    assert refused == [] and written == 4      # two flags, two sheets each
+
+    again = import_master(path, comp)
+    assert again.riders[rider.key].checked_in is True
+    assert again.riders[rider.key].not_starting is True
+    # and untickable again: the cell is cleared, not left saying SI
+    E.write_back(path, comp, again, [
+        Patch(target=rider.key, op="set_checked_in", value=False)], store=store)
+    assert import_master(path, comp).riders[rider.key].checked_in is False
+
+
+def test_the_licence_check_says_so_when_the_file_has_no_column(store, comp,
+                                                               iscritti_path,
+                                                               tmp_path):
+    """Without the columns there is nowhere to put the tick, and it says which."""
+    import shutil
+
+    path = tmp_path / iscritti_path.name
+    shutil.copy2(iscritti_path, path)
+    el = import_master(path, comp)
+    rider = next(iter(el.riders.values()))
+    bare = replace(comp, entry_sheet=replace(comp.entry_sheet, check_in={}))
+    assert E.check_in_columns(bare) == ()
+
+    written, refused = E.write_back(path, bare, el, [
+        Patch(target=rider.key, op="set_checked_in", value=True)], store=store)
+    assert written == 0 and len(refused) == 1
+    assert rider.full_name in refused[0]
+
+
+def test_a_check_in_column_next_to_the_specialita_is_not_read_as_one(comp):
+    """The giuria puts the two columns where there is room - even mid-sheet.
+
+    They are known by name, so they neither cut the run of event columns short
+    nor get reported as a specialità nobody recognises.
+    """
+    import openpyxl
+    from core.entries import _events_by_header, _read_category_sheet
+
+    sheet, cat = comp.entry_sheet, comp.cat_order()[0]
+    events = [s for s in (comp.events_for(cat) or comp.event_order())
+              if s != "entry_list"]
+    heads = ([sheet.header_of(f) for f in sheet.fields]
+             + [comp.event(s).short for s in events]
+             + [sheet.header_of("checked_in"), sheet.header_of("not_starting")])
+    ws = openpyxl.Workbook().active
+    for c, h in enumerate(heads, start=1):
+        ws.cell(sheet.header_row, c, h)
+    row = {"bib": 7, "uci_id": "10000000001", "last_name": "ROSSI",
+           "first_name": "MARIO", "cat": cat, "region": "TOSCANA"}
+    for c, f in enumerate(sheet.fields, start=1):
+        ws.cell(sheet.first_data_row, c, row.get(f, ""))
+    for c in range(len(sheet.fields) + 1, len(heads) - 1):
+        ws.cell(sheet.first_data_row, c, "X")
+    ws.cell(sheet.first_data_row, len(heads) - 1, "SI")   # Verificato
+
+    el = EntryList()
+    _read_category_sheet(ws, cat, el, _events_by_header(comp), sheet)
+    rider = el.riders["10000000001"]
+    assert set(rider.events) == set(events)
+    assert (rider.checked_in, rider.not_starting) == (True, False)
+    assert el.warnings == []
 
 
 def test_np_rider_is_excluded_from_entries(iscritti_path, comp):

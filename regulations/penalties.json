@@ -4,37 +4,37 @@
         "EN": "for not holding their line during the final sprint",
         "FR": "pour avoir quitté sa ligne pendant le sprint final",
         "ES": "por no mantener su línea durante el sprint final",
-        "IT": "per non aver mantenuto la propria traiettoria durante la volata finale"
+        "IT": "per non aver mantenuto la propria traiettoria durante la volata finale."
     },
     "2": {
         "EN": "for riding on the blue band",
         "FR": "pour avoir roulé sur la côte d'azur",
         "ES": "por pasar por la zona azul.",
-        "IT": "per aver pedalato sulla fascia azzurra"
+        "IT": "per essere transitato sulla fascia azzurra."
     },
     "3": {
         "EN": "for not having held their line during the last 200 meters of the race",
         "FR": "pour ne pas avoir tenu sa ligne dans les 200 derniers mètres de l'épreuve",
         "ES": "por no mantener su linea en los últimos 200 metros de la prueba",
-        "IT": "per non aver mantenuto la propria traiettoria negli ultimi 200 metri della prova"
+        "IT": "per non aver mantenuto la propria traiettoria negli ultimi 200 metri della prova."
     },
     "4": {
         "EN": "for irregular movement to prevent the opponent from passing",
         "FR": "pour manœuvre illicite, faite pour empêcher son adversaire de passer",
         "ES": "por maniobra irregular para impedir el paso de su oponente",
-        "IT": "per manovra irregolare per impedire il sorpasso dell'avversario"
+        "IT": "per manovra irregolare per impedire il sorpasso dell'avversario."
     },
     "5": {
         "EN": "for dangerous riding during the race",
         "FR": "pour manœuvre dangereuse au cours de l'épreuve",
         "ES": "por movimientos peligrosos durante la prueba",
-        "IT": "per condotta di guida pericolosa durante la gara"
+        "IT": "per condotta pericolosa durante la prova."
     },
     "6": {
         "EN": "for entering the sprinter's lane when the opponent was already there",
         "FR": "pour être entré dans le couloir des sprinters alors que son adversaire s'y trouvait déjà",
         "ES": "por entrar en el passillo de sprinters cuanda estaba ocupado por su adversario",
-        "IT": "per essere entrato nella corsia dei velocisti quando l'avversario vi si trovava già"
+        "IT": "per essere entrato nella corsia dei velocisti quando questa era già occupata."
     },
     "7": {
         "EN": "for moving down towards the inside of the track when an opponent was already there",

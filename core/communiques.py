@@ -1,6 +1,6 @@
 """The communiqué register: plan the numbers, then hand them out.
 
-The register is authored in `programme.yaml` (for CITA 26 it is the 138-entry
+The register is authored in `programme.yaml` (for CITA 26 it is the 140-entry
 list transcribed from *Lista Comunicati*, verified against the number printed
 on every jury workbook). At print time a document takes its planned number; a
 document that was not planned gets the next free one and is recorded, so the

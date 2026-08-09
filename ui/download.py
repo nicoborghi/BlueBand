@@ -30,11 +30,16 @@ KEEP = 20  # copies kept before the oldest are dropped
 
 def save_button(store: Store, docs, comp: Competition, *, number: str = "",
                 signature: bool = False, key: str = "dl",
-                label: str = "", container=None) -> Path | None:
+                label: str = "", container=None,
+                timestamp: bool = True) -> Path | None:
     """Render the document into the output folder.
 
     Falls back to the self-contained HTML when no Chromium is installed, so
     the jury always gets a file.
+
+    `timestamp=False` prints the sheet without the "Emesso il ..." line, for a
+    document that is reprinted as the day goes on and would otherwise differ
+    from the copy already handed out by nothing but the minute on its foot.
 
     `container` is where the button goes. Everything the save produces - the
     frame that opens the tab above all - is written outside it: an element
@@ -49,7 +54,8 @@ def save_button(store: Store, docs, comp: Competition, *, number: str = "",
 
     # no spinner: it pushed the page down while Chromium started and the tab
     # opens by itself the moment the file is there
-    path = archive(store, docs, comp, number=number, signature=signature)
+    path = archive(store, docs, comp, number=number, signature=signature,
+                   timestamp=timestamp)
     # Streamlit collapses a toast behind a "view more" past ~100 characters of
     # *source*, so nothing but the file name goes in there.
     st.toast(msg("saved_as", name=_short(path.name)),

@@ -16,7 +16,7 @@
    footline sits on a single sheet. #}
 {% if page_numbers %}
 {% set foot_box %}
-  content: "{{ printed_at }} · pag. " counter(page) "/" counter(pages);
+  content: "{% if printed_at %}{{ printed_at }} · {% endif %}pag. " counter(page) "/" counter(pages);
   font: 8pt "Helvetica Neue", Arial, sans-serif; color: #777;
   width: 100%; text-align: right; padding-right: 8mm; vertical-align: top;
 {% if footer_img %}
@@ -44,13 +44,13 @@
    it once per run: st.html throws away the <style> of what it is given). #}
 {% if css %}<style>{{ css|safe }}</style>{% endif %}
 {% endif %}
-<div class="cmsr" style="--header-color: {{ header_color }}">
+<div class="cmsr" style="--header-color: {{ header_color }};{{ note_vars }}">
 {{ body|safe }}
 {# Printed at the bottom of every sheet (position: fixed); the copy inside each
    document's tfoot only reserves the space. #}
 {% if footer %}
 <div class="page-footer">
-  <div class="footline">{{ printed_at }}</div>
+  {% if printed_at %}<div class="footline">{{ printed_at }}</div>{% endif %}
   {% if footer_img %}<div class="footer-strip"><img src="{{ footer_img }}"></div>
   {% endif %}
 </div>

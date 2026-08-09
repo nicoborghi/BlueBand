@@ -15,6 +15,8 @@ jury decision and reports the ones that no longer apply.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
@@ -42,6 +44,16 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     if stale:
         notify.warn("stale_patches",
                     list="\n".join(f"- {s}" for s in stale))
+    # the edits do not go into the overlay any more: they go into the file the
+    # entries were imported from, which is then read back
+    if not E.overlay_on(store):
+        missing = [f for f in E.CHECK_IN_FIELDS
+                   if f not in E.check_in_columns(comp)]
+        notify.info("edits_go_to_file",
+                    file=Path(E.source_path(store, comp) or "?").name,
+                    left_out=(msg("check_in_not_in_file",
+                                  what=", ".join(label(f) for f in missing))
+                              if missing else ""))
 
     # how far the check has got, then what the field is made of, then what is
     # wrong with it: the numbers the jury is asked for, in that order
@@ -158,9 +170,18 @@ def _editor(el, comp: Competition, store: Store) -> None:
         "Max": lim.get(r.cat) or None,
     } for r in riders])
 
+    # With the overlay off the grid edits the workbook itself: verificato and
+    # NP stay open only where the file has a column for them (`entries.check_in`
+    # - columns the giuria adds by hand), and are closed otherwise, since there
+    # would be nowhere on disk to put the tick.
+    to_file = not E.overlay_on(store)
+    writable = E.check_in_columns(comp)
+    frozen = [label(f) for f in ("uci_id", "cat", "n_events")] + ["key", "Max"]
+    if to_file:
+        frozen += [label(f) for f in E.CHECK_IN_FIELDS if f not in writable]
     edited = st.data_editor(
         df, hide_index=True, use_container_width=True, key="ver_editor",
-        disabled=[label(f) for f in ("uci_id", "cat", "n_events")] + ["key", "Max"],
+        disabled=frozen,
         column_config={
             "key": None, "Max": None,
             # Off the grid: at the licence desk the jury reads a dorsale and a
@@ -186,7 +207,8 @@ def _editor(el, comp: Competition, store: Store) -> None:
     reason = st.text_input(ui("edit_reason"), key="ver_reason",
                            help=help_text("edit_reason"))
     b1, b2 = st.columns([1, 2])
-    if b1.button(ui("save_edits"), type="primary"):
+    if b1.button(ui("save_to_file") if to_file else ui("save_edits"),
+                 type="primary"):
         patches = _diff(df, edited, heads, reason)
         if not patches:
             notify.info("no_edits_to_save")
@@ -197,18 +219,48 @@ def _editor(el, comp: Competition, store: Store) -> None:
                                       for p in patches):
             notify.error("reason_required")
             return
+        if to_file:
+            _write_to_file(el, comp, store, patches)
+            return
         current = E.load_overlay(store)
         E.save_overlay(store, current + patches)
         notify.ok("edits_saved", n=len(patches))
         st.rerun()
 
+    # ticking the lot at once goes wherever the single ticks go: the overlay,
+    # or the file when it has the column
     todo = [r for r in riders if not r.checked_in and not r.not_starting]
-    if todo and b2.button(ui("mark_verified", n=len(todo))):
-        current = E.load_overlay(store)
-        E.save_overlay(store, current + [
-            E.Patch(target=r.key, op="set_checked_in", value=True,
-                    reason=ui("check_in_reason")) for r in todo])
+    if todo and (not to_file or "checked_in" in writable) \
+            and b2.button(ui("mark_verified", n=len(todo))):
+        patches = [E.Patch(target=r.key, op="set_checked_in", value=True,
+                           reason=ui("check_in_reason")) for r in todo]
+        if to_file:
+            _write_to_file(el, comp, store, patches)
+            return
+        E.save_overlay(store, E.load_overlay(store) + patches)
         notify.ok("riders_verified", n=len(todo))
+        st.rerun()
+
+
+def _write_to_file(el, comp: Competition, store: Store, patches) -> None:
+    """Save the grid's edits into the entry workbook, then read it back.
+
+    The file is the master here: it is written, copied aside first, and
+    re-imported straight away, so what the app holds is what is on disk and
+    the "il file è cambiato" warning does not fire on our own edit.
+    """
+    path = E.source_path(store, comp)
+    if not path or not Path(path).exists():
+        notify.error("file_not_found")
+        return
+    written, refused = E.write_back(path, comp, el, patches, store=store)
+    if written:
+        E.save_import(store, E.import_entries(path, comp))
+        notify.ok("written_to_file", n=written, file=Path(path).name)
+    if refused:
+        notify.warn("write_back_refused",
+                    list="\n".join(f"- {r}" for r in refused))
+    if written:
         st.rerun()
 
 

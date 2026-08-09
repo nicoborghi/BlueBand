@@ -70,6 +70,51 @@ def test_nothing_written_yet_reads_as_an_empty_log(store):
     assert D.next_n([]) == 1
 
 
+# ── ammonizioni ─────────────────────────────────────────────────────────────
+
+def warn(**kw) -> D.Decision:
+    return D.Decision(penalty=D.WARNING, text="ammonizione", **kw)
+
+
+def test_the_numbers_of_a_decision_are_read_out_of_the_field():
+    assert D.bibs_of(D.Decision(bibs="12, 15")) == [12, 15]
+    assert D.bibs_of(D.Decision(bibs="12 e 15; 3")) == [12, 15, 3]
+    assert D.bibs_of(D.Decision(bibs="")) == []
+
+
+def test_a_warning_is_carried_into_the_fasi_that_follow():
+    rounds = ["Turno 1", "Quarti", "Semifinali", "Finali"]
+    taken = [warn(cat="AL", event="velocita", round_key="Quarti", bibs="12"),
+             # another specialità: it does not travel across events
+             warn(cat="AL", event="keirin", round_key="Turno 1", bibs="7")]
+    carried = D.warned_bibs(taken, "AL", "velocita", rounds=rounds,
+                            upto="Semifinali")
+    assert carried == {12: "Quarti"}
+    # and never backwards, onto a sheet filed before the decision existed
+    assert D.warned_bibs(taken, "AL", "velocita", rounds=rounds,
+                         upto="Turno 1") == {}
+    # nor on the fase it was taken in: that sheet carries the decision itself,
+    # and the W is there to say it in the *next* race
+    assert D.warned_bibs(taken, "AL", "velocita", rounds=rounds,
+                         upto="Quarti") == {}
+
+
+def test_a_warning_filed_against_no_fase_counts_everywhere():
+    taken = [warn(cat="ES", event="omnium", bibs="4")]
+    assert D.warned_bibs(taken, "ES", "omnium", rounds=["Scratch"],
+                         upto="Scratch") == {4: ""}
+
+
+def test_two_warnings_in_the_same_fase_are_a_disqualification():
+    taken = [warn(cat="AL", event="madison", round_key="Finale", bibs="12"),
+             warn(cat="AL", event="madison", round_key="Finale", bibs="12, 3"),
+             warn(cat="AL", event="madison", round_key="Qualificazioni",
+                  bibs="3")]
+    assert D.double_warned(taken, "AL", "madison", "Finale") == [12]
+    # 3 was warned twice, but in two different fasi: that is not a DSQ
+    assert D.double_warned(taken, "AL", "madison", "Qualificazioni") == []
+
+
 # ── the regulations ─────────────────────────────────────────────────────────
 
 def test_the_uci_offences_come_out_in_numeric_order():
@@ -147,3 +192,85 @@ def test_the_regulation_files_are_json_the_app_can_read():
     for path in (D.PENALTIES_FILE, D.PUIS_FILE):
         with path.open(encoding="utf-8") as fh:
             assert isinstance(json.load(fh), dict)
+
+
+# ── the register: columns, codes, and reading it back ───────────────────────
+
+def test_the_compact_code_is_the_provvedimento_and_the_article():
+    """`C3` - what the jury quotes and what the sheet prints next to the number."""
+    d = D.Decision(penalty="C", reason="3")
+    assert d.code == "C3" and d.kind == "relegation"
+    assert D.parse_code("C3") == ("C", "3")
+    assert D.parse_code(" c3 ") == ("C", "3")
+    # a decision that sanctions nobody has no code and is a plain note
+    plain = D.Decision(text="Il torneo è stato disputato in due batterie.")
+    assert plain.code == "" and plain.kind == D.NOTE
+
+
+def test_a_penalty_without_an_article_still_has_a_code():
+    """The provvedimento is the decision; the article is what it was taken under."""
+    assert D.Decision(penalty="D").code == "D"
+    assert D.Decision(penalty="D").kind == "disqualification"
+
+
+def test_every_kind_a_block_can_have_is_one_the_sheets_can_colour():
+    from core.config import NOTE_COLORS
+    from core.i18n import NOTE_KINDS as NAMES
+
+    assert set(D.KINDS.values()) | {D.NOTE} == set(D.NOTE_KINDS)
+    assert set(D.NOTE_KINDS) == set(NOTE_COLORS) == set(NAMES)
+
+
+def test_the_article_is_kept_across_a_reload(store):
+    D.add(store, D.Decision(penalty="A", reason="6", text="ammonito"))
+    assert D.load(store)[0].code == "A6"
+
+
+def test_one_specialita_is_read_back_fase_by_fase(store):
+    """The recap the panel signs off: in programme order, empty fasi left out."""
+    for rnd, bib in (("Quarti", "5"), ("Turno 1", "3"), ("Quarti", "7")):
+        D.add(store, D.Decision(cat="AL", event="velocita", round_key=rnd,
+                                bibs=bib, penalty="C", reason="2", text="x"))
+    # another specialità entirely: it is not part of this recap
+    D.add(store, D.Decision(cat="AL", event="keirin", round_key="Finali",
+                            text="y"))
+    groups = D.by_round(D.load(store), "AL", "velocita",
+                        ["Qualificazioni", "Turno 1", "Quarti"])
+    assert [(k, [d.bibs for d in v]) for k, v in groups] == [
+        ("Turno 1", ["3"]), ("Quarti", ["5", "7"])]
+
+
+def test_a_fase_the_programme_does_not_know_is_kept_at_the_end(store):
+    """A round_key edited by hand must not drop out of the recap."""
+    D.add(store, D.Decision(cat="AL", event="velocita", round_key="Turno 1",
+                            text="a"))
+    D.add(store, D.Decision(cat="AL", event="velocita", round_key="Spareggio",
+                            text="b"))
+    assert [k for k, _ in D.by_round(D.load(store), "AL", "velocita",
+                                     ["Turno 1"])] == ["Turno 1", "Spareggio"]
+
+
+def test_one_race_is_not_the_whole_specialita(store):
+    """`round_key=None` is every fase; `""` is the fase that has no name."""
+    D.add(store, D.Decision(cat="AL", event="omnium", round_key="", text="a"))
+    D.add(store, D.Decision(cat="AL", event="omnium", round_key="Scratch",
+                            text="b"))
+    taken = D.load(store)
+    assert len(D.for_race(taken, "AL", "omnium")) == 2
+    assert [d.text for d in D.for_race(taken, "AL", "omnium", "")] == ["a"]
+    assert [d.text for d in D.for_race(taken, "AL", "omnium", "Scratch")] == ["b"]
+
+
+# ── the sentence proposed to the jury ───────────────────────────────────────
+
+def test_the_proposal_is_the_wording_the_jury_would_have_written():
+    line = D.compose("DA 46 BOSONIN MELANIE", "A", "6")
+    assert line.startswith("DA 46 BOSONIN MELANIE: AMMONIZIONE (A) ")
+    assert line.endswith(D.reason("6"))
+
+
+def test_every_part_of_the_proposal_is_optional():
+    """A decision about nobody, under no article, is one the jury types itself."""
+    assert D.compose("", "", "") == ""
+    assert D.compose("AL 3", "", "") == "AL 3:"
+    assert "SQUALIFICA (D)" in D.compose("", "D", "")

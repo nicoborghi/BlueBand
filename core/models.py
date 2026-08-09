@@ -21,6 +21,7 @@ class Status(str, Enum):
     OK = "OK"
     REL = "REL"  # declassato / relegato
     DNF = "DNF"
+    ABD = "ABD"  # ritirato di sua volontà: scende dalla pista, non è caduto
     DNS = "DNS"
     DSQ = "DSQ"
     NP = "NP"  # non partente (declared before the race, entry-list level)
@@ -33,14 +34,24 @@ class Status(str, Enum):
 # Single ordering convention for every format: classified riders first (by
 # their own result), then the non-classified in this order. Replaces the three
 # mutually inconsistent sentinel schemes of the old track.py.
+#
+# ABD comes after DNF: both left the race, and the one who came down of her own
+# accord left it behind the one who could not finish it. A DSQ is last of all -
+# a decision of the jury, not a way of ending a race.
 STATUS_ORDER: dict[Status, int] = {
     Status.OK: 0,
     Status.REL: 1,
     Status.DNF: 2,
-    Status.DNS: 3,
-    Status.NP: 4,
-    Status.DSQ: 5,
+    Status.ABD: 3,
+    Status.DNS: 4,
+    Status.NP: 5,
+    Status.DSQ: 6,
 }
+
+#: The two ways a rider leaves a race she started. They are ranked among
+#: themselves by *when* they left it, which is the order the jury types them in
+#: (see `formats.base.leaving_order`).
+LEFT_RACE = (Status.DNF, Status.ABD)
 
 
 def status_of(value: Any) -> Status:
@@ -125,6 +136,7 @@ class Rider:
     not_starting: bool = False   # "NP": not starting, whole competition
     events: dict[str, EventEntry] = field(default_factory=dict)
     source: str = ""             # which file this rider came from
+    ksport_source: str = ""      # "KSPORT!12": the federal row, when there is one
 
     @property
     def full_name(self) -> str:

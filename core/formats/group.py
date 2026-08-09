@@ -19,7 +19,12 @@ from ..i18n import msg
 from ..models import Status
 from ..parse import duplicates, unknown
 from .base import (CLASSIFIED, Placing, Result, assign_positions,
-                   sort_by_status, sort_placings)
+                   leaving_order, sort_by_status, sort_placings)
+
+#: Whose total is printed at all. A ritirata keeps what she scored before she
+#: left - she rode those volate - so the column stands next to her DNF; a scesa
+#: and a squalificata have no total to show (see `group_classification`).
+SCORING = (Status.OK, Status.DNF)
 
 SPRINT_POINTS = [5, 3, 2, 1]
 FINAL_SPRINT_POINTS = [10, 6, 4, 2]
@@ -91,12 +96,18 @@ def group_classification(startlist: list[int], sprints: list[list[int]], *,
     for bib in startlist:
         key = str(bib)
         status = statuses.get(key, Status.OK)
+        # a rider who came down of her own accord scores nothing: the volate she
+        # took before that are not printed either, or the sheet reads as if she
+        # had been classified on them (a ritirata keeps hers - she was racing
+        # until the race stopped her)
+        scored = status is not Status.ABD
         total = points[bib] + LAP_POINTS * lap_net[bib]
+        shown = total if status in SCORING else 0
         placings.append(Placing(key=key, status=status, data={
-            "sprints": per_sprint[bib],
-            "points": points[bib],
-            "laps": lap_net[bib],
-            "total": total if status is Status.OK else 0,
+            "sprints": per_sprint[bib] if scored else [0] * len(sprints),
+            "points": points[bib] if scored else 0,
+            "laps": lap_net[bib] if scored else 0,
+            "total": shown,
             "_sort": -(total if status is Status.OK else 0),
             "_tiebreak": last_sprint_rank[bib],
         }))
@@ -112,7 +123,7 @@ def group_classification(startlist: list[int], sprints: list[list[int]], *,
             p.data["sprints"] = []
 
     placings.sort(key=lambda p: (p.data["_sort"], p.data["_tiebreak"], int(p.key)))
-    placings = sort_placings(placings)
+    placings = sort_placings(placings, order=leaving_order(statuses))
     assign_positions(placings)
 
     cols = [] if scoring == SCRATCH else ["points", "laps", "total"]
@@ -158,7 +169,7 @@ def elimination_classification(startlist: list[int], eliminated: list[int], *,
     # sheet doubles as a live provisional classification
     placings.sort(key=lambda p: (p.position is not None, p.position or 0,
                                  int(p.key)))
-    placings = sort_by_status(placings)
+    placings = sort_by_status(placings, leaving_order(statuses))
 
     return Result(placings=placings, warnings=warnings,
                   pending=len(still) if len(still) > 1 else 0)

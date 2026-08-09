@@ -325,13 +325,15 @@ def scheme_classification(*, finals: list[list[str]],
                           final_5_8: list[str] = (),
                           qual_ranking: list[str] = (),
                           statuses: dict[str, Status] | None = None) -> Result:
-    """Places 1-8 from the finals, everybody else on the 200 m.
+    """Places from the finals, everybody else on the 200 m.
 
     `finals` are the finals as they were ridden - the 3°/4° first, then the
-    1°/2° - so the sheet is read off the same list the track ran. Below the
-    eighth place there is nothing left to rank on but the qualifying time: a
-    rider knocked out in the first round and one knocked out in the quarti are
-    separated by the only race they both rode.
+    1°/2° - so the sheet is read off the same list the track ran. `final_5_8`
+    is the 5°-8° when it was ridden and empty when it was not: with the finals
+    1°-4° alone the classification goes on with the 200 m from the fifth place,
+    which is the only race the riders under the finals all rode. A rider
+    knocked out in the first round and one knocked out in the quarti are
+    separated by that race and by nothing else.
     """
     statuses = dict(statuses or {})
     order: list[str] = []

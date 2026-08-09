@@ -61,6 +61,28 @@ def test_a_prova_not_finished_is_carried_into_the_standings():
     assert res.placings[-1].key == "B"
 
 
+def test_riders_on_the_same_points_are_split_by_the_last_prova():
+    """From 21st on everybody scores 1: the classifica still ranks them.
+
+    The parziale of the scratch is a classifica, not the ordine di partenza of
+    the prova that follows: the tail on one point is read in the order they
+    crossed the line, not in the order the entrants happen to be listed in.
+    """
+    order = [f"r{i}" for i in range(1, 26)]
+    res = O.omnium_classification({O.SCRATCH: _res(list(reversed(order)))})
+    tail = [p.key for p in res.placings if p.data["total"] == 1]
+    assert len(tail) == 5                            # 21st to 25th
+    assert tail == list(reversed(order))[20:]
+
+    # and the prova ridden last is the one that separates them: the same five
+    # are on one point in both, in the other order in the tempo race
+    tempo = list(reversed(order))[:20] + order[:5]
+    res = O.omnium_classification({O.SCRATCH: _res(list(reversed(order))),
+                                   O.TEMPO: _res(tempo)})
+    tail = [p.key for p in res.placings if p.data["total"] == 2]
+    assert tail == order[:5]
+
+
 def test_the_worst_status_of_the_four_prove_wins():
     rounds = {O.SCRATCH: _res(["A", "B"], {"B": Status.DNF}),
               O.TEMPO: _res(["A", "B"], {"B": Status.DSQ})}
@@ -137,6 +159,22 @@ def test_the_points_race_sheet_runs_on_the_omnium_total():
     assert out.by_key("9").data["total"] == 90
 
 
+def test_the_points_race_sheet_is_ordered_on_the_omnium_total():
+    """It is the last prova: its risultati are the classifica of the omnium.
+
+    Whoever won the race has not won the omnium unless the total says so, and
+    two riders on the same total are separated by this race (3.2.109).
+    """
+    result = Result(placings=[Placing(key="7", position=1, data={"total": 20}),
+                              Placing(key="9", position=2, data={"total": 6}),
+                              Placing(key="4", position=3, data={"total": 6})],
+                    columns=["points", "laps", "total"])
+    out = R.omnium_points_race(result, {"7": 60, "9": 84, "4": 84})
+    assert [p.key for p in out.placings] == ["9", "4", "7"]
+    assert [p.position for p in out.placings] == [1, 2, 3]
+    assert [p.data["total"] for p in out.placings] == [90, 90, 80]
+
+
 def test_a_prova_carries_the_points_its_placings_are_worth():
     out = R.omnium_prova_points(_res(["A", "B", "C"]), O.ELIMINATION)
     assert [p.data["prova_points"] for p in out.placings] == [40, 38, 36]
@@ -153,7 +191,7 @@ def test_a_prova_carries_the_points_its_placings_are_worth():
 ])
 def test_the_documents_a_prova_files(ev, entries, comp, round_key, docs):
     state = R.ensure_state(ev, comp, "AL", "omnium", round_key, entries)
-    assert _doc_kinds(comp, state) == docs
+    assert _doc_kinds(comp, state, ev) == docs
 
 
 def test_the_classifica_parziale_says_which_prova_it_starts(ev, entries, comp):
@@ -193,17 +231,17 @@ def test_the_points_columns_of_each_sheet(ev, entries, comp):
     # prova and the partenti of the next one are the jury's own
     ("ED", O.SCRATCH, DOC_STARTLIST, "39"),
     ("ED", O.SCRATCH, DOC_RESULTS, "-1"),
-    ("ED", O.SCRATCH, DOC_PARTIAL, "53"),
+    ("ED", O.SCRATCH, DOC_PARTIAL, "54"),
     ("ED", O.TEMPO, DOC_RACE, "-1"),
-    ("ED", O.TEMPO, DOC_RESULTS, "61"),
-    ("ED", O.TEMPO, DOC_PARTIAL, "62"),
+    ("ED", O.TEMPO, DOC_RESULTS, "63"),
+    ("ED", O.TEMPO, DOC_PARTIAL, "64"),
     ("ED", O.ELIMINATION, DOC_STARTLIST, "-1"),
-    ("ED", O.ELIMINATION, DOC_RESULTS, "65"),
-    ("ED", O.ELIMINATION, DOC_PARTIAL, "66"),
+    ("ED", O.ELIMINATION, DOC_RESULTS, "67"),
+    ("ED", O.ELIMINATION, DOC_PARTIAL, "68"),
     ("ED", O.POINTS_RACE, DOC_STARTLIST, "-1"),
-    ("ED", "", DOC_CLASSIFICATION, "70"),
-    ("AL", O.SCRATCH, DOC_PARTIAL, "97"),
-    ("AL", O.ELIMINATION, DOC_PARTIAL, "106"),
+    ("ED", "", DOC_CLASSIFICATION, "72"),
+    ("AL", O.SCRATCH, DOC_PARTIAL, "101"),
+    ("AL", O.ELIMINATION, DOC_PARTIAL, "110"),
 ])
 def test_the_register_numbers_the_omnium_sheets(comp, cat, round_key, doc,
                                                 number):
@@ -227,6 +265,15 @@ def _sheet(ev, entries, comp, round_key, doc, **kw):
         result = R.omnium_standings(ev, comp, entries, "ED", upto=round_key)
     return D.race_classification(state, result, entries, comp, doc_kind=doc,
                                  **kw), state
+
+
+def test_the_elenco_partenti_of_the_scratch_carries_the_uci_id(ev, entries,
+                                                               comp):
+    """The sheet that starts the omnium is read against the licences."""
+    state = R.ensure_state(ev, comp, "ED", "omnium", O.SCRATCH, entries)
+    heads = [c.label for c in
+             D.race_startlist(state, entries, comp).tables[0].columns]
+    assert "UCI ID" in heads
 
 
 def test_the_classifica_parziale_is_an_ordine_di_partenza(ev, entries, comp):
@@ -261,3 +308,122 @@ def test_the_omnium_classifica_files_the_society_by_name(ev, entries, comp):
                     show_club=True, show_club_code=False)
     heads = [c.label for c in doc.tables[0].columns]
     assert "Società" in heads and "Cod. Soc." not in heads
+
+
+# ── the batterie di qualificazione ──────────────────────────────────────────
+#
+# An omnium with more riders than the prove take is ridden with a corsa a punti
+# di qualificazione in two batterie. Who rides where is a decision of the jury,
+# taken in the composition round; who rides the four prove is what the batterie
+# qualified. Nothing of this is the madison's, except the machinery.
+
+QUALIF_1 = "Qualificazioni Batteria 1"
+QUALIF_2 = "Qualificazioni Batteria 2"
+
+
+@pytest.fixture
+def composed(ev, entries, comp):
+    """ES omnium composed: the iscritti dealt into the two batterie."""
+    keys = R.entrants(entries, comp, "ES", "omnium")
+    setup = R.ensure_state(ev, comp, "ES", "omnium", "Composizione batterie",
+                           entries)
+    setup.payload[R.PAIR_HEATS] = R.spread_heats(keys, 2)
+    setup.payload[R.ELIMINATE] = 5
+    ev.save_race(setup)
+    return ev
+
+
+def test_the_omnium_composition_round_is_composed_not_ridden(comp):
+    assert R.round_format(comp, "ES", "omnium",
+                          "Composizione batterie") == R.SETUP
+    assert R.setup_round(comp, "ES", "omnium") == "Composizione batterie"
+    assert R.is_composed(comp, "ES", "omnium")
+    assert R.heat_rounds(comp, "ES", "omnium") == [(1, QUALIF_1), (2, QUALIF_2)]
+    # what the batterie qualify for is the omnium itself: all four prove
+    assert R.final_rounds(comp, "ES", "omnium") == O.ROUNDS
+    # a categoria without qualification is ridden straight off
+    assert not R.is_composed(comp, "ED", "omnium")
+
+
+def test_the_riders_keep_their_dorsale(composed, entries, comp):
+    """No numbers to hand out: an omnium composes batterie and nothing else."""
+    pr = R.pairing(composed, comp, "ES", "omnium", entries)
+    assert not pr.numbered
+    assert all(pr.number(k) == int(k) for k in pr.pairs)
+    assert pr.eliminate == 5           # what the programme says
+
+
+def test_each_batteria_starts_only_its_own_riders(composed, entries, comp):
+    everyone = R.entrants(entries, comp, "ES", "omnium")
+    b1 = R.ensure_state(composed, comp, "ES", "omnium", QUALIF_1, entries)
+    b2 = R.ensure_state(composed, comp, "ES", "omnium", QUALIF_2, entries)
+
+    assert set(b1.entrants) | set(b2.entrants) == set(everyone)
+    assert not set(b1.entrants) & set(b2.entrants)
+    assert len(b1.entrants) < len(everyone)
+    # by dorsale, which is what the ordine di partenza is read by
+    assert b1.entrants == sorted(b1.entrants, key=int)
+    # the cut in force travels onto the batteria, so its sheets keep saying it
+    assert b1.payload[R.ELIMINATE] == 5
+
+
+def test_without_a_composition_both_batterie_hold_everybody(ev, entries, comp):
+    """Before the jury composes anything there is nothing to split the field by.
+
+    The startlist of a batteria is the entry list until the composition round
+    says otherwise - what it must not be is silently half of it.
+    """
+    everyone = R.entrants(entries, comp, "ES", "omnium")
+    b1 = R.ensure_state(ev, comp, "ES", "omnium", QUALIF_1, entries)
+    assert b1.entrants == everyone
+
+
+def _ride(store, entries, comp, round_key):
+    """Ride one batteria: everybody finishes, in startlist order."""
+    state = R.ensure_state(store, comp, "ES", "omnium", round_key, entries)
+    state.payload["sprints"] = ",".join(state.entrants)
+    store.save_race(state)
+    return state
+
+
+def test_the_prove_start_who_the_batterie_qualified(composed, entries, comp):
+    b1 = _ride(composed, entries, comp, QUALIF_1)
+    b2 = _ride(composed, entries, comp, QUALIF_2)
+
+    info = R.load_qualified(composed, comp, entries, "ES", "omnium")
+
+    assert not info["missing"]
+    assert len(info["qualified"]) == (len(b1.entrants) - 5
+                                      + len(b2.entrants) - 5)
+    # dealt across the batterie: the winners first, then the seconds
+    assert info["qualified"][:2] == [b1.entrants[0], b2.entrants[0]]
+    # all four prove are loaded together: the field rides the whole omnium
+    assert info["rounds"] == O.ROUNDS
+    for name in O.ROUNDS:
+        prova = R.ensure_state(composed, comp, "ES", "omnium", name, entries)
+        assert prova.entrants == info["qualified"]
+    # reopening must not put the eliminated riders back on the startlist
+    scratch = R.ensure_state(composed, comp, "ES", "omnium", O.SCRATCH, entries)
+    assert len(scratch.entrants) < len(R.entrants(entries, comp, "ES",
+                                                  "omnium"))
+
+
+def test_the_classification_is_over_the_qualified_field(composed, entries,
+                                                        comp):
+    _ride(composed, entries, comp, QUALIF_1)
+    _ride(composed, entries, comp, QUALIF_2)
+    info = R.load_qualified(composed, comp, entries, "ES", "omnium")
+
+    field = R.omnium_field(composed, comp, entries, "ES", "omnium")
+    assert field == info["qualified"]
+    # whoever went out in the qualification is not in the standings at all
+    res = R.omnium_standings(composed, comp, entries, "ES", "omnium")
+    assert {p.key for p in res.placings} == set(info["qualified"])
+
+
+def test_an_omnium_without_batterie_starts_everybody(ev, entries, comp):
+    """ED rides the four prove straight off: no qualification, no cut."""
+    everyone = R.entrants(entries, comp, "ED", "omnium")
+    scratch = R.ensure_state(ev, comp, "ED", "omnium", O.SCRATCH, entries)
+    assert scratch.entrants == everyone
+    assert R.omnium_field(ev, comp, entries, "ED", "omnium") == everyone

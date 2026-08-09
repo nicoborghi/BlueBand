@@ -153,9 +153,17 @@ def test_multiple_documents_break_pages(entries, comp):
 
 
 def test_archive_names_by_comunicato(store, entries, comp):
+    """The name is the jury's, whichever way the document came out.
+
+    With a browser it is a PDF; the HTML is the fallback, so the extension is
+    the one thing that changes from machine to machine.
+    """
     doc = D.entry_list(entries, comp, "AL", communique="3")
     p = archive(store, doc, comp, number="3")
-    assert p.name == "003_AL_partenti.html"  # the category stays uppercase
+    assert p.stem == "003_AL_partenti"       # the category stays uppercase
+    if p.suffix == ".pdf":
+        assert p.read_bytes().startswith(b"%PDF")
+        return
     assert p.read_text(encoding="utf-8").lstrip().startswith("<!doctype html>")
     assert "Comunicato n. 3" in _text(p.read_text(encoding="utf-8"))
 
@@ -260,6 +268,26 @@ def test_footer_can_be_left_out_of_the_on_screen_preview(entries, comp):
     assert '<div class="footline">' not in on_screen
 
 
+def test_the_printing_time_can_be_left_off_the_foot(entries, comp):
+    """`timestamp=False`: the rest of the foot stays, the «Emesso il» goes.
+
+    A sheet reprinted through the day - the medagliere - otherwise differs
+    from the copy already handed out by nothing but the minute on its foot.
+    """
+    doc = D.entry_list(entries, comp, "ED")
+    stamped = to_html(doc, comp, standalone=True)
+    plain = to_html(doc, comp, standalone=True, timestamp=False)
+    assert "Emesso il" in stamped
+    assert "Emesso il" not in plain
+    # the foot itself is still there - only its one line is gone
+    assert 'class="page-footer"' in plain
+    assert '<div class="footline">' not in plain
+    # and a numbered sheet still numbers its pages, without a stray separator
+    numbered_ = to_html(doc, comp, standalone=True, page_numbers=True,
+                        timestamp=False)
+    assert 'content: "pag. " counter(page)' in numbered_
+
+
 def test_rows_never_wrap_and_columns_always_fit():
     css = (ROOT / "render" / "print.css").read_text(encoding="utf-8")
     assert "table-layout: fixed" in css
@@ -338,6 +366,34 @@ def test_the_browser_profile_never_goes_next_to_the_document(tmp_path,
     dirs = P.profile_dirs()
     assert dirs[0] == tmp_path / "first"      # an explicit setting wins
     assert len(dirs) > 1                      # and is not the only try
+
+
+def test_a_working_directory_the_browser_cannot_use_is_not_the_answer(tmp_path,
+                                                                      monkeypatch):
+    """The Drive folder is offered first and dropped when it does not work.
+
+    The comunicati live on `/mnt/g/...`, which a snap Chromium cannot write to
+    at all ("No such device"): the page and the PDF have to fall back to a
+    local directory, or every sheet comes out as HTML with no tab opened.
+    """
+    from render import pdf as P
+
+    if not P.available():
+        pytest.skip("nessun browser Chromium installato")
+    dead = tmp_path / "dead"
+    dead.mkdir()
+    dead.chmod(0o500)                        # created, never written into
+    monkeypatch.setattr(P, "_LAST_GOOD", None)
+    assert P.work_dirs(dead)[:1] == [dead]   # the caller's choice comes first
+    try:
+        data = P.html_to_pdf("<html><body><p>prova</p></body></html>",
+                             workdir=dead)
+        assert data.startswith(b"%PDF")
+        # and the directory that worked is where the next document starts
+        assert P._LAST_GOOD is not None and P._LAST_GOOD != dead
+        assert P.work_dirs(dead)[0] == P._LAST_GOOD
+    finally:
+        dead.chmod(0o700)
 
 
 def test_every_profile_candidate_is_tried_before_giving_up(monkeypatch,
@@ -519,6 +575,28 @@ def test_the_merged_name_column_gives_width_back(entries, comp):
         next(c.pct for c in t.columns if c.key == "club")
 
 
+def test_how_wide_the_merged_name_column_is_comes_from_the_settings():
+    """Impostazioni → Nome sets it: the renderer has no figure of its own.
+
+    A bad value in `settings.json` would narrow every printed name at once, so
+    `Branding` clamps it rather than passing it through.
+    """
+    from core.config import (DEFAULT_NAME_WIDTH, NAME_WIDTH_MAX,
+                             NAME_WIDTH_MIN, Branding)
+    from render.render import COLS_RIDER, merge_names
+
+    doc = Document(title="X", tables=[Table(columns=list(COLS_RIDER))])
+    narrow = merge_names(doc, 0.5).tables[0]
+    wide = merge_names(doc, 0.9).tables[0]
+    assert (next(c.pct for c in narrow.columns if c.key == "full_name")
+            < next(c.pct for c in wide.columns if c.key == "full_name"))
+
+    assert Branding(name_width=99).name_width == NAME_WIDTH_MAX
+    assert Branding(name_width=0.01).name_width == NAME_WIDTH_MIN
+    assert Branding(name_width="").name_width == DEFAULT_NAME_WIDTH
+    assert NAME_WIDTH_MIN <= Branding().name_width <= NAME_WIDTH_MAX
+
+
 def test_the_champion_band_follows_the_merged_name_column():
     """The band under the champion sits under the names, whichever they are."""
     from render.render import merge_names
@@ -535,3 +613,88 @@ def test_the_champion_band_follows_the_merged_name_column():
     assert t.rows[0]["_bold"] == ["full_name"]
     assert t.rows[1]["_banner_at"] == "full_name"
     assert t.banner_offset(t.rows[1]) == 1
+
+
+# ── the blocks under the table ──────────────────────────────────────────────
+
+def _blocks(html: str) -> list[str]:
+    return re.findall(r'<div class="decisione ([a-z]+)">(.*?)</div>', html)
+
+
+def test_a_decision_prints_in_the_tint_of_its_provvedimento(comp):
+    """Squalifica, retrocessione and ammonizione are not the same box."""
+    from core.decisions import Decision
+    from render.documents import decision_notes
+
+    doc = Document(title="PROVA", tables=[],
+                   notes=decision_notes([
+                       Decision(penalty="D", reason="5", text="squalificato"),
+                       Decision(penalty="C", reason="3", text="retrocesso"),
+                       Decision(penalty="A", reason="6", text="ammonito"),
+                   ], codes=True),
+                   decision="I primi due passano alla finale.")
+    html = to_html(doc, comp)
+    kinds = [k for k, _ in _blocks(html)]
+    # the note is last and keeps the plain box: it sanctions nobody
+    assert kinds == ["disqualification", "relegation", "warning", "note"]
+    assert "I primi due passano alla finale." in _blocks(html)[-1][1]
+    # each carries the code it was taken under: the competition asked for it
+    assert ">D5</span>" in html and ">C3</span>" in html
+    # and the tints reach the page as custom properties
+    assert "--note-disqualification:" in html and "--note-note-rule:" in html
+
+
+def test_the_uci_code_is_off_unless_the_competition_asks_for_it(comp):
+    """The comunicato carries the sentence; the code is in the jury's register."""
+    from core.decisions import Decision
+    from render.documents import decision_notes
+
+    notes = decision_notes([Decision(penalty="C", reason="3",
+                                     text="retrocesso")])
+    assert [n.title for n in notes] == [""]
+    # the tint stays: what the box is remains readable without the code
+    assert notes[0].kind == "relegation"
+
+
+def test_a_decision_with_no_text_prints_nothing(comp):
+    """A coloured box with a code and no sentence is one nobody can answer."""
+    from core.decisions import Decision
+    from render.documents import decision_notes
+
+    assert decision_notes([Decision(penalty="D", reason="5")]) == []
+
+
+def test_the_tints_are_the_competitions_to_change(comp):
+    """Set in Impostazioni, and the rule down the side follows the tint."""
+    from dataclasses import replace
+
+    from render.render import darken
+
+    recoloured = replace(comp, branding=replace(
+        comp.branding, note_colors={"disqualification": "#ff0000"}))
+    html = to_html(Document(title="PROVA", tables=[]), recoloured)
+    assert "--note-disqualification: #ff0000" in html
+    assert f"--note-disqualification-rule: {darken('#ff0000')}" in html
+    # what was not set keeps the default rather than printing untinted
+    assert "--note-warning: #fef08a" in html
+
+
+def test_the_rule_of_a_box_keeps_the_hue_of_its_tint():
+    """A pink box gets a red rule, not a brown one; grey stays grey."""
+    from render.render import darken
+
+    assert darken("#fecaca") == "#ad0000"     # the squalifica reads as red
+    assert darken("#fed7aa").startswith("#ad")  # and the retrocessione orange
+    assert darken("#ffffff") == "#575757"     # no hue to keep
+    # anything the sheet cannot read is left alone rather than crashing it
+    assert darken("rgb(1,2,3)") == "rgb(1,2,3)"
+
+
+def test_the_printed_register_carries_the_compact_code(comp):
+    """`C3`, not `C`: the article a decision was taken under is answerable."""
+    from core.decisions import Decision
+
+    doc = D.decisions_register(
+        [Decision(n=1, day=2, cat="AL", event="velocita", round_key="Quarti",
+                  bibs="7", penalty="C", reason="3", text="retrocesso")], comp)
+    assert doc.tables[0].rows[0]["code"] == "C3"

@@ -13,6 +13,8 @@ of the qualification.
 
 from __future__ import annotations
 
+from typing import Iterable
+
 from ..i18n import msg
 from ..models import Status
 from ..parse import duplicates, format_heats
@@ -86,18 +88,43 @@ def final_label(place: int) -> str:
     return f"{place}°/{place + 1}°" if place else ""
 
 
+def final_places(final_heats: list[list[str]], ranking: list[str]) -> list[int]:
+    """The best place each final rides for, in the order they are ridden.
+
+    A final composed by hand - one the qualification did not seed - has nobody
+    in the ranking to read a place off: it falls back on the order the heats
+    are in, which is the order they are ridden (3/4 first, then 1/2).
+    """
+    return [final_place(h, ranking) or 2 * i + 1
+            for i, h in enumerate(final_heats)]
+
+
 def finals_classification(final_heats: list[list[str]],
                           times: dict[str, int], *,
                           statuses: dict[str, Status] | None = None,
                           qualification: list[str] | None = None,
                           qual_times: dict[str, int] | None = None,
-                          qual_out: dict[str, Status] | None = None) -> Result:
+                          qual_out: dict[str, Status] | None = None,
+                          tied: Iterable[int] | None = None,
+                          on_qual: Iterable[int] | None = None) -> Result:
     """Classify the finals against the qualification they were loaded from.
 
     Each final assigns the places it rides for - the 3/4 final cannot promote
     anyone to second - so the sheet reads the same whichever final ran first.
     Whoever did not qualify keeps the qualifying order below the finalists, and
     the time they set there: it is the only time they rode.
+
+    A final that is not ridden is closed in one of two ways, and the jury says
+    which. Both are given by the place the final rides for - 1 for the 1/2, 3
+    for the 3/4 - and neither moves anybody below: two entrants take two places
+    whatever decided them, so whoever follows is 3rd, or 5th, as before.
+
+    * `tied`: **a pari merito**. Neither of the two places is assigned on its
+      own - the two share the lower one: both are 2°, or both 4°. They carry
+      no time at all: nothing was ridden for that place.
+    * `on_qual`: **on the qualifying times**. The two are placed 1° and 2° (or
+      3° and 4°) by the time they set in the qualification, which is the only
+      time they rode, and that is the time the sheet carries.
 
     `qual_out` are the squadre the qualification did not classify - DNS, DSQ,
     DNF. They never reach the finals, but the classification of the specialità
@@ -107,11 +134,43 @@ def finals_classification(final_heats: list[list[str]],
     statuses = dict(statuses or {})
     ranking = list(qualification or [])
     qual_times = dict(qual_times or {})
+    ex_aequo = set(tied or ())
+    from_qual = set(on_qual or ()) - ex_aequo
     placings: list[Placing] = []
     seen: set[str] = set()
 
-    for h, heat in enumerate(final_heats):
-        base = final_place(heat, ranking) or 2 * h + 1
+    def qual_key(e: str) -> tuple:
+        """The qualification's own order: its time, then where it ranked."""
+        t = qual_times.get(e)
+        return (t is None, t or 0,
+                ranking.index(e) if e in ranking else len(ranking))
+
+    for base, heat in zip(final_places(final_heats, ranking), final_heats):
+        if base in ex_aequo:
+            # not ridden: the two keep the order the qualification put them in
+            # and share the second of the two places the final rides for. And
+            # no time - the final was not ridden and nothing decided it, so a
+            # time in that column would be a result nobody rode for.
+            for e in sorted(heat, key=qual_key):
+                seen.add(e)
+                placings.append(Placing(
+                    key=e, status=statuses.get(e, Status.OK),
+                    position=base + 1,
+                    data={"time": None, "final": base,
+                          "tied": True, "unridden": True}))
+            continue
+        if base in from_qual:
+            # not ridden either, but decided: the qualifying times place the
+            # two, and the time on the sheet is the one they set there
+            for i, e in enumerate(sorted(heat, key=qual_key)):
+                seen.add(e)
+                placings.append(Placing(
+                    key=e, status=statuses.get(e, Status.OK),
+                    position=base + i,
+                    data={"time": qual_times.get(e, times.get(e)),
+                          "final": base, "heat_place": i + 1,
+                          "unridden": True}))
+            continue
         ranked = sorted(heat, key=lambda e: (times.get(e) is None,
                                              times.get(e, 0), e))
         for i, e in enumerate(ranked):
@@ -138,19 +197,47 @@ def finals_classification(final_heats: list[list[str]],
         placings.append(Placing(key=e, status=statuses.get(e, st),
                                 data={"time": qual_times.get(e), "qual": True}))
 
+    # the finals are seeded, so this sheet has a full order on it the moment it
+    # is loaded - before a single time is taken. Say how many are still to come:
+    # read without that, the places above look like a result. A final that is
+    # not going to be ridden - a pari merito or closed on the qualifying times
+    # - is not counted: no time is coming for it.
+    waiting = {p.key for p in placings if p.data.get("final") is not None
+               and not p.data.get("unridden")}
+    missing = sum(1 for e in seen if not times.get(e) and e in waiting
+                  and statuses.get(e, Status.OK) in CLASSIFIED)
+
     ordered = sort_by_status(placings)
     # renumber: a squadra squalificata in a final does not keep the place the
     # heat gave it, and the one that beat nobody still wins. Without a decision
     # this is a no-op - the finals are seeded 1/2 and 3/4, so the places they
-    # assign are already 1..n.
-    n = 0
+    # assign are already 1..n. Two a pari merito are numbered as one block:
+    # they take two places between them and print the lower of the two.
+    n = i = 0
     for p in ordered:
-        if p.status in CLASSIFIED:
-            n += 1
-            p.position = n
-        else:
+        if p.status not in CLASSIFIED:
             p.position = None
-    return Result(placings=ordered, columns=["time"])
+    while i < len(ordered):
+        p = ordered[i]
+        if p.status not in CLASSIFIED:
+            i += 1
+            continue
+        block = [p]
+        while p.data.get("tied") and i + len(block) < len(ordered):
+            q = ordered[i + len(block)]
+            if (q.status not in CLASSIFIED or not q.data.get("tied")
+                    or q.data.get("final") != p.data.get("final")):
+                break
+            block.append(q)
+        n += len(block)
+        for q in block:
+            q.position = n
+            if q.data.get("tied"):
+                # left alone by a decision on the other squadra, there is
+                # nobody to share the place with: it is a place like any other
+                q.data["tied"] = len(block) > 1
+        i += len(block)
+    return Result(placings=ordered, columns=["time"], pending=missing)
 
 
 # ── team helpers ────────────────────────────────────────────────────────────

@@ -2,9 +2,9 @@
 
 from core.formats.group import (POINTS, SCRATCH, TEMPO,
                                 elimination_classification, group_classification)
-from core.formats.timed import (final_label, finals_classification,
-                                seed_finals, seed_finals_text,
-                                timed_classification)
+from core.formats.timed import (final_label, final_places,
+                                finals_classification, seed_finals,
+                                seed_finals_text, timed_classification)
 from core.models import Status
 from core.parse import parse_time
 
@@ -101,7 +101,27 @@ def test_dnf_dns_dsq_are_ranked_after_the_classified():
     assert order(r)[0] == "1"
     assert labels(r)[-3:] == ["DNF", "DNS", "DSQ"]
     assert [p.key for p in r.placings if p.status is Status.OK] == ["1", "4"]
-    assert {p.key: p.data["total"] for p in r.placings}["2"] == 0
+    # a ritirata keeps the points she scored before she left: she rode those
+    # volate, and a zero next to the DNF would say she scored nothing
+    assert {p.key: p.data["total"] for p in r.placings}["2"] == 6
+
+
+def test_the_riders_who_left_are_ranked_by_when_they_left():
+    """DNF and ABD in reverse order of entry: the last to leave heads them.
+
+    And a scesa prints no points at all - she came down of her own accord -
+    while a ritirata keeps hers.
+    """
+    r = group_classification(
+        startlist=[1, 2, 3, 4, 5, 6],
+        sprints=[[2, 3, 4, 5]], scoring=POINTS, n_sprint=1,
+        statuses={"2": Status.DNF, "3": Status.DNF,
+                  "4": Status.ABD, "5": Status.ABD})
+    assert order(r) == ["1", "6", "3", "2", "5", "4"]
+    points = {p.key: p.data["total"] for p in r.placings}
+    assert points["2"] == 10 and points["3"] == 6     # DNF: kept
+    assert points["4"] == 0 and points["5"] == 0      # ABD: hidden
+    assert all(v == 0 for v in r.by_key("4").data["sprints"])
 
 
 def test_relegated_rider_is_classified_last():
@@ -256,3 +276,98 @@ def test_a_final_lost_on_a_decision_is_won_by_the_other_team():
                               qualification=ranking)
     assert order(r) == ["Q2", "Q3", "Q4", "Q1"]
     assert labels(r) == ["1°", "2°", "3°", "DSQ"]
+
+
+# ── finali a pari merito ────────────────────────────────────────────────────
+
+def test_the_1_2_final_left_a_pari_merito_gives_two_seconds():
+    """Finale non disputata: nobody is first, the two finalists are both 2°."""
+    ranking = ["Q1", "Q2", "Q3", "Q4"]
+    r = finals_classification(seed_finals(ranking),
+                              {"Q3": 210000, "Q4": 213000},
+                              qualification=ranking, tied=[1])
+    assert order(r) == ["Q1", "Q2", "Q3", "Q4"]
+    assert labels(r) == ["2°", "2°", "3°", "4°"]
+    assert [p.position for p in r.placings] == [2, 2, 3, 4]
+
+
+def test_the_3_4_final_left_a_pari_merito_does_not_move_the_1_2():
+    ranking = ["Q1", "Q2", "Q3", "Q4"]
+    r = finals_classification(seed_finals(ranking),
+                              {"Q1": 212000, "Q2": 211000},
+                              qualification=ranking, tied=[3])
+    assert order(r) == ["Q2", "Q1", "Q3", "Q4"]
+    assert labels(r) == ["1°", "2°", "4°", "4°"]
+
+
+def test_both_finals_a_pari_merito_keep_the_places_below_intact():
+    """Two finals unridden: 2°, 2°, 4°, 4° - and the fifth is still fifth."""
+    ranking = ["Q1", "Q2", "Q3", "Q4", "Q5"]
+    r = finals_classification(seed_finals(ranking), {},
+                              qualification=ranking,
+                              qual_times={"Q5": 220000}, tied=[1, 3])
+    assert labels(r) == ["2°", "2°", "4°", "4°", "5°"]
+    assert [p.position for p in r.placings] == [2, 2, 4, 4, 5]
+    # a final that will not be ridden is not a time still to come
+    assert r.pending == 0
+
+
+def test_a_pari_merito_final_with_one_team_squalificata():
+    """One of the two is out: the other keeps the place alone, and 4th is 4th."""
+    ranking = ["Q1", "Q2", "Q3", "Q4"]
+    r = finals_classification(seed_finals(ranking),
+                              {"Q1": 212000, "Q2": 211000},
+                              statuses={"Q4": Status.DSQ},
+                              qualification=ranking, tied=[3])
+    assert order(r) == ["Q2", "Q1", "Q3", "Q4"]
+    assert labels(r) == ["1°", "2°", "3°", "DSQ"]
+
+
+def test_final_places_fall_back_on_the_order_the_finals_are_ridden():
+    ranking = ["Q1", "Q2", "Q3", "Q4"]
+    assert final_places(seed_finals(ranking), ranking) == [3, 1]
+    assert final_places([["A", "B"], ["C", "D"]], []) == [1, 3]
+
+
+def test_a_final_closed_on_the_qualifying_times_still_has_a_winner():
+    """Non disputata, ma decisa: the qualifying time places the two."""
+    ranking = ["Q1", "Q2", "Q3", "Q4"]
+    quali = {"Q1": 211000, "Q2": 210000, "Q3": 213000, "Q4": 212000}
+    r = finals_classification(seed_finals(ranking), {}, qualification=ranking,
+                              qual_times=quali, on_qual=[1, 3])
+    # Q2 qualified faster than Q1 and Q4 faster than Q3
+    assert order(r) == ["Q2", "Q1", "Q4", "Q3"]
+    assert labels(r) == ["1°", "2°", "3°", "4°"]
+    # the time on the sheet is the one they rode - the qualifying one
+    assert [p.data["time"] for p in r.placings] == [210000, 211000,
+                                                    212000, 213000]
+    assert r.pending == 0
+
+
+def test_one_final_ridden_and_the_other_on_the_qualifying_times():
+    ranking = ["Q1", "Q2", "Q3", "Q4"]
+    quali = {"Q1": 211000, "Q2": 210000, "Q3": 213000, "Q4": 212000}
+    r = finals_classification(seed_finals(ranking),
+                              {"Q1": 209000, "Q2": 209500},
+                              qualification=ranking, qual_times=quali,
+                              on_qual=[3])
+    assert order(r) == ["Q1", "Q2", "Q4", "Q3"]
+    assert labels(r) == ["1°", "2°", "3°", "4°"]
+    assert r.placings[0].data["time"] == 209000     # ridden: the final's time
+    assert r.placings[2].data["time"] == 212000     # not ridden: qualifying
+
+
+def test_a_pari_merito_final_carries_no_time_at_all():
+    """Nothing was ridden for that place: the Tempo column stays empty."""
+    ranking = ["Q1", "Q2", "Q3", "Q4"]
+    r = finals_classification(seed_finals(ranking),
+                              {"Q1": 209000, "Q2": 209500},
+                              qualification=ranking,
+                              qual_times={"Q1": 211000, "Q2": 210000},
+                              tied=[1])
+    assert labels(r)[:2] == ["2°", "2°"]
+    assert [p.position for p in r.placings][:2] == [2, 2]
+    # neither the qualifying time nor anything typed in the finals
+    assert [p.data["time"] for p in r.placings][:2] == [None, None]
+    # even a pari merito the sheet reads in qualifying order
+    assert order(r)[:2] == ["Q2", "Q1"]

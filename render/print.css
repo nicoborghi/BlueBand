@@ -264,6 +264,12 @@
 
 /* ── decisione / signature / footer ──────────────────────────────────── */
 
+/* One box per block under the table (render.Document.blocks). The plain note
+ * is the one that has always been here - grey, ruled in the letterhead colour.
+ * A decision is the same box in the tint of its provvedimento: the tints are
+ * set per competition in Impostazioni and arrive as the custom properties
+ * below (see render.note_css_vars), so this file states the shape and never
+ * the colour. */
 .cmsr .decisione {
     margin: 4mm 0 0 0;
     padding: 2mm 3mm;
@@ -272,6 +278,55 @@
     font-weight: bold;
     font-size: 9.5pt;
     white-space: pre-line;
+    /* the tint has to survive the printer: browsers drop backgrounds by
+     * default, and a squalifica that prints white is a squalifica nobody
+     * sees */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.cmsr .decisione + .decisione {
+    /* blocks of a stack read as a list, not as four unrelated boxes */
+    margin-top: 1.5mm;
+}
+
+/* The plain note keeps the rule of the letterhead it has always had - it is
+ * part of the sheet, not a sanction - and only its background is a setting. */
+.cmsr .decisione.note {
+    background: var(--note-note);
+}
+
+.cmsr .decisione.warning {
+    background: var(--note-warning);
+    border-left-color: var(--note-warning-rule);
+}
+
+.cmsr .decisione.fine {
+    background: var(--note-fine);
+    border-left-color: var(--note-fine-rule);
+}
+
+.cmsr .decisione.relegation {
+    background: var(--note-relegation);
+    border-left-color: var(--note-relegation-rule);
+}
+
+.cmsr .decisione.disqualification {
+    background: var(--note-disqualification);
+    border-left-color: var(--note-disqualification-rule);
+}
+
+/* The word the block opens with - SQUALIFICA, RETROCESSIONE - set apart from
+ * the sentence so the sheet can be read at a glance from across the table. */
+.cmsr .decisione .dec-tag {
+    font-size: 8pt;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    padding: 0.3mm 1.2mm;
+    margin-right: 0.6mm;
+    border-radius: 0.8mm;
+    background: rgba(255, 255, 255, 0.55);
+    border: 0.3mm solid rgba(0, 0, 0, 0.18);
 }
 
 /* "Per la giuria:" followed by the scanned signature - nothing else: no typed

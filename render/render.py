@@ -9,6 +9,7 @@ self-contained page for the archive. Nothing here imports streamlit.
 from __future__ import annotations
 
 import base64
+import colorsys
 import mimetypes
 import re
 from dataclasses import dataclass, field, replace
@@ -18,7 +19,8 @@ from typing import Any, Iterable
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from core.config import NAME_FULL, SIG_TEXT, Competition
+from core.config import (DEFAULT_NAME_WIDTH, NAME_FULL, SIG_TEXT,
+                         Competition)
 from core.i18n import label
 
 HERE = Path(__file__).resolve().parent
@@ -125,6 +127,25 @@ class Table:
 
 
 @dataclass
+class Note:
+    """One block under the table of a sheet, tinted by what it says.
+
+    A squalifica and "i primi due passano alla finale" are both prose in a box,
+    and for years they were the same box. They are not the same thing: one is a
+    sanction a team may appeal, the other is how the torneo is run. So a block
+    carries its `kind` - one of `core.decisions.NOTE_KINDS` - and the sheet
+    colours it accordingly (`print.css`, tints set in Impostazioni).
+
+    `title` is the one word above the text ("SQUALIFICA"); empty on the plain
+    note, which needs no announcing.
+    """
+
+    text: str
+    kind: str = "note"
+    title: str = ""
+
+
+@dataclass
 class Document:
     title: str
     subtitle: str = ""
@@ -135,12 +156,26 @@ class Document:
     pages: str = ""  # "1/2"
     date: str = ""
     tables: list[Table] = field(default_factory=list)
+    #: The tinted blocks - the decisions of the race, in the order they were
+    #: taken. They print above the note, which is the standing text of the
+    #: sheet and says nothing about anybody.
+    notes: list[Note] = field(default_factory=list)
     decision: str = ""
     slug: str = ""
     landscape: bool = False
 
     def __post_init__(self):
         self.slug = self.slug or slugify(self.title)
+
+    @property
+    def blocks(self) -> list[Note]:
+        """Everything printed under the table: the decisions, then the note.
+
+        The note is the last block and keeps the plain tint it has always had:
+        it is what the sheet says about itself, and a colour on it would say
+        that somebody was sanctioned.
+        """
+        return list(self.notes) + ([Note(self.decision)] if self.decision else [])
 
     @property
     def is_landscape(self) -> bool:
@@ -153,6 +188,46 @@ class Document:
         widest classification readable.
         """
         return self.landscape
+
+
+# ── the tints of the note blocks ────────────────────────────────────────────
+
+def darken(hex_color: str, lightness: float = 0.34,
+           saturate: float = 1.7) -> str:
+    """The rule of a tinted box, derived from the tint itself.
+
+    One colour per kind is set in Impostazioni and the border comes from it:
+    asking the jury for two colours per provvedimento would be asking it to do
+    the design of the sheet, and the pair would drift apart the first time one
+    of them was changed.
+
+    Not simply the tint scaled towards black - a pastel scaled that way goes
+    muddy brown, and a squalifica ruled in mud does not read as a squalifica.
+    The hue is kept, the lightness is taken down to `lightness` and the
+    saturation up: a pink box gets a red rule, a peach one an orange rule, and
+    the grey of the note - which has no hue to keep - stays grey.
+
+    An unreadable value comes back unchanged, which leaves the box ruled in
+    whatever was typed instead of taking the sheet down.
+    """
+    m = re.fullmatch(r"#?([0-9a-fA-F]{6})", str(hex_color or "").strip())
+    if not m:
+        return str(hex_color or "")
+    r, g, b = (int(m.group(1)[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    h, _l, s = colorsys.rgb_to_hls(r, g, b)
+    rgb = colorsys.hls_to_rgb(h, lightness, min(1.0, s * saturate))
+    return "#" + "".join(f"{round(v * 255):02x}" for v in rgb)
+
+
+def note_css_vars(colors: dict[str, str]) -> str:
+    """The tints as custom properties, for the wrapper of the page.
+
+    `--note-<kind>` and `--note-<kind>-rule` per kind: print.css states the
+    shape of a block and takes every colour from here, so recolouring a
+    provvedimento is a setting and never an edit to the stylesheet.
+    """
+    return "".join(f"--note-{k}: {v};--note-{k}-rule: {darken(v)};"
+                   for k, v in (colors or {}).items())
 
 
 def slugify(text: str) -> str:
@@ -221,7 +296,7 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
             banner_width: int = 620, signature: bool = False,
             footer: bool = True, assets_base: Path | None = None,
             page_numbers: bool = False, sig_px: int = 0,
-            css: bool = True) -> str:
+            css: bool = True, timestamp: bool = True) -> str:
     """Render one or more documents. `standalone` yields a complete HTML page.
 
     `head=False` drops the whole letterhead block - banner, communiqué number,
@@ -242,6 +317,12 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
     `css=False` leaves the stylesheet out of a fragment, for a page that
     already carries it. A standalone document always brings its own.
 
+    `timestamp=False` drops the "Emesso il ..." line from the foot, keeping the
+    rest of it. A sheet that is reprinted as the day goes on - the medagliere -
+    otherwise differs from the copy already handed out by nothing but the
+    minute it came off the printer, which is the one difference nobody wants to
+    have to explain. The page number, where there is one, stays.
+
     `page_numbers` adds "pag. n/m" in the bottom margin of the paper. It is set
     by `to_pdf`/`archive` on the second pass, once the first one has shown the
     document really spans more than one sheet: only the printer knows how many
@@ -254,7 +335,7 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
     # every sheet goes through here, preview and paper alike: this is the one
     # place that has to know how the competition sets a rider's name
     if comp.branding.name_style == NAME_FULL:
-        docs = [merge_names(d) for d in docs]
+        docs = [merge_names(d, comp.branding.name_width) for d in docs]
 
     b = comp.branding
     ctx = {
@@ -278,7 +359,8 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
         "signature_style": (f"max-height:{sig_px}px;max-width:{sig_px * 3}px;"
                             "width:auto;height:auto;" if sig_px else ""),
         "printed_at": (f"{label('printed_at')} "
-                       + datetime.now().strftime("%d/%m/%Y %H:%M")),
+                       + datetime.now().strftime("%d/%m/%Y %H:%M")
+                       if timestamp else ""),
         "page_numbers": page_numbers,
     }
     # A numbered sheet hands its whole foot to a @page margin box - the one
@@ -293,6 +375,7 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
     return _env.get_template("page.html.j2").render(
         standalone=standalone, css=_css() if css or standalone else "", body=body,
         header_color=b.color or "#0a5688",
+        note_vars=note_css_vars(b.note_colors),
         page_title=docs[0].title if docs else comp.name, **ctx)
 
 
@@ -312,7 +395,7 @@ def suffix_titles(docs: Iterable[Document], suffix: str) -> None:
 
 
 def _render_pdf(docs: list[Document], comp: Competition, *, signature: bool,
-                workdir: str | Path | None) -> bytes:
+                workdir: str | Path | None, timestamp: bool = True) -> bytes:
     """PDF bytes, numbering the sheets when there is more than one.
 
     Two passes: nothing but the browser knows how many sheets a table takes, so
@@ -321,11 +404,12 @@ def _render_pdf(docs: list[Document], comp: Competition, *, signature: bool,
     the second pass.
     """
     from .import pdf as _pdf
-    html = to_html(docs, comp, standalone=True, signature=signature)
+    html = to_html(docs, comp, standalone=True, signature=signature,
+                   timestamp=timestamp)
     data = _pdf.html_to_pdf(html, workdir=workdir)
     if _pdf.page_count(data) > 1:
         html = to_html(docs, comp, standalone=True, signature=signature,
-                       page_numbers=True)
+                       page_numbers=True, timestamp=timestamp)
         data = _pdf.html_to_pdf(html, workdir=workdir)
     return data
 
@@ -346,7 +430,7 @@ def out_name(docs: list[Document], number: str | int = "", ext: str = "pdf") -> 
 
 def archive(store, docs: Document | Iterable[Document], comp: Competition,
             *, number: str | int = "", signature: bool = True,
-            fmt: str = "pdf") -> Path:
+            fmt: str = "pdf", timestamp: bool = True) -> Path:
     """Write a copy under `out/`, named by comunicato number.
 
     `fmt="pdf"` renders through a headless Chromium and falls back to the
@@ -355,13 +439,14 @@ def archive(store, docs: Document | Iterable[Document], comp: Competition,
     if isinstance(docs, Document):
         docs = [docs]
     docs = list(docs)
-    html = to_html(docs, comp, standalone=True, signature=signature)
+    html = to_html(docs, comp, standalone=True, signature=signature,
+                   timestamp=timestamp)
 
     if fmt == "pdf":
         from .import pdf as _pdf
         try:
             data = _render_pdf(docs, comp, signature=signature,
-                               workdir=store.out_dir)
+                               workdir=store.out_dir, timestamp=timestamp)
         except _pdf.PdfError as exc:
             # keep the HTML rather than losing the document, but record why:
             # a sandboxed browser cannot read every directory (a snap Chromium
@@ -376,11 +461,13 @@ def archive(store, docs: Document | Iterable[Document], comp: Competition,
 
 
 def to_pdf(docs: Document | Iterable[Document], comp: Competition, *,
-           signature: bool = True, workdir: str | Path | None = None) -> bytes:
+           signature: bool = True, workdir: str | Path | None = None,
+           timestamp: bool = True) -> bytes:
     """PDF bytes for one or more documents (for a download button)."""
     if isinstance(docs, Document):
         docs = [docs]
-    return _render_pdf(list(docs), comp, signature=signature, workdir=workdir)
+    return _render_pdf(list(docs), comp, signature=signature, workdir=workdir,
+                       timestamp=timestamp)
 
 
 # ── table helpers ───────────────────────────────────────────────────────────
@@ -472,29 +559,28 @@ def _titled(name: str) -> str:
     return s.title() if s.isupper() or s.islower() else s
 
 
-#: What the merged column keeps of the two it replaces. "ROSSI Mario Luigi" is
-#: one string set on one line: it does not need the width of two columns, each
-#: of which was sized to hold a long name by itself. The rest goes back to the
-#: columns the sheet is actually read for - the volate, the points, the society.
-FULL_NAME_W = 0.72
+#: What the merged column keeps of the two it replaces, when the caller does
+#: not say. The competition's own figure is `branding.name_width`, set in
+#: Impostazioni → Nome: see `core.config.DEFAULT_NAME_WIDTH`.
+FULL_NAME_W = DEFAULT_NAME_WIDTH
 
 
-def merge_names(doc: Document) -> Document:
+def merge_names(doc: Document, width: float = FULL_NAME_W) -> Document:
     """A copy of `doc` with Cognome and Nome merged into a single column.
 
-    The merged column takes the width of the two it replaces, and everything
-    that pointed at either of them - the bold and red marks, the column a band
-    starts under - is moved onto it.
+    `width` is the fraction of the two replaced columns the merged one keeps,
+    and everything that pointed at either of them - the bold and red marks, the
+    column a band starts under - is moved onto it.
     """
-    return replace(doc, tables=[_merge_table(t) for t in doc.tables])
+    return replace(doc, tables=[_merge_table(t, width) for t in doc.tables])
 
 
-def _merge_table(t: Table) -> Table:
+def _merge_table(t: Table, width: float = FULL_NAME_W) -> Table:
     keys = [c.key for c in t.columns]
     if not ("last_name" in keys and "first_name" in keys):
         return t
-    width = FULL_NAME_W * sum(c.w for c in t.columns
-                              if c.key in ("last_name", "first_name"))
+    width = width * sum(c.w for c in t.columns
+                        if c.key in ("last_name", "first_name"))
     cols = []
     for c in t.columns:
         if c.key == "first_name":

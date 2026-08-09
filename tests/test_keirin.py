@@ -232,6 +232,93 @@ def test_a_keirin_runs_from_the_first_round_to_the_champion(ev, comp, entries):
         R.keirin_entrants(el, comp, CAT, EVENT))
 
 
+def test_a_keirin_with_one_final_sends_nobody_to_the_second(ev, comp, entries):
+    """The jury's own decision, taken on the first round: one final, not two.
+
+    The table of 3.2.135 ends with 1°-6° and 7°-12°; a programme that rides
+    only the first is not running a different tournament - the semifinali
+    qualify exactly the same six - it just does not line the others up again.
+    They keep the places the round they went out in gives them, which is what
+    the classification does for everybody under the finals anyway.
+    """
+    el = entries
+    t1 = _compose_first_round(ev, comp, el)
+    assert R.keirin_has_final_b(ev, comp, CAT, EVENT)   # the register plans it
+    t1.payload[R.FINAL_B] = False
+    _ride(t1)
+    ev.save_race(t1)
+    R.load_keirin_round(ev, comp, el, t1, DOC_RESULTS)
+    _ride(t1, R.REP_HEATS, R.REP_RESULTS)
+    ev.save_race(t1)
+    assert not R.keirin_has_final_b(ev, comp, CAT, EVENT)
+
+    R.load_keirin_round(ev, comp, el, t1, DOC_RESULTS_REP)
+    sf = ev.load_race(R.race_key(CAT, EVENT, K.SEMI))
+    semis = _ride(sf)
+    ev.save_race(sf)
+
+    what, n = R.load_keirin_round(ev, comp, el, sf, DOC_RESULTS)
+    assert (what, n) == (K.FINALI, 1)                   # one final, not two
+    fin = ev.load_race(R.race_key(CAT, EVENT, K.FINALI))
+    top = R.bracket_heats(fin)[0]
+    assert set(top) == {k for h in semis for k in h[:3]}
+    assert not R.bracket_heats(fin, R.HEATS_B)
+    assert len(fin.entrants) == 6
+    assert R.keirin_final_labels(fin) == ("1°-6°", "")
+    # and the sheet that composed it publishes that one batteria, once
+    assert len(R.keirin_composition(comp, el, sf, DOC_RESULTS,
+                                    final_b=False)) == 1
+
+    fin.payload["results"] = R.heats_text([top])
+    ev.save_race(fin)
+    res = R.keirin_standings(ev, comp, el, CAT, EVENT)
+    order = [p.key for p in res.placings]
+    assert order[:6] == top
+    # the six the semifinali did not qualify are 7° and down, ridden or not
+    assert set(order[6:12]) == {k for h in semis for k in h[3:]}
+    assert len(order) == len(set(order)) == len(
+        R.keirin_entrants(el, comp, CAT, EVENT))
+
+
+def test_with_one_final_the_classifica_generale_is_that_final(ev, comp,
+                                                              entries):
+    """One final, one classification: its six riders and nobody else.
+
+    Two finals are filed one under the other because each of them is a race
+    that was ridden and files its own decisions. With only the finale 1°-6°
+    the classifica generale *is* its result: no other race placed anybody, so
+    the sheet carries the six places the tournament decided and stops there.
+    """
+    from ui.pages.races import _keirin_blocks
+
+    el = entries
+    t1 = _compose_first_round(ev, comp, el)
+    t1.payload[R.FINAL_B] = False
+    _ride(t1)
+    ev.save_race(t1)
+    R.load_keirin_round(ev, comp, el, t1, DOC_RESULTS)
+    _ride(t1, R.REP_HEATS, R.REP_RESULTS)
+    ev.save_race(t1)
+    R.load_keirin_round(ev, comp, el, t1, DOC_RESULTS_REP)
+    sf = ev.load_race(R.race_key(CAT, EVENT, K.SEMI))
+    _ride(sf)
+    ev.save_race(sf)
+    R.load_keirin_round(ev, comp, el, sf, DOC_RESULTS)
+
+    fin = ev.load_race(R.race_key(CAT, EVENT, K.FINALI))
+    top = R.bracket_heats(fin)[0]
+    fin.payload["results"] = R.heats_text([list(reversed(top))])
+    ev.save_race(fin)
+
+    res = R.keirin_standings(ev, comp, el, CAT, EVENT)
+    result, extra, block_title = _keirin_blocks(fin, res, el, comp, 10,
+                                                False, True, [])
+    assert not extra and not block_title
+    # only the six who rode it, in the order they finished it
+    assert [p.key for p in result.placings] == list(reversed(top))
+    assert [p.position for p in result.placings] == [1, 2, 3, 4, 5, 6]
+
+
 def test_only_the_riders_a_round_left_behind_ride_its_recuperi(ev, comp,
                                                               entries):
     """The pool of a recupero is not the categoria: it is who did not qualify.
