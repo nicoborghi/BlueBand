@@ -22,11 +22,22 @@ from typing import Any
 import yaml
 
 from .formats.omnium import TEMPO as _TEMPO_ROUND
-from .i18n import IT, fix_accents, label, msg
+from .i18n import fix_accents, msg, word
 
 #: The name the tempo race is scheduled under inside an omnium, lowercased:
 #: which prova a round is, is its name (see `race.round_format`).
 TEMPO_RACE = _TEMPO_ROUND.lower()
+
+# How a round names itself in the programme. Two words carry meaning for the
+# code - a *qualifying* round is ridden against the clock, a *finals* round
+# rides for places instead of qualifying for them - and both are matched on the
+# first letters, so "Finale", "Finali", "Qualificazioni Batteria 1" all read.
+# They live here, with the rest of the programme's vocabulary, because more
+# than the service layer reads them: so does the table of regulation distances
+# (`core.distances`), which is asked for "the qualifying distance" and must
+# answer without knowing what a race is.
+PREFIX_QUALIFYING = "qualificazioni"
+PREFIX_FINALS = "final"
 
 DEFAULT_TRACK_LEN = 0.3333  # km
 
@@ -226,6 +237,10 @@ class Round:
     # Madison qualifying heats (3.2.157): teams eliminated from *each* heat,
     # never fewer than 2, counted among those who started.
     eliminate: int | None = None
+    # When it is ridden ("14:30"), as the programme sheet prints it. *Not* a
+    # measured time: what a rider does over the distance is a `time` on a
+    # result, and the two must not be confusable - hence `start`.
+    start: str = ""
     note: str = ""
 
     def __post_init__(self):
@@ -237,13 +252,34 @@ class Round:
 
 @dataclass
 class ProgrammeItem:
-    """One (category, event) contest with its rounds, as scheduled."""
+    """One (category, event) contest with its rounds, as scheduled.
+
+    The three optional fields under the rounds are what the *format* runs, as
+    opposed to what the rounds are: whether a velocità qualifies twelve or
+    eight, whether it rides the 5°-8° final, whether a keirin rides its second
+    one. They used to be nowhere - inferred from the round list and from the
+    documents a round files, and re-decided inside the race on the day. Stated
+    here they are a decision the programme carries, and `None` still means "not
+    stated", so a file written before this existed reads exactly as it did.
+    """
 
     cat: str
     event: str
     day: int = 0
     time: str = ""
     rounds: list[Round] = field(default_factory=list)
+    #: velocità: how many the 200 m qualifies ("12" | "8"), see formats.sprint
+    scheme: str = ""
+    #: velocità: is the final for 5th-8th place ridden
+    final_5_8: bool | None = None
+    #: keirin: is the second final (the one under the title) ridden
+    final_b: bool | None = None
+    #: How many start together in a timed round *for this categoria*. The
+    #: specialità states the usual shape (`Event.teams_per_start`), and it is
+    #: not always the same one: a chilometro is ridden two at a time by a
+    #: categoria with thirty entered and one at a time by the eight of another,
+    #: on the same afternoon. `None` = whatever the specialità says.
+    teams_per_start: int | None = None
     note: str = ""
 
 
@@ -291,6 +327,10 @@ class CommuniqueSpec:
     doc: str = ""
     title: str = ""
     ret: bool = False             # annullato (printed as "NN RET")
+    #: Typed by hand rather than handed out by the numbering
+    #: (`communiques.autonumber`), which then never moves it again. A number
+    #: the jury chose is a number somebody is expecting on paper.
+    pinned: bool = False
     extra: list[Sheet] = field(default_factory=list)   # YAML says `with`
 
     @property
@@ -375,7 +415,11 @@ class Branding:
     footer_img: str = ""
     color: str = "#0a5688"
     signature: str = ""  # image of the handwritten signature
-    signature_label: str = label("signature")
+    #: What the block is headed with. Empty - which is the normal case - is the
+    #: catalogue word for the language in force, read through
+    #: `signature_caption`: a default evaluated here would freeze the Italian
+    #: wording into every programme loaded before the language was chosen.
+    signature_label: str = ""
     signature_mode: str = SIG_IMAGE
     signature_name: str = ""      # printed in bold when the mode is `text`
     signature_scope: str = SIG_ALWAYS
@@ -404,6 +448,11 @@ class Branding:
         self.note_colors = {**NOTE_COLORS,
                             **{k: v for k, v in (self.note_colors or {}).items()
                                if k in NOTE_COLORS and str(v).strip()}}
+
+    @property
+    def signature_caption(self) -> str:
+        """The line the signature block is headed with ("Per la giuria:")."""
+        return self.signature_label or word("signature")
 
     def signs(self, doc_kind: str) -> bool:
         """Whether a sheet of this kind opens with the signature ticked.
@@ -525,6 +574,12 @@ class Competition:
     entry_sheet: EntrySheet = field(default_factory=EntrySheet)
     branding: Branding = field(default_factory=Branding)
     quotas: Quotas = field(default_factory=Quotas)
+    #: Whether the comunicato numbers stand as they are. Unfrozen, they are
+    #: recomputed from the running order every time it changes
+    #: (`communiques.autonumber`) - which is what keeps the register in step
+    #: while the programme is being built, and exactly what must stop once a
+    #: sheet has gone out with a number on it.
+    numbering_frozen: bool = False
     path: str = ""
 
     @property
@@ -540,9 +595,9 @@ class Competition:
     @property
     def team_name(self) -> str:
         """What that squadra is *called* on a printed sheet ("Squadra")."""
-        # the dictionary word, not `label("team")`: that one already answers
+        # the catalogue word, not `label("team")`: that one already answers
         # with whatever override is in force, which is what this *sets*
-        return self.entry_sheet.team_name or IT["team"]
+        return self.entry_sheet.team_name or word("team")
 
     def team_merge(self, event: str = "") -> dict[str, str]:
         """`{regione: nome della squadra unica}` for this event, if any.
@@ -616,6 +671,15 @@ class Competition:
                 out.append(r.cat)
         return sorted(out, key=lambda c: self.cat_order().index(c)
                       if c in self.cat_order() else 99)
+
+    def scheduled_any(self, event: str) -> bool:
+        """Whether any categoria contests this specialità.
+
+        What stops a specialità being un-declared from under the races that
+        name it: the programme would go on scheduling an event the file no
+        longer has, and every sheet of it would print under the bare code.
+        """
+        return any(r.event == event for r in self.programme)
 
     def scheduled(self, cat: str, event: str) -> ProgrammeItem | None:
         for r in self.programme:
@@ -742,6 +806,7 @@ def load_competition(path: str | Path) -> Competition:
         entry_sheet=EntrySheet(**entries),
         branding=Branding(**(raw.get("branding") or {})),
         quotas=Quotas(**(raw.get("quotas") or {})),
+        numbering_frozen=bool(raw.get("numbering_frozen", False)),
         path=str(path),
     )
 

@@ -286,6 +286,23 @@ def split_heat(round_key: str) -> tuple[str, str]:
         else (round_key or "", "")
 
 
+#: **Programme vocabulary, not a label** (see `formats.omnium`): the word a
+#: numbered batteria is scheduled under. It is the one `split_heat` reads back,
+#: which is why the two live side by side - a programme that writes them apart
+#: is a race the app cannot find on disk.
+HEAT_WORD = "Batteria"
+
+
+def heat_key(phase: str, n: int) -> str:
+    """('Qualificazioni', 1) -> 'Qualificazioni Batteria 1'.
+
+    What `split_heat` parses, written the other way round: the builder
+    schedules batterie with it, so a proposed programme names them exactly as
+    a hand-written one does.
+    """
+    return " ".join(p for p in (str(phase).strip(), f"{HEAT_WORD} {int(n)}") if p)
+
+
 # ── (de)serialisation ───────────────────────────────────────────────────────
 
 _NESTED = {

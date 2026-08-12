@@ -553,5 +553,8 @@ The correspondences, in case you find yourself reading a file name:
 | Verificato | `checked_in` |
 | Non partente | `not_starting` |
 
-Every Italian wording lives in one file, `core/i18n.py`: changing a word the
-panel does not like is editing one line there, and it applies everywhere.
+Every wording lives in one catalogue per language under `core/i18n/`
+(`it.py`, `en.py`): changing a word the panel does not like is editing one line
+there, and it applies everywhere. Which language a competition is run in is set
+in **Impostazioni → Lingua**; the names written out in `programme.yaml` -
+categories, events, rounds - print as they stand there whatever is chosen.

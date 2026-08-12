@@ -184,11 +184,23 @@ class Scheme:
     """One way of running a velocità, from the 200 m to the classification."""
 
     key: str
-    label: str            # what the dropdown says
-    qualify: int          # how many the 200 m qualify
+    # The two lines a scheme is read by are held as catalogue keys and looked
+    # up when they are asked for: a scheme is a module constant, built at
+    # import, and a word frozen there would be in whatever language the app
+    # started in rather than the one the competition is run in.
+    label_key: str            # what the dropdown says
+    qualify: int              # how many the 200 m qualify
     rounds: tuple[str, ...]   # the rounds ridden, in order
-    note: str             # the decision the qualifying start order opens on
+    note_key: str             # the decision the qualifying start order opens on
     repechage: bool = False   # a repechage inside the first round
+
+    @property
+    def label(self) -> str:
+        return ui(self.label_key)
+
+    @property
+    def note(self) -> str:
+        return msg(self.note_key)
 
     def next_round(self, round_key: str) -> str:
         """The round that follows this one, '' at the end of the event."""
@@ -202,17 +214,17 @@ class Scheme:
 SCHEMES: dict[str, Scheme] = {
     "12": Scheme(
         key="12",
-        label=ui("scheme_12"),
+        label_key="scheme_12",
         qualify=12,
         rounds=(TURNO1, QUARTI, SEMI, FINALI),
-        note=msg("note_scheme_12"),
+        note_key="note_scheme_12",
         repechage=True),
     "8": Scheme(
         key="8",
-        label=ui("scheme_8"),
+        label_key="scheme_8",
         qualify=8,
         rounds=(QUARTI, SEMI, FINALI),
-        note=msg("note_scheme_8")),
+        note_key="note_scheme_8"),
 }
 
 DEFAULT_SCHEME = "12"

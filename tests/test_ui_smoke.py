@@ -8,6 +8,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from conftest import programme_path
+from core.i18n import catalogue
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -25,15 +26,32 @@ def app(tmp_path, monkeypatch, iscritti_path):
     return at
 
 
+def _key_of(shown):
+    """The catalogue key behind a word a picker shows.
+
+    Every picker whose options are fixed holds a *key* and formats it through
+    `ui` when it draws itself, so the pick survives a change of language
+    (`core.i18n`); AppTest reports the formatted option and takes the value, so
+    a test that says which option it means the way the jury does - by reading
+    it - has to come back the other way. Where two keys carry the same word the
+    later one wins: the earlier is a heading elsewhere on the page.
+    """
+    return {v: k for k, v in catalogue().UI.items()}[shown]
+
+
+def _pick(widget, name):
+    """Set a picker by the word it shows, whatever it holds underneath."""
+    shown = next(o for o in widget.options if o.endswith(name))
+    return widget.set_value(_key_of(shown))
+
+
 def _page(app, name):
     """Open a page by name, whatever icon its label carries.
 
     The sidebar picker is an `st.radio` styled into a nav (`ui/style.py`), so
     every label is "🏁 Gare", "✓ Verifica", ... - matched here on the word.
     """
-    picker = app.sidebar.radio[0]
-    return picker.set_value(
-        next(o for o in picker.options if o.endswith(name))).run()
+    return _pick(app.sidebar.radio[0], name).run()
 
 
 def test_app_starts_without_an_entry_list(app):
@@ -96,13 +114,21 @@ def test_the_register_lists_and_filters_what_was_filed(app):
     assert any("Decisioni registrate (2)" in s.value for s in app.subheader)
     assert any("Reclamo respinto" in m.value for m in app.markdown)
 
-    # the tick that leaves the ammonizioni out of what gets printed
-    app.checkbox(key="dec_f_warn").uncheck().run()
+    # the picker that leaves the ammonizioni out of what gets printed: they
+    # are the many, and hardly ever the ones to publish
+    kinds = app.multiselect(key="dec_f_kinds")
+    # the page opens on the ammonizioni and the squalifiche: a retrocessione is
+    # already printed on the sheet of the race it was given in
+    assert kinds.value == ["A", "D"]
+    kinds.set_value(["C", "D"]).run()
     assert any("Decisioni registrate (1)" in s.value for s in app.subheader)
     assert not any("ammonizione al dorsale" in m.value for m in app.markdown)
+    # ... and what the picker does not offer is not filtered by it: the reclamo
+    # respinto is a nota, and it stays
+    assert any("Reclamo respinto" in m.value for m in app.markdown)
 
     # and the pickers, which read the same log
-    app.checkbox(key="dec_f_warn").check().run()
+    app.multiselect(key="dec_f_kinds").set_value(["A", "C", "D"]).run()
     app.selectbox(key="dec_f_event").set_value("keirin").run()
     assert any("Decisioni registrate (0)" in s.value for s in app.subheader)
 
@@ -217,7 +243,7 @@ def _documents(app, group):
     live in both: they are groups of one page now, picked under the page radio.
     """
     _page(app, "Documenti")
-    app.sidebar.radio(key="doc_group").set_value(group).run()
+    _pick(app.sidebar.radio(key="doc_group"), group).run()
     return app
 
 
@@ -534,10 +560,10 @@ def test_partenti_page_prints(app, iscritti_path):
     _import(app, iscritti_path)
     _documents(app, "Elenchi iscritti")
     assert not app.exception
-    app.radio(key="pa_mode").set_value("Per specialità").run()
+    _pick(app.radio(key="pa_mode"), "Per specialità").run()
     assert not app.exception
-    app.radio(key="pa_mode").set_value(
-        "Tutte le specialità di una categoria").run()
+    _pick(app.radio(key="pa_mode"),
+          "Tutte le specialità di una categoria").run()
     assert not app.exception
 
 
@@ -577,10 +603,10 @@ def test_import_then_edit_entry_list(app, iscritti_path):
     assert not app.exception
 
     # before any tick, everyone is still to be verified and nobody is filtered out
-    app.selectbox(key="ver_state").set_value("Da verificare").run()
+    _pick(app.selectbox(key="ver_state"), "Da verificare").run()
     assert not app.exception
     assert any("Segna verificati" in b.label for b in app.button)
-    app.selectbox(key="ver_state").set_value("Verificati").run()
+    _pick(app.selectbox(key="ver_state"), "Verificati").run()
     assert not app.exception
     assert any("Nessun atleta" in i.value for i in app.info)
 
@@ -696,9 +722,9 @@ def test_stampa_page_batches(app, iscritti_path):
     assert not app.exception
     assert any("documenti" in c.value for c in app.caption)
 
-    app.sidebar.radio(key="stp_mode").set_value("Per specialità").run()
+    _pick(app.sidebar.radio(key="stp_mode"), "Per specialità").run()
     assert not app.exception
-    app.sidebar.radio(key="stp_mode").set_value("Per giornata").run()
+    _pick(app.sidebar.radio(key="stp_mode"), "Per giornata").run()
     assert not app.exception
 
 
@@ -714,7 +740,7 @@ def test_documenti_prints_one_recap_per_squadra(app, iscritti_path):
     """The pile a team manager is handed: one sheet each, in one PDF."""
     _import(app, iscritti_path)
     _documents(app, "Serie di documenti")
-    app.sidebar.radio(key="stp_mode").set_value("Per squadra").run()
+    _pick(app.sidebar.radio(key="stp_mode"), "Per squadra").run()
     assert not app.exception
 
     picker = app.sidebar.selectbox(key="stp_team")
@@ -736,7 +762,7 @@ def test_documenti_prints_the_tabella_specialita(app, iscritti_path):
     """The same table Verifica shows, on one sheet, for the briefing."""
     _import(app, iscritti_path)
     _documents(app, "Serie di documenti")
-    app.sidebar.radio(key="stp_mode").set_value("Tabella specialità").run()
+    _pick(app.sidebar.radio(key="stp_mode"), "Tabella specialità").run()
     assert not app.exception
     assert any("1 documento" in c.value for c in app.caption)
 
@@ -771,7 +797,7 @@ def test_documenti_keeps_both_halves_of_the_old_pages(app, iscritti_path):
     assert app.checkbox(key="pa_ver")                        # solo verificati
 
     _documents(app, "Serie di documenti")
-    assert app.sidebar.radio(key="stp_mode").value == "Per categoria"
+    assert app.sidebar.radio(key="stp_mode").value == _key_of("Per categoria")
     assert not app.exception
 
 
@@ -813,12 +839,13 @@ def test_settings_page_changes_the_letterhead(app, tmp_path):
     assert not app.exception
     # The page runs from what the app is working on down to what destroys work:
     # the entry list it is all read off, what a squadra is, the folder a
-    # comunicato lands in, then how it looks, then the programme, then the
-    # backups - and only last the one control here that deletes a race.
+    # comunicato lands in, then how it looks, then the backups - and only last
+    # the one control here that deletes a race. The programme is not on it at
+    # all: it is read, written and printed on the Programma page, and a
+    # read-only copy here was a second place to look for the same answer.
     subs = [s.value for s in app.subheader]
     assert subs == ["Elenco iscritti", "Squadra", "Cartella dei comunicati",
-                    "Aspetto dei comunicati", "Programma gare", "Backup",
-                    "Azzera una gara"]
+                    "Aspetto dei comunicati", "Backup", "Azzera una gara"]
     # the three things that decide how a sheet looks are one section, not two:
     # the letterhead was on the page while the signature was hidden behind an
     # expander called «avanzate», which is not a different kind of choice
@@ -2038,12 +2065,17 @@ def _programme_page(app):
 
 
 def test_programma_page_opens_on_a_tab_per_day(app):
-    """Gara, Specialità, and one tab per date of the competition."""
+    """Gara, Specialità, one tab per date - and the sheet it all prints as.
+
+    The days in the middle and the two things that are not a day at either
+    end: what the competition *is* first, and the foglio programma last.
+    """
     _programme_page(app)
     labels = [t.label for t in app.tabs]
     assert labels[:2] == ["Gara", "Specialità"]
     # four dates in the programme, four tabs - and each says which day it is
-    assert labels[2:] == [f"Giornata {n} · 08-0{n + 3}" for n in (1, 2, 3, 4)]
+    assert labels[2:-1] == [f"Giornata {n} · 08-0{n + 3}" for n in (1, 2, 3, 4)]
+    assert labels[-1] == "Foglio programma"
     # every day tab holds the two panels that make a day
     assert [s.value for s in app.subheader].count("Gare della giornata") == 4
     assert [s.value for s in app.subheader].count(
@@ -2064,7 +2096,7 @@ def test_saving_the_programme_changes_nothing(app, tmp_path):
     before = load_competition(path)
 
     _programme_page(app)
-    [b for b in app.button if "Salva programme" in b.label][0].click().run()
+    app.button(key="savebar_save").click().run()
     assert not app.exception
 
     after = load_competition(path)
@@ -2083,7 +2115,7 @@ def test_the_previous_programme_is_kept_as_a_snapshot(app):
     from core.store import open_competition
 
     _programme_page(app)
-    [b for b in app.button if "Salva programme" in b.label][0].click().run()
+    app.button(key="savebar_save").click().run()
     assert not app.exception
     snaps = open_competition("CITA26").snapshots("programme.yaml")
     assert snaps and "CAMPIONATI ITALIANI" in snaps[0].read_text(encoding="utf-8")
@@ -2124,7 +2156,7 @@ def test_a_comunicato_can_carry_two_documents(app, iscritti_path):
     path.write_text(dump(comp), encoding="utf-8")
 
     _documents(app, "Serie di documenti")
-    app.sidebar.radio(key="stp_mode").set_value("Per comunicato").run()
+    _pick(app.sidebar.radio(key="stp_mode"), "Per comunicato").run()
     assert not app.exception
 
     picker = app.sidebar.selectbox(key="stp_com")
@@ -2190,3 +2222,151 @@ def test_a_programme_cached_before_a_code_change_is_read_again(app):
                for f in fields(fresh.branding))
     _page(app, "Impostazioni")
     assert not app.exception
+
+
+# ── building a competition from nothing ─────────────────────────────────────
+
+@pytest.fixture
+def empty(tmp_path, monkeypatch):
+    """The app pointed at a data folder with nothing in it at all."""
+    monkeypatch.setenv("COMMISSAIRE_TRACK_DATA", str(tmp_path / "competitions"))
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120)
+    at.run()
+    return at
+
+
+def test_an_empty_data_folder_asks_for_the_first_competition(empty):
+    """It used to say the folder was empty and stop, with nowhere to act on it."""
+    assert not empty.exception
+    assert empty.text_input(key="setup_first_name")
+
+    empty.text_input(key="setup_first_name").set_value("TR2026").run()
+    empty.button(key="setup_first_go").click().run()
+    assert not empty.exception
+    # the folder exists now, and the app has walked on into the three steps
+    assert empty.text_input(key="prog_name")
+
+
+def test_a_competition_with_no_programme_builds_one(empty):
+    """The dead end: no programme.yaml, and Impostazioni unreachable to fix it."""
+    from core.config import Category, load_competition
+
+    empty.text_input(key="setup_first_name").set_value("TR2026").run()
+    empty.button(key="setup_first_go").click().run()
+
+    empty.text_input(key="prog_name").set_value("TROFEO DI PROVA").run()
+    empty.text_input(key="prog_dates").set_value("2026-09-05").run()
+    empty.number_input(key="prog_track").set_value(250.0).run()
+    # the track is quoted in metres and what follows from it is shown at once
+    assert any("18" in c.value for c in empty.caption), "no madison capacity"
+
+    # the categorie grid is an st.data_editor, which AppTest cannot drive
+    empty.session_state["setup_draft"].categories = {
+        "DA": Category(code="DA", name="DONNE ALLIEVE", sex="F", order=1)}
+    [b for b in empty.button if "Crea" in b.label][-1].click().run()
+    assert not empty.exception
+
+    path = (empty.session_state["setup_draft"] if "setup_draft"
+            in empty.session_state else None)
+    written = load_competition(
+        __import__("core.store", fromlist=["open_competition"])
+        .open_competition("TR2026").path("programme.yaml"))
+    assert written.name == "TROFEO DI PROVA"
+    assert written.track_len == 0.25 and written.dates == ["2026-09-05"]
+    assert "DA" in written.categories
+    # the pseudo-event the opening comunicati hang off is declared from the start
+    assert "entry_list" in written.events
+
+
+def test_a_specialita_is_picked_and_its_shape_asked_per_categoria(empty):
+    """Seven fields typed by hand is how an inseguimento becomes a corsa.
+
+    The specialità are *picked* - the catalogue knows the code, the sigla, the
+    format and the atleti per squadra. What differs from categoria to categoria
+    is asked when the race is put on a giornata, and not once for everybody:
+    the same chilometro is ridden two at a time by one categoria and one at a
+    time by the next.
+    """
+    from core.config import Category
+
+    empty.text_input(key="setup_first_name").set_value("TR2026").run()
+    empty.button(key="setup_first_go").click().run()
+    empty.text_input(key="prog_dates").set_value("2026-09-05").run()
+    empty.number_input(key="prog_track").set_value(250.0).run()
+    empty.session_state["setup_draft"].categories = {
+        "DA": Category(code="DA", name="DONNE ALLIEVE", sex="F", order=1)}
+    [b for b in empty.button if "Crea" in b.label][-1].click().run()
+
+    # a fresh run rather than the same one: the app has just left the setup
+    # page for the race pages, and AppTest cannot follow a widget it has
+    # already touched off the screen (it is the harness, not the app)
+    app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120)
+    app.run()
+    _page(app, "Programma")
+    empty = app
+
+    empty.multiselect(key="prog_events_pick").set_value(["chilometro"]).run()
+    assert not empty.exception
+
+    ev = empty.session_state["prog_draft"].events["chilometro"]
+    assert (ev.fmt, ev.abbr) == ("time_trial", "TT")
+
+    # scheduling it gives the whole race, distance and giri included, and asks
+    # the one thing the specialità cannot answer for every categoria
+    empty.selectbox(key="prog_addcat_1").set_value("DA").run()
+    empty.selectbox(key="prog_addev_1").set_value("chilometro").run()
+    starts = empty.radio(key="prog_opt_per_start_add_1")
+    starts.set_value(starts.options[1]).run()          # uno alla volta
+    empty.button(key="prog_add_1").click().run()
+    assert not empty.exception
+
+    item = empty.session_state["prog_draft"].scheduled("DA", "chilometro")
+    assert [r.key for r in item.rounds] == ["Finale"]
+    # a kilometre is a kilometre, and on a 250 it is four giri
+    assert (item.rounds[0].distance, item.rounds[0].laps) == (1.0, 4.0)
+    assert item.rounds[0].docs[-1] == "classifica"
+    # ... and this categoria rides it one at a time, whatever the next one does
+    assert item.teams_per_start == 1
+    from core import race as R
+    assert R.starts_per_race(empty.session_state["prog_draft"],
+                             "DA", "chilometro") == 1
+
+
+def test_the_last_races_are_one_tap_away(app, iscritti_path):
+    """Three selectboxes to go back to the sheet left two minutes ago is two too many.
+
+    A championship is not run one specialità at a time: the risultati of a
+    batteria are typed while another event is on the track. The pills are the
+    races last *written*, so the row is exactly the ones being worked on.
+    """
+    def save(cat, event, rnd):
+        _open_race(app, iscritti_path, cat, event, rnd)
+        # the one Salva of the page, pinned at the foot of the sidebar
+        app.button(key="savebar_save").click().run()
+        assert not app.exception
+
+    save("AL", "velocita", "Qualificazioni")
+    save("ES", "madison", "Finale")
+    # the row is drawn at the top of the page, so a race saved further down it
+    # joins the row on the next run - one more of them, and it is there
+    app.run()
+
+    # st.pills is a button_group in the element tree, and its options carry
+    # the formatted label rather than the value behind it
+    pills = app.button_group(key="ga_recent")
+    labels = [o.content for o in pills.options]
+    # both races worked on are on the row, named as the jury names the sheet
+    # (the order they come in is `store.recent_races`, tested there)
+    assert any(t.startswith("ES · Madison") for t in labels)
+    assert any(t.startswith("AL · Velocità") for t in labels)
+
+    # picking one moves the three pickers under it. The pill holds the race id
+    # and shows the label, so it is set by the id - which is what the page
+    # reads back to seed `ga_cat`, `ga_event` and `ga_round`.
+    from core.models import race_id
+
+    pills.set_value([race_id("AL", "velocita", "Qualificazioni")]).run()
+    assert not app.exception
+    assert app.selectbox(key="ga_cat").value == "AL"
+    assert app.selectbox(key="ga_event").value == "velocita"
+    assert app.selectbox(key="ga_round").value == "Qualificazioni"

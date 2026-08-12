@@ -29,7 +29,7 @@ from .config import (DOC_ALL_KINDS, DOC_CLASSIFICATION, DOC_RESULTS,
                      DOC_STARTLIST, EVENT_ENTRY_LIST, ROUND_SETUP,
                      Category, CommuniqueSpec, Competition, Event,
                      ProgrammeItem, Round, Sheet, load_competition)
-from .i18n import msg
+from .i18n import label, msg
 
 INDENT = "  "
 
@@ -106,6 +106,8 @@ def _competition_head(comp: Competition) -> list[str]:
     if comp.dates:
         out.append(f"dates: {flow_list(comp.dates)}")
     out.append(f"track_len: {scalar(comp.track_len)}")
+    if comp.numbering_frozen:
+        out.append(f"numbering_frozen: {scalar(True)}")
     return out
 
 
@@ -208,7 +210,7 @@ def _round(r: Round) -> str:
     if r.kind:
         pairs.append(("kind", r.kind))
     pairs += _kept(r, "distance", "laps", "sprints", "heat_size", "qualify",
-                   "eliminate", "note")
+                   "eliminate", "start", "note")
     # A round that is ridden always says which sheets it files: the default is
     # two of them, and a round that files three (a finals round with the
     # classifica of the specialità on it) has to be explicit. A setup round
@@ -243,8 +245,16 @@ def _programme(comp: Competition) -> list[str]:
         lines.append(f"{INDENT}- cat: {scalar(item.cat)}")
         lines.append(f"{INDENT * 2}event: {scalar(item.event)}")
         lines.append(f"{INDENT * 2}day: {item.day}")
-        for name, value in _kept(item, "time", "note"):
+        for name, value in _kept(item, "time", "scheme", "teams_per_start",
+                                 "note"):
             lines.append(f"{INDENT * 2}{name}: {scalar(value)}")
+        # the two optional finals are tri-state: `False` is a decision - this
+        # velocità does not ride its 5°-8° - and `_kept` cannot tell it from a
+        # field nobody has touched, which would silently drop it
+        for name in ("final_5_8", "final_b"):
+            value = getattr(item, name)
+            if value is not None:
+                lines.append(f"{INDENT * 2}{name}: {scalar(bool(value))}")
         if item.rounds:
             lines.append(f"{INDENT * 2}rounds:")
             lines += [f"{INDENT * 3}- {_round(r)}" for r in item.rounds]
@@ -279,6 +289,8 @@ def _communiques(comp: Competition) -> list[str]:
             ("round", c.round_key), ("doc", c.doc)]
         if c.ret:
             pairs.append(("ret", True))
+        if c.pinned:
+            pairs.append(("pinned", True))
         pairs.append(("title", c.title))
         text = f"{INDENT}- {flow(pairs)}"
         if c.extra:
@@ -586,10 +598,20 @@ def issues(comp: Competition, issued: list | None = None) -> list[Issue]:
 def blank(name: str, days: int = 1) -> Competition:
     """An empty programme, for a competition that has none yet.
 
-    One day, no categories, no events: everything else the page adds. It exists
+    One day, no categories, no races: everything else the page adds. It exists
     so that starting a new championship is not copying a file by hand.
+
+    One event is declared, and it is not a race: `entry_list` is the pseudo-event
+    the opening comunicati hang off - one elenco iscritti per categoria, before
+    anybody rides (`communiques.sheet_order`). Every programme has it, including
+    the ones written by hand, so a new one starts with it rather than growing it
+    the first time the register is numbered.
     """
-    return Competition(name=name, dates=[""] * days)
+    comp = Competition(name=name, dates=[""] * days)
+    comp.events[EVENT_ENTRY_LIST] = Event(
+        code=EVENT_ENTRY_LIST, name=label("entry_list"),
+        short=label("entered").capitalize(), fmt="entrylist", order=0)
+    return comp
 
 
 def add_event(comp: Competition, code: str, name: str = "",

@@ -341,7 +341,7 @@ def _read_category_sheet(ws, cat: str, el: EntryList, headers: dict[str, str],
             e = parse_flag(ws.cell(r, c).value)
             if e is not None:
                 rider.events[code] = e
-                if e.note.startswith(_UNKNOWN_FLAG):
+                if e.note.startswith(_unknown_flag()):
                     el.warnings.append(msg("xls_bad_flag", cat=cat,
                                            name=rider.full_name, event=code,
                                            note=e.note))
@@ -726,9 +726,14 @@ class Patch:
         self.ts = self.ts or datetime.now().isoformat(timespec="seconds")
 
 
-#: Prefix of the note `parse_flag` leaves on a workbook value it cannot read.
-#: Matched again on import to report it, so the two never drift apart.
-_UNKNOWN_FLAG = msg("xls_unknown_flag", value="").rstrip("'\" ")
+def _unknown_flag() -> str:
+    """Prefix of the note `parse_flag` leaves on a workbook value it cannot read.
+
+    Matched again on import to report it, so the two never drift apart - and
+    read from the catalogue each time rather than frozen at import, or a
+    workbook read after a change of language would match nothing.
+    """
+    return msg("xls_unknown_flag", value="").rstrip("'\" ")
 
 OPS = ("set_field", "set_checked_in", "set_not_starting", "set_event",
        "clear_event", "set_pair")

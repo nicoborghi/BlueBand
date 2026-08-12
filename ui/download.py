@@ -31,7 +31,7 @@ KEEP = 20  # copies kept before the oldest are dropped
 def save_button(store: Store, docs, comp: Competition, *, number: str = "",
                 signature: bool = False, key: str = "dl",
                 label: str = "", container=None,
-                timestamp: bool = True) -> Path | None:
+                timestamp: bool = True, primary: bool = True) -> Path | None:
     """Render the document into the output folder.
 
     Falls back to the self-contained HTML when no Chromium is installed, so
@@ -49,7 +49,11 @@ def save_button(store: Store, docs, comp: Competition, *, number: str = "",
     box = container if container is not None else st
     if not _pdf.available():
         box.caption(msg("chromium_missing"))
-    if not box.button(label or ui("save_pdf"), key=f"btn_{key}"):
+    # Saving is what the page is for: it is the primary button wherever it is
+    # offered, and `primary=False` is for the second save next to a first one.
+    if not box.button(label or ui("save_pdf"), key=f"btn_{key}",
+                      type="primary" if primary else "secondary",
+                      use_container_width=True):
         return None
 
     # no spinner: it pushed the page down while Chromium started and the tab

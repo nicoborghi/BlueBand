@@ -29,7 +29,7 @@ from core.formats import sprint as S
 from core.formats import timed as T
 from core.checks import bib_line
 from core.formats.base import Result
-from core.i18n import gendered, help_text, label, msg, plural, ui
+from core.i18n import gendered, help_text, label, msg, ordinal, plural, ui
 from core.models import RaceState, Status, race_slug
 from core.parse import (ParseError, format_time, parse_bibs, parse_heats,
                         parse_time_safe)
@@ -37,7 +37,7 @@ from core.store import Store
 from render import documents as D
 from render.render import SIG_PREVIEW_PX, to_html
 from ui import decisions_form as DF
-from ui import notify, scroll
+from ui import notify, savebar, scroll
 from ui.download import save_button
 # imported as a name, not through the module: `state` is what a RaceState is
 # called in nearly every function here
@@ -87,14 +87,16 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     # round itself (see § keirin)
     keirin = R.is_keirin(comp, event) and kind == R.BRACKET
     # the pickers stay on screen, the race header comes to the top: on a laptop
-    # the two together do not fit above the fold. On the *fase* alone, which is
-    # the last of the three to be picked and the one that opens a race: moving
-    # the page under a jury that is still choosing the categoria is exactly the
-    # kind of help nobody asked for.
+    # the two together do not fit above the fold. Only on the two presses that
+    # open a race - the *fase* selectbox, which is the last of the three to be
+    # picked, and a pill of the recent row: moving the page under a jury that is
+    # still choosing the categoria is exactly the kind of help nobody asked for.
     scroll.anchor("race")
-    scroll.on_change("race", round_key)
+    scroll.requested("race")
     if kind == R.SETUP:
+        savebar.render(label=ui("save_pairing"))
         _pairing_page(state, el, comp, store)
+        _recent_races(comp, store)
         return
     # This is the header the jury reads while working: the document's own
     # letterhead is dropped from the preview below (`head=False`) instead.
@@ -212,13 +214,7 @@ def render(competition: str, comp: Competition, store: Store) -> None:
         st.session_state[f"land_{state.race_id}"] = st.checkbox(
             ui("landscape"), key=f"land_cb_{state.race_id}",
             help=help_text("landscape"))
-        if st.button(ui("save"), type="primary", use_container_width=True):
-            store.save_race(state)
-            notify.saved("race_saved")
-        if st.button(ui("restore_previous"), use_container_width=True):
-            if store.restore(store.race_rel(state.race_id)):
-                st.rerun()
-            notify.warn("no_previous_version")
+    savebar.render(label=ui("save"), restore_label=ui("restore_previous"))
 
     # the grid up the page asked to be saved: now the race carries everything
     # this run typed into it, the sidebar included
@@ -238,6 +234,26 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     _output(state, result, el, comp, store, kind, font, sign, club,
             time_col, note, show_bib, screen_font, scheme, keirin, lane, detail,
             warned)
+
+    # last of all: by now the race carries everything this run typed into it.
+    # The button that asked for this is pinned at the foot of the sidebar and
+    # was drawn before any of it (`ui.savebar`).
+    _save_bar(state, store)
+    # ... and only now the row of recent races, into the place kept for it at
+    # the top: whatever was just saved is already the first of them
+    _recent_races(comp, store)
+
+
+def _save_bar(state, store: Store) -> None:
+    """Act on the pinned Salva / Ripristina, once the page has been built."""
+    action = savebar.requested()
+    if action == savebar.SAVE:
+        store.save_race(state)
+        notify.saved("race_saved")
+    elif action == savebar.RESTORE:
+        if store.restore(store.race_rel(state.race_id)):
+            st.rerun()
+        notify.warn("no_previous_version")
 
 
 # ── madison: the pairing round ──────────────────────────────────────────────
@@ -279,7 +295,9 @@ def _pairing_page(state, el, comp: Competition, store: Store) -> None:
     eliminate = _eliminate_field(state, comp, pr, heats, keys)
     _pairing_problems(numbers, heats, pr, keys)
 
-    if st.button(ui("save_pairing"), type="primary"):
+    # the composition is saved from the same place as everything else: the
+    # strip pinned at the foot of the sidebar (`ui.savebar`)
+    if savebar.requested() == savebar.SAVE:
         if pr.numbered:
             state.payload[R.PAIR_NUMBERS] = numbers
         state.payload[R.PAIR_HEATS] = heats
@@ -501,8 +519,19 @@ def _final_round(comp: Competition, cat: str, event: str) -> str:
 # ── race picker ─────────────────────────────────────────────────────────────
 
 def _pick_race(comp: Competition, store: Store) -> tuple[str, str, str]:
-    """The three selectboxes, reopened on the race left last time."""
+    """The three selectboxes, reopened on the race left last time.
+
+    The row of recent races goes above them, but it is *drawn* at the end of
+    the run (`_recent_races`): a race saved further down the page would
+    otherwise reach the row only on the next click, which is exactly the
+    moment the jury looks for it. The container reserves the place here; the
+    tap that came from it is picked up here too, before the pickers below are
+    drawn, because that is what moves them.
+    """
     last = store.settings.get("last_race") or {}
+    st.session_state[RECENT_BOX] = st.container()
+    _jump_requested(comp, store)
+
     c1, c2, c3 = st.columns(3)
     cats = comp.cat_order()
     cat = _sticky(c1, ui("category"), cats, "ga_cat", last.get("cat"))
@@ -512,12 +541,97 @@ def _pick_race(comp: Competition, store: Store) -> tuple[str, str, str]:
     event = _sticky(c2, ui("event"), events, "ga_event", last.get("event"),
                     format_func=lambda s: comp.event(s).short)
     rounds = [p.key for p in comp.rounds(cat, event)] or [""]
-    round_key = _sticky(c3, ui("round"), rounds, "ga_round", last.get("round"))
+    # the one picker that moves the page: a fase is what opens a race, and the
+    # callback is what tells a pick apart from a fase replaced under the jury
+    # because the categoria above it changed (see `ui.scroll`)
+    round_key = _sticky(c3, ui("round"), rounds, "ga_round", last.get("round"),
+                        on_change=_round_picked)
 
     picked = {"cat": cat, "event": event, "round": round_key}
     if picked != last:
         store.set_setting("last_race", picked)
     return cat, event, round_key
+
+
+def _round_picked() -> None:
+    """A fase was chosen by hand: bring the race under the pickers."""
+    scroll.request("race")
+
+
+#: How many of the races last worked on are offered above the pickers. Four:
+#: they are `AL · Ins. Individuale · Qualificazioni` long, and a row that wraps
+#: onto a second line pushes the pickers down the page - which is the opposite
+#: of what a shortcut is for.
+RECENT = 4
+
+
+def _jump_requested(comp: Competition, store: Store) -> None:
+    """Move the pickers onto the race whose pill was tapped, if one was.
+
+    A *tap*, not a selection. Acting on whatever the row happens to hold would
+    drag the page back there on every rerun and make the three selectboxes
+    unusable; clearing the pill afterwards is not allowed either - a widget's
+    own key cannot be written once it is drawn. So the tap is recorded by the
+    callback, consumed here exactly once, and the same pill tapped again works
+    like the first time.
+    """
+    picked = st.session_state.pop(RECENT_JUMP, None)
+    race = next((r for r in _recent(comp, store) if r.race_id == picked), None)
+    if race is None:
+        return
+    # the pickers are keyed widgets drawn just below: setting their session
+    # values before they exist is what moves them
+    st.session_state.update({"ga_cat": race.cat, "ga_event": race.event,
+                             "ga_round": race.round_key})
+    # a pill is a press like the fase is: the run it starts scrolls to the race
+    scroll.request("race")
+    st.rerun()
+
+
+def _recent_races(comp: Competition, store: Store) -> None:
+    """The fasi last saved, one tap away - drawn into the place kept for it.
+
+    A championship is not run one specialità at a time: the risultati of a
+    batteria are typed while another event is on the track, and the jury moves
+    between four or five fasi all afternoon. Doing that through three
+    selectboxes - categoria, then specialità, then fase, each one reloading the
+    next - is three picks to go back to the sheet left two minutes ago.
+
+    Called last, so a race saved anywhere on the page is already at the head of
+    the row when the row is built.
+    """
+    box = st.session_state.get(RECENT_BOX)
+    races = _recent(comp, store)
+    if box is None or not races:
+        return
+    labels = {r.race_id: _race_pill(comp, r) for r in races}
+    with box:
+        st.pills(ui("recent_races"), list(labels), key=RECENT_PILL,
+                 format_func=labels.get, label_visibility="collapsed",
+                 on_change=_jump_to, help=help_text("recent_races"))
+
+
+def _recent(comp: Competition, store: Store) -> list:
+    """The races last written that this programme still schedules."""
+    return [r for r in store.recent_races(RECENT)
+            if comp.scheduled(r.cat, r.event)]
+
+
+#: The pill row: where it is drawn, what it is keyed by, and where a tap on it
+#: is left for the script to pick up.
+RECENT_BOX = "ga_recent_box"
+RECENT_PILL = "ga_recent"
+RECENT_JUMP = "ga_recent_jump"
+
+
+def _jump_to() -> None:
+    st.session_state[RECENT_JUMP] = st.session_state.get(RECENT_PILL)
+
+
+def _race_pill(comp: Competition, race) -> str:
+    """`AL · Velocità · Quarti` - what the jury calls that sheet."""
+    return " · ".join(p for p in (race.cat, comp.event(race.event).short,
+                                  race.round_key) if p)
 
 
 #: Where the sheet last worked on is remembered, next to the race itself
@@ -845,17 +959,17 @@ def _unridden_finals(state, el) -> None:
                           heats):
         options = [FINAL_RIDDEN, FINAL_TIED, FINAL_QUAL]
         names = {FINAL_RIDDEN: ui("final_ridden"),
-                 FINAL_TIED: ui("final_tied", place=base + 1),
+                 FINAL_TIED: ui("final_tied", place=ordinal(base + 1)),
                  FINAL_QUAL: ui("final_on_qual")}
         mode = st.selectbox(ui("unridden_final", name=T.final_label(base)),
                             options, format_func=names.get,
                             index=options.index(was.get(base, FINAL_RIDDEN)),
                             key=f"fin_{state.race_id}_{base}",
-                            help=help_text("unridden_final", place=base + 1))
+                            help=help_text("unridden_final", place=ordinal(base + 1)))
         if mode != FINAL_RIDDEN:
             modes[mode].append(base)
             st.caption(msg("tied_final_who" if mode == FINAL_TIED
-                           else "qual_final_who", place=base + 1,
+                           else "qual_final_who", place=ordinal(base + 1),
                            who=" · ".join(R.entrant_label(k, el)
                                           for k in heat)))
     p["finals_tied"] = modes[FINAL_TIED]
@@ -1048,7 +1162,7 @@ def _velocita_inputs(state, el, scheme, doc_kind: str = "",
 
     if rk == S.FINALI:
         titles = [ui("final_n_place", name=n)
-                  for n in R.FINAL_LABELS][-len(heats):]
+                  for n in R.final_labels()][-len(heats):]
         with _race_box(ui("finals_1_4"), doc_kind != DOC_RESULTS_58):
             _run_picks(state, heats, el, "results", R.RUNS, titles=titles)
         # a year that does not ride it has no box for it at all: an empty one
@@ -1122,7 +1236,7 @@ def _order_picks(state, heats: list[list[str]], el, key: str, *,
             left = [k for k in heat if k not in order]
             wid = f"{key_prefix}_{rid}_{h}_{place}"
             prev = cur[place] if place < len(cur) else ""
-            picked = _pick_one(ui("place_n", n=place + 1), left, wid, prev,
+            picked = _pick_one(ui("place_n", n=ordinal(place + 1)), left, wid, prev,
                                el, state.cat, show_label=len(heat) > 2)
             if not picked:
                 break
@@ -1196,7 +1310,7 @@ def _velocita_result(state, doc_kind: str):
                              labels=[label("final_5_8_short")], scope=scope)
     heats = R.bracket_heats(state)
     # on a finals sheet the batteria number says nothing: what it rides for does
-    labels = (R.FINAL_LABELS[-len(heats):] if rk == S.FINALI else [])
+    labels = (R.final_labels()[-len(heats):] if rk == S.FINALI else [])
     return R.heat_result(state, heats, R.bracket_orders(state),
                          runs=(state.payload or {}).get(R.RUNS),
                          n_runs=3 if rk in S.BEST_OF_THREE else 0,
@@ -2729,7 +2843,7 @@ def _output(state, result, el, comp, store: Store, kind: str, font: int,
         for w in _heat_size_warnings(heats, comp, state):
             notify.text(w)
         labels = ([ui("final_n_place", name=n)
-                   for n in R.FINAL_LABELS][-len(heats):]
+                   for n in R.final_labels()][-len(heats):]
                   if sprint and state.round_key == S.FINALI else [])
         if keirin and R.is_finals(state.round_key):
             # both finals on one sheet, each named by what it rides for: the
@@ -3039,7 +3153,7 @@ def _last_time_banner(state, el, kind: str, doc_kind: str) -> None:
     # rode it, then where it puts them for now
     st.markdown(f'<div class="cmsr-sprint">'
                 f'<b>{format_time(times[key])}</b> · {who} · '
-                f'{msg("provisional_time", n=rank)}'
+                f'{msg("provisional_time", n=ordinal(rank))}'
                 f'</div>{_BANNER_CSS}', unsafe_allow_html=True)
 
 

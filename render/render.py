@@ -21,7 +21,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from core.config import (DEFAULT_NAME_WIDTH, NAME_FULL, SIG_TEXT,
                          Competition)
-from core.i18n import label
+from core.i18n import label, ordinal
 
 HERE = Path(__file__).resolve().parent
 TEMPLATES = HERE / "templates"
@@ -351,7 +351,7 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
         "signature_name": (b.signature_name
                            if signature and b.signature_mode == SIG_TEXT
                            else ""),
-        "signature_label": b.signature_label if signature else "",
+        "signature_label": b.signature_caption if signature else "",
         # Screen only: the preview is embedded in the app's own document, where
         # the stylesheet does not reach the image, so the size has to travel on
         # the tag itself. Left empty for print and for the PDF, which keep the
@@ -485,7 +485,7 @@ def position_label(pos: int | str | None) -> str:
     if pos is None or pos == "":
         return ""
     if isinstance(pos, int) or str(pos).isdigit():
-        return f"{int(pos)}°"
+        return ordinal(int(pos))
     return str(pos)
 
 # Column weights shared by the startlist / classification renderers. They keep
@@ -493,11 +493,17 @@ def position_label(pos: int | str | None) -> str:
 # the page whatever combination a document asks for.
 
 
-COLS_RIDER = [Column(k, label(k), "c" if k in ("bib", "uci_id") else "l", w)
-              for k, w in (("bib", 7), ("last_name", 20), ("first_name", 15),
-                           ("uci_id", 20), ("club", 22), ("region", 17))]
+#: The columns of a rider, and how wide each one is. A *pair* and not a
+#: `Column`: the heading is looked up when the sheet is built, so it comes out
+#: in the language the competition is being run in.
+RIDER_COLS = (("bib", 7), ("last_name", 20), ("first_name", 15),
+              ("uci_id", 20), ("club", 22), ("region", 17))
 
-COLS_RIDER_MIN = [c for c in COLS_RIDER if c.key != "club"]
+
+def cols_rider(minimal: bool = False) -> list[Column]:
+    """The rider columns, headed from the catalogue (`minimal` drops the club)."""
+    return [Column(k, label(k), "c" if k in ("bib", "uci_id") else "l", w)
+            for k, w in RIDER_COLS if not (minimal and k == "club")]
 
 # Plain row counter down the left edge: it says how many riders there are and
 # gives the jury something to point at on paper. Not a placing - hence grey.

@@ -631,3 +631,54 @@ def test_the_two_races_of_a_round_keep_their_own_decisions(ev, comp, entries):
     # the classification of the specialità is the one that reads both
     both = R.all_statuses(t1)
     assert both == {in_turno: Status.REL, in_rep: Status.DNS}
+
+
+# ── what the programme states, and who overrules it ─────────────────────────
+#
+# Three answers, in this order: the day, the programme, the inference. The
+# third is what every file written before `ProgrammeItem` carried these fields
+# falls back on, so it is tested first - it is the one that must not have moved.
+
+def test_the_scheme_is_inferred_from_the_rounds_when_nobody_states_it(ev, comp):
+    """A programme that says nothing reads exactly as it always did."""
+    assert R.sprint_scheme(ev, comp, "ES", "velocita").key == "12"   # has a Turno 1
+
+
+def test_a_programme_that_states_the_scheme_is_believed(ev, comp):
+    import dataclasses
+
+    item = comp.scheduled("ES", "velocita")
+    stated = dataclasses.replace(comp, programme=[
+        dataclasses.replace(i, scheme="8") if i is item else i
+        for i in comp.programme])
+    assert R.sprint_scheme(ev, stated, "ES", "velocita").key == "8"
+
+
+def test_the_day_beats_the_programme(ev, comp, entries):
+    """The jury at the track has the last word - it always did."""
+    import dataclasses
+
+    item = comp.scheduled("ES", "velocita")
+    stated = dataclasses.replace(comp, programme=[
+        dataclasses.replace(i, scheme="8") if i is item else i
+        for i in comp.programme])
+    qual = R.sprint_qualifying(stated, "ES", "velocita")
+    st = R.ensure_state(ev, stated, "ES", "velocita", qual, entries)
+    st.payload[R.SCHEME] = "12"
+    ev.save_race(st)
+    assert R.sprint_scheme(ev, stated, "ES", "velocita").key == "12"
+
+
+def test_the_5_8_final_is_stated_by_the_programme_before_it_is_inferred(ev, comp):
+    """`False` has to survive being stated: it is a race that is not ridden."""
+    import dataclasses
+
+    item = comp.scheduled("ES", "velocita")
+    # inferred: the CITA26 finals round files no risultati 5°-8°
+    assert R.sprint_has_58(ev, comp, "ES", "velocita") is False
+
+    for stated in (True, False):
+        prog = dataclasses.replace(comp, programme=[
+            dataclasses.replace(i, final_5_8=stated) if i is item else i
+            for i in comp.programme])
+        assert R.sprint_has_58(ev, prog, "ES", "velocita") is stated

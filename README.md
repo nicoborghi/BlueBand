@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="header/track_text.svg" alt="" width="350">
+  <img src="header/track_text.svg" alt="" width="370">
 </p>
 
 
@@ -48,8 +48,12 @@ the phase.
 
 ```
 core/       the domain, without streamlit: all of it testable headless
-  i18n.py     THE TRANSLATION DOCUMENT: every Italian word, once
+  i18n/       THE TRANSLATION DOCUMENT: one catalogue per language
+                (it.py, en.py) behind one set of lookups
   config.py   programme.yaml -> dataclass;  programme.py: and back again
+  rounds.py   what a format runs: the fasi proposed from the regulation
+  distances.py  regulations/distances.json - how long, and how often it sprints
+  catalogue.py  regulations/events.json - the specialità, ready to add
   models.py   Rider, Team, Pair, RaceState, Status
   store.py    atomic JSON, snapshots, journal, backup
   entries.py  Excel import (both shapes), overlay of jury edits, validation
@@ -61,19 +65,22 @@ core/       the domain, without streamlit: all of it testable headless
 render/     Document/Table/Column -> HTML -> PDF (headless Chromium)
 ui/         streamlit
   notify.py   HOW THE APP SAYS SOMETHING: error / warn / info / ok / flag
+  savebar.py  WHERE A PAGE IS SAVED: the pinned strip at the foot of the sidebar
   state.py    the only place that knows about st.session_state
   style.py    print.css on the app's own page, and the sidebar nav
   icons.py    the nav icons, as SVG paths: nothing is fetched from a CDN
   pages/      races, check_in, decisions, documents, stats, programme,
-              settings (+ startlists.py, printing.py behind Documenti)
+              settings, setup (+ startlists.py, printing.py behind Documenti)
 ```
 
 ### Two shared layers
 
-**`core/i18n.py` is the only file with translations in it** - column headings,
+**`core/i18n/` is the only place with translations in it** - column headings,
 button names, help texts, warnings, errors - in dictionaries keyed in English
-(`FIELDS`, `RACE`, `DOCS`, `UI`, `HELP`, `MSG`). Translating the app, or fixing
-a wording the jury dislikes, is editing one line in one dictionary.
+(`FIELDS`, `RACE`, `DOCS`, `UI`, `HELP`, `MSG`). One module per language
+(`it.py`, `en.py`), the same keys in each; fixing a wording the jury dislikes
+is editing one line in one dictionary, and adding a language is adding one
+module and listing it in `CATALOGUES`.
 
 ```python
 label("bib")                    # "Dors."     a column
@@ -84,8 +91,50 @@ help_text("status_dns")         # a field's tooltip
 
 `ui`, `msg` and `help_text` raise on an unknown key: a missing label is a bug,
 not a word to invent. `label` falls back to the key, so a new column still comes
-out readable. `tests/test_i18n.py` checks that every key asked for exists and
+out readable, and a key one language does not have yet is answered from Italian
+rather than failing. `tests/test_i18n.py` checks that every key asked for
+exists, that every language answers all of them with the same placeholders, and
 that no module writes Italian of its own.
+
+The language is a per-competition setting (**Impostazioni → Lingua**, stored in
+`settings.json`) and is set once per rerun, before anything draws a word. It
+moves the catalogue only: what `programme.yaml` spells out - the names of the
+categories, the events and the rounds - prints as it is written there.
+
+### Building a programme
+
+A competition folder with no `programme.yaml` opens on **ui/pages/setup.py**:
+the manifestazione, the pista and the categorie, then the app runs normally.
+From there the Programma page builds it day by day - a race is added with the
+questions its format actually asks (a velocità qualifies 12 or 8 and does or
+does not ride its 5°-8°, a madison eliminates so many coppie per batteria) and
+comes out with all its fasi, each carrying a distance from
+`regulations/distances.json`, the giri derived from the track length and the
+volate from the sprint interval. Every value is editable, and ↩ puts the
+regulation back without touching the notes or the start times.
+
+The comunicato numbers follow the running order while they are unfrozen: move a
+race up the day and its comunicati move with it (`communiques.autonumber`). A
+number typed by hand is pinned, one already issued never moves at all, and the
+freeze switch stops the whole thing once the register is settled. Programma →
+*Foglio programma* prints the running order with those numbers beside it.
+
+A specialità is added from `regulations/events.json`, which knows its code, UCI
+abbreviation, format and riders per squadra - the chilometro and the 500 ride on
+the machinery of the inseguimento, two at a time or one at a time as the jury
+prefers. The names in that file are per language, because they are written into
+`programme.yaml` and printed as they stand there.
+
+**`ui/savebar.py` is the only place a page is saved from.** Salva - and the way
+back from it, *Ripristina versione precedente* or *Ricarica dal file* - is
+pinned to the foot of the sidebar on every page that has something to save, so
+it never scrolls away under a long sheet. The strip is drawn before the page
+body, so it *records* the press and the page acts on it at the end, once every
+field of that run has been read.
+
+The Gare page opens with a row of pills: the fasi last saved, `CAT · Specialità
+· Fase`, one tap back to any of them - because a championship is not run one
+specialità at a time.
 
 **`ui/notify.py` is the only way the app says anything.** Red means "fix this",
 yellow "look at this", blue says what to do next, a toast is a save. The short

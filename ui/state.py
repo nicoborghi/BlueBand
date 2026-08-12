@@ -11,7 +11,7 @@ from dataclasses import fields, replace
 import streamlit as st
 
 from core import entries as E
-from core.i18n import msg, set_overrides, ui
+from core.i18n import msg, set_language, set_overrides, ui
 from core.config import Competition, load_competition, validate
 from core.store import (Store, competitions_root, current_competition,
                         list_competitions, open_competition,
@@ -30,6 +30,11 @@ BRANDING_SETTINGS = ("signature", "header_img", "footer_img",
 # What a squadra is here and what it is called: the programme states the rule,
 # this machine can override it (Impostazioni → Squadra).
 ENTRY_SETTINGS = ("team_group", "team_name")
+
+#: Where the language of this competition is stored (Impostazioni → Lingua).
+#: Unset - which is every competition set up before it could be chosen - is the
+#: language the app was written in.
+LANGUAGE = "language"
 
 
 @st.cache_data(show_spinner=False)
@@ -82,8 +87,12 @@ def competition(name: str) -> Competition | None:
     p = competitions_root() / name / PROGRAMME
     if not p.exists():
         return None
-    comp = _stale_free(str(p), p.stat().st_mtime)
     settings = open_competition(name).settings
+    # first, and before anything reads a word: everything below this line -
+    # `validate`, the sidebar, the page that follows - looks up its prose in
+    # the catalogue of whatever is set here
+    set_language(settings.get(LANGUAGE))
+    comp = _stale_free(str(p), p.stat().st_mtime)
     # an empty value is not a choice - a signature never set must not blank the
     # one the programme carries - but False *is* one: a tick taken off in
     # Impostazioni has to win over a programme that turns it on
@@ -101,11 +110,14 @@ def competition(name: str) -> Competition | None:
 
 
 def selected_competition() -> str | None:
-    """The competition set in Impostazioni - chosen once, not on every page."""
-    if not list_competitions():
-        st.sidebar.error(msg("no_competitions", path=competitions_root()))
-        return None
-    return current_competition()
+    """The competition set in Impostazioni - chosen once, not on every page.
+
+    `None` means there is not one to choose: a data folder with nothing in it,
+    which is what a new installation is. The caller offers to create the first
+    one (`ui.pages.setup`); saying so in the sidebar and stopping, which is
+    what this did, left nowhere to say it *to*.
+    """
+    return current_competition() if list_competitions() else None
 
 
 def choose_competition(name: str) -> None:

@@ -1,62 +1,30 @@
-"""Italian display vocabulary for an English domain - the only file with Italian in it.
+"""Italian: the catalogue the app was written for, and the fallback of the rest.
 
-The code speaks UCI English (competition, event, round, bib, club, region); the
-jury reads Italian. **Every word that reaches a screen or a printed sheet lives
-here, once**, keyed by an English name: column headings, statuses, document
-kinds, the label of every widget, the help text of every field, and the wording
-of every warning, error and confirmation the app can produce.
+One module per language, all with the same dictionaries keyed the same way (see
+`core.i18n` for what each of them names and how a word is looked up). This one
+is the reference: a key missing from another language is answered from here, so
+a half-finished translation shows an Italian word rather than nothing at all.
 
-Nothing under `core/`, `render/` or `ui/` writes Italian of its own. Translating
-the app - or correcting a wording the jury does not like - is editing one entry
-in one of the five dictionaries below, never a search through the code.
-
-    from core.i18n import label, ui, msg, help_text
-
-    label("bib")                        -> "Dors."
-    ui("save_pdf")                      -> "Salva PDF"
-    msg("bib_not_entered", bib=17)      -> "Dorsale 17 non è tra i partenti."
-    help_text("status_dns", "bibs_csv")
-
-The five dictionaries, by what they name:
-
-    FIELDS    a column of the entry list (a property of a rider)
-    RACE      a column or a word of a race sheet
-    DOCS      a kind of document, and the words a sheet is titled with
-    STATUSES  the decisions a jury takes on an entrant
-    UI        what a control is called: pages, buttons, fields, options
-    HELP      what a field says when you hover it
-    MSG       the prose shown when something needs saying
-
-`label` never raises: an unknown key comes back capitalised, so a new column
-shows up readable and the missing entry is obvious. `ui` and `msg` do raise on
-an unknown key - a missing label is a bug to fix, not a word to invent - and
-both take keyword arguments, formatted into the template with `str.format`.
+Correcting a wording the jury does not like is editing one entry here, never a
+search through the code.
 """
 
 from __future__ import annotations
 
-import re
+#: What this language is called, in itself, in the picker in Impostazioni.
+NAME = "Italiano"
 
 
-# ── accents ─────────────────────────────────────────────────────────────────
+# ── ordinals ────────────────────────────────────────────────────────────────
 #
-# The federation types an apostrophe where an accent belongs - VELOCITA',
-# NICOLO', CITTA' - because that is what an Italian keyboard gives in capitals.
-# Nothing printed by this app repeats it: the workbook is read through here
-# (`entries._s`) and so is the programme (`config.load_competition`).
-
-_ACCENTED = {"A": "À", "E": "È", "I": "Ì", "O": "Ò", "U": "Ù",
-             "a": "à", "e": "è", "i": "ì", "o": "ò", "u": "ù"}
-
-# Only at the end of a word - an elision is followed by another letter
-# (DELL'ORSO, D'AMICO) - and only past the third letter, which leaves the real
-# truncations alone: VO', PO', VA' are written with an apostrophe and keep it.
-_APOSTROPHE = re.compile(r"(?<=\w\w\w)([AEIOUaeiou])['’](?!\w)")
+# Every place a sheet prints, from the rank column to the name of a final. The
+# masculine is the one the code asks for; the feminine forms a sentence needs
+# (`1ª batteria`) are written into the template that needs them.
 
 
-def fix_accents(text: str) -> str:
-    """VELOCITA' -> VELOCITÀ, CITTA' -> CITTÀ, DELL'ORSO unchanged."""
-    return _APOSTROPHE.sub(lambda m: _ACCENTED[m.group(1)], text)
+def ordinal(n: int) -> str:
+    """1 -> '1°'."""
+    return f"{n}°"
 
 
 # ── field / column labels ───────────────────────────────────────────────────
@@ -202,6 +170,13 @@ DOCS = {
     "medal_silver": "Argento",
     "medal_bronze": "Bronzo",
     "podium_detail_title": "PODI",
+    "programme_title": "PROGRAMMA GARE",
+    "programme_slug": "programma",
+    "programme_start": "Ora",
+    "programme_startlist": "Part.",
+    "programme_results": "Ris.",
+    "programme_classification": "Class.",
+    "programme_sheets": "Comunicati",
     "entry_list_slug": "iscritti",
     "startlist_slug": "partenti",
     "register_slug": "registro-comunicati",
@@ -444,7 +419,6 @@ UI = {
     "decision_update": "Aggiorna",
     "decisions_here": "In questa fase ({n})",
     "show_warnings": "Ammonizioni (W) sui fogli",
-    "include_warnings": "Includi le ammonizioni",
     "decisions_register": "Registro delle decisioni",
     "save_decisions_pdf": "Salva il registro in PDF",
     "decisions_filter_cat": "Categoria",
@@ -493,7 +467,7 @@ UI = {
     "unridden_finals": "Finali non disputate",
     "unridden_final": "Finale {name}",
     "final_ridden": "Disputata",
-    "final_tied": "Pari merito ({place}°)",
+    "final_tied": "Pari merito ({place})",
     "final_on_qual": "Tempi qualifiche",
     "laps_gained": "Giri guadagnati",
     "laps_lost": "Giri persi",
@@ -545,7 +519,7 @@ UI = {
     "finals_1_4": "Finali 1°-4°",
     "final_5_8": "Finale 5°-8°",
     "runs": "Prove",
-    "place_n": "{n}°",
+    "place_n": "{n}",
     "final_n_place": "{name} posto",
     "wins": "→ vince **{who}**",
     "load_round_1": "Carica Turno 1",
@@ -649,6 +623,7 @@ UI = {
     "competition_location": "Sede",
     "track_len": "Lunghezza pista (km)",
     "dates": "Date (una per giornata, separate da virgola)",
+    "dates_hint": "2026-09-05, 2026-09-06",
     "dates_caption": "Le date decidono quante giornate ha la manifestazione: "
                      "una data, una scheda «Giorno».",
     "categories_caption": "Le categorie in gara, nell'ordine in cui compaiono "
@@ -707,7 +682,6 @@ UI = {
     "produced_documents": "Documenti prodotti",
     "file": "File",
     "modified": "Modificato",
-    "programme_table": "Programma gare",
     "appearance": "Aspetto dei comunicati",
     "letterhead": "Testata e piè di pagina",
     "header_img": "Testata",
@@ -733,6 +707,49 @@ UI = {
     "name_split_example": "ROSSI · Mario Luigi",
     "name_full_example": "ROSSI Mario Luigi - una sola colonna «Nome»",
     "name_width": "Larghezza della colonna «Nome»",
+    "language": "Lingua",
+    "language_how": "In che lingua sono scritti l'app e i documenti",
+    "round_start": "Ora",
+    "race_options": "Come si corre",
+    "repropose": "↩ Riproponi",
+    "repropose_round": "↩",
+    "option_scheme": "Qualificati dal 200 m",
+    "option_final_5_8": "Si corre la finale 5°-8°",
+    "option_final_b": "Si corre la seconda finale",
+    "option_heats": "Batterie di qualificazione",
+    "option_eliminate": "Eliminati per batteria",
+    "option_qualify": "Qualificati alle finali",
+    "edited_fields": "modificati a mano: {list}",
+    "setup_title": "Nuova manifestazione",
+    "setup_intro": "Costruiamo il programma",
+    "setup_create": "Crea il programma",
+    "track_len_m": "Lunghezza pista (m)",
+    "new_competition": "➕ Nuova manifestazione",
+    "new_competition_name": "Nome della cartella",
+    "create": "Crea",
+    "add_event": "Aggiungi una specialità",
+    "add_event_other": "Altra (a mano)",
+    "event_code_new": "Codice",
+    "starts_per_race": "Come partono",
+    "starts_pairs": "A coppie (due alla volta)",
+    "starts_single": "Uno alla volta",
+    "events_of_competition": "Specialità in programma",
+    "option_per_start": "Come partono",
+    "recent_races": "Ultime gare",
+    "penalties_shown": "Provvedimenti",
+    "measure_a": "Ammonizioni",
+    "measure_c": "Retrocessioni",
+    "measure_d": "Squalifiche",
+    "register_range_filter": "Numeri",
+    "export_xlsx": "Esporta Excel",
+    "credit": "Released under the GPLv3 License © 2026 {name}",
+    "programme_print": "Foglio programma",
+    "programme_times": "Colonna ora",
+    "programme_merge_round": "Specialità e fase in una colonna",
+    "programme_merge_results": "Risultati e classifica in una colonna",
+    "save_programme_pdf": "Salva il programma in PDF",
+    "freeze_numbering": "Congela i numeri dei comunicati",
+    "pinned_count": "{n} fissati a mano",
     "reset_event": "Azzera una gara",
     "reset_confirm": "Confermo: cancella {n} gare di {cat} · {event}",
     "reset_with_results": " ({n} con risultati)",
@@ -787,7 +804,7 @@ HELP = {
     "time_format": "Tempo in m:ss,mmm.",
     "unridden_final": ("Come si chiude la finale se non viene disputata. "
                        "«Pari merito»: le due si classificano insieme al "
-                       "{place}° posto e il posto sopra resta vuoto. «Tempi "
+                       "{place} posto e il posto sopra resta vuoto. «Tempi "
                        "qualifiche»: le due vengono piazzate sul tempo delle "
                        "qualificazioni, l'unico che hanno corso. In entrambi "
                        "i casi chi segue in classifica non si sposta."),
@@ -939,9 +956,6 @@ HELP = {
                       "questa specialità: la porta con sé in tutte le fasi "
                       "successive. Due ammonizioni nella stessa fase sono "
                       "una squalifica."),
-    "include_warnings": ("Le ammonizioni (provvedimento A) nel registro "
-                         "stampato. Toglile per avere solo le decisioni che "
-                         "vanno pubblicate."),
     "decision_codes": ("Apre il riquadro della decisione con il codice "
                        "compatto sotto cui è stata presa (A1, C3). Di norma "
                        "no: sul comunicato va la decisione scritta per "
@@ -988,6 +1002,16 @@ HELP = {
     "save_programme": ("Riscrive `programme.yaml`. La versione precedente resta "
                        "in `.snapshots/`. Non tocca gare, iscritti o comunicati "
                        "già emessi."),
+    "programme_print": ("Il programma gara con accanto il numero di comunicato "
+                        "di ogni foglio: una riga per fase, nell'ordine in cui "
+                        "si corre. È il foglio che sta sul tavolo della "
+                        "giuria."),
+    "freeze_numbering": ("Acceso, i numeri restano quelli che sono. Spento, si "
+                         "rinumerano da soli a ogni modifica del programma - "
+                         "prima gli ordini di partenza, poi i risultati, fase "
+                         "per fase. Un numero scritto a mano non si muove più, "
+                         "e uno già emesso nemmeno: quel foglio è in mano alle "
+                         "squadre."),
     "reload_programme": "Butta via le modifiche non salvate e rilegge il file.",
     "track_len": ("Da qui si calcolano i giri di ogni distanza che non li "
                   "dichiara."),
@@ -1009,6 +1033,43 @@ HELP = {
     "move_up": "Sposta prima",
     "move_down": "Sposta dopo",
     "remove_race": "Togli questa gara dalla giornata",
+    "race_options": ("Quello che decide come si corre la specialità: da qui "
+                     "escono le fasi, con distanze, giri e volate proposti dal "
+                     "regolamento e dalla lunghezza della pista. Tutto "
+                     "modificabile dopo, e riproponibile con ↩."),
+    "repropose": ("Rifà le fasi dal regolamento, tenendo le tue note e le ore "
+                  "di partenza. Quello che avevi corretto a mano torna alla "
+                  "proposta."),
+    "round_start": ("Ora di partenza della fase, sul foglio programma. Non è "
+                    "il tempo di gara: quello sta nei risultati."),
+    "new_competition": ("Crea una cartella sotto `competitions/` e ci apre "
+                        "dentro la costruzione del programma. Il nome è quello "
+                        "della cartella, non del campionato: corto, senza "
+                        "spazi - CITA26."),
+    "track_len_m": ("In metri: 250, 333.33, 400. Da qui escono i giri di ogni "
+                    "distanza e quante coppie tiene la madison."),
+    "add_event": ("Le specialità del catalogo: codice, sigla UCI, formato e "
+                  "atleti per squadra già a posto. Tutto resta modificabile "
+                  "nella tabella qui sotto."),
+    "starts_per_race": ("Chilometro e inseguimento si corrono con la stessa "
+                        "macchina: a coppie, uno per rettilineo, o uno alla "
+                        "volta. È il valore di partenza - la giuria può "
+                        "cambiarlo sulla singola gara."),
+    "events_of_competition": ("Le specialità che questa manifestazione mette in "
+                             "programma. Qui si scelgono e basta: quante "
+                             "batterie, che distanze e come partono cambiano da "
+                             "categoria a categoria, e si decidono aggiungendo "
+                             "la gara alla giornata."),
+    "recent_races": ("Le fasi su cui hai lavorato per ultime: un tocco e la "
+                     "pagina ci torna, senza ripassare dai tre menu."),
+    "penalties_shown": ("Quali provvedimenti compaiono qui e sul registro "
+                        "stampato. Toglierne uno lo nasconde: le ammonizioni "
+                        "sono le più numerose e quasi mai quelle da "
+                        "pubblicare. Ammende e note non si filtrano - restano "
+                        "sempre."),
+    "register_range_filter": ("Da quale a quale numero. Il registro di una "
+                             "manifestazione di quattro giorni è lungo: si "
+                             "stampa il pezzo che serve, non tutto."),
     "round_distance": "Km. Vuoto: la fase non ha una distanza dichiarata.",
     "round_laps": ("Vuoto: si calcolano dalla lunghezza della pista. Scrivili "
                    "solo se la gara non segue la formula."),
@@ -1041,6 +1102,11 @@ HELP = {
                         "sempre cambiarla sul singolo foglio."),
     "header_img": "Banner in cima al comunicato: manifestazione, sede e date.",
     "footer_img": "Striscia in fondo al foglio: sponsor, loghi federali.",
+    "language": ("In che lingua sono scritti l'app, i comunicati e i fogli "
+                 "stampati. È un'impostazione di questa manifestazione: "
+                 "programma, elenco iscritti e gare non vengono toccati - i "
+                 "nomi di categorie, specialità e fasi stanno nel programma e "
+                 "si stampano come sono scritti lì."),
 }
 
 
@@ -1204,7 +1270,7 @@ MSG = {
     "pending_times": ("Tempi non ancora inseriti ({n} mancanti): l'ordine qui "
                       "sopra è quello di partenza, non una classifica."),
     "times_missing": "{n} senza tempo: la classifica non li piazza.",
-    "tied_final_who": "{place}° a pari merito: {who}.",
+    "tied_final_who": "{place} a pari merito: {who}.",
     "qual_final_who": "Sul tempo delle qualificazioni: {who}.",
     "no_previous_version": "Nessuna versione precedente.",
     "heat_wrong_size": ("{heat}ª batteria, corsia {lane}: {n} dorsali invece di "
@@ -1353,7 +1419,7 @@ MSG = {
     # the line under a classifica that no longer lists them
     "dns_note": "Non partiti: {bibs}.",
     # the speaker's banner over a race against the clock
-    "provisional_time": "{n}° tempo provvisorio",
+    "provisional_time": "{n} tempo provvisorio",
 
     # -- statistics ----------------------------------------------------------
     "stats_no_results": ("Nessuna specialità conclusa: il medagliere è ancora "
@@ -1396,6 +1462,11 @@ MSG = {
                             "fase in cui è stata presa: il colore del "
                             "riquadro, e se aprirlo con il codice UCI. La "
                             "nota resta grigia: non sanziona nessuno."),
+    "language_caption": ("In che lingua sono scritti l'app e i fogli stampati. "
+                         "È un'impostazione di questa manifestazione, come "
+                         "l'aspetto dei comunicati: quello che il programma "
+                         "scrive per esteso - i nomi di categorie, specialità "
+                         "e fasi - si stampa come sta lì."),
     "reset_caption": ("Cancella i risultati salvati di una specialità: **tutte "
                       "le fasi**, qualificazioni e batterie comprese. Non tocca "
                       "l'elenco iscritti né la verifica licenze; i comunicati "
@@ -1430,6 +1501,27 @@ MSG = {
                          "ora è «{now}». Il foglio in mano alla giuria e il "
                          "registro direbbero due cose diverse."),
     "no_communique_planned": "{cat} {event}: nessun comunicato previsto.",
+    "programme_count": "{races} gare  ·  {rounds} fasi  ·  {days} giornate",
+    "numbering_free": ("I numeri seguono l'ordine del programma: spostare una "
+                       "gara li rinumera. {n} fissati a mano restano dove "
+                       "sono."),
+    "numbering_frozen": "I numeri sono congelati: il programma non li tocca più.",
+    "race_reproposed": "«{cat} {event}»: {n} fasi riproposte.",
+    "setup_needed": ("«{name}» non ha ancora un programma. Il programma è quello "
+                     "da cui esce tutto il resto: le categorie, le specialità, "
+                     "le fasi di ogni gara e i comunicati. Si costruisce qui, "
+                     "in tre passi, e si corregge quando si vuole nella pagina "
+                     "Programma."),
+    "setup_track_holds": "Su questa pista la madison tiene {n} coppie in finale.",
+    "setup_track_unknown": ("Lunghezza non in tabella (3.2.157): le coppie in "
+                            "finale le decide la giuria."),
+    "setup_done": "Programma creato in {path}",
+    "setup_no_categories": "Dichiara almeno una categoria.",
+    "competition_exists": "«{name}» esiste già.",
+    "competition_created": "«{name}» creata.",
+    "event_exists": "«{name}» è già in programma.",
+    "event_added": "«{name}» aggiunta.",
+    "event_in_programme": "«{name}» è in programma: toglila dalle giornate prima.",
     "programme_saved": "Programma salvato in {path}",
     "no_race_on_day": "Nessuna gara in programma nella giornata {day}.",
     "race_already_scheduled": "{cat} {event} è già in programma.",
@@ -1475,97 +1567,3 @@ MSG = {
     "heats_count": "{n} batterie",
     "heat_one": "1 batteria",
 }
-
-
-IT: dict[str, str] = {**FIELDS, **RACE, **DOCS, **STATUSES}
-
-
-# ── words this competition spells its own way ───────────────────────────────
-#
-# One word is not the same at every meeting: what a rider rides for is a
-# *squadra* at a championship, a *rappresentativa* in some regions, a *team* on
-# an international sheet. It is a name the jury chooses in Impostazioni, so it
-# cannot be frozen in the dictionaries above - and it is still one word in one
-# place, because everything asks for it by the same key.
-#
-# Set once per run, from the competition being loaded (`ui.state.competition`).
-
-_OVERRIDES: dict[str, str] = {}
-
-
-def set_overrides(values: dict[str, str]) -> None:
-    """Replace the words this competition spells its own way ({} clears them)."""
-    _OVERRIDES.clear()
-    _OVERRIDES.update({k: v for k, v in (values or {}).items() if v})
-
-
-def label(key: str, default: str | None = None) -> str:
-    """Italian label for a domain key ('bib' -> 'Dors.')."""
-    if key in _OVERRIDES:
-        return _OVERRIDES[key]
-    if key in IT:
-        return IT[key]
-    return default if default is not None else str(key).replace("_", " ").capitalize()
-
-
-def ui(key: str, /, **kwargs) -> str:
-    """What a control is called ('save_pdf' -> 'Salva PDF').
-
-    Raises on an unknown key: a control with no name is a bug in the code, not
-    a word to make up on the spot.
-    """
-    if key in _OVERRIDES and not kwargs:
-        return _OVERRIDES[key]
-    return UI[key].format(**kwargs) if kwargs else UI[key]
-
-
-def msg(key: str, /, **kwargs) -> str:
-    """One message, with its values filled in ('bib_not_entered', bib=17)."""
-    return MSG[key].format(**kwargs) if kwargs else MSG[key]
-
-
-def help_text(*keys: str, **kwargs) -> str:
-    """The tooltip for a field, one or more entries of HELP joined by a space.
-
-    Raises on an unknown key, like `ui` and `msg`: a tooltip that silently came
-    back empty is how a field ends up with no help at all and nobody notices.
-    An empty key is skipped, which is what makes a conditional part readable:
-    `help_text("n_events", reserves="")`.
-    """
-    parts = [HELP[k] for k in keys if k]
-    return " ".join(p.format(**kwargs) if kwargs else p for p in parts)
-
-
-def code_name(code: str) -> str:
-    """What a finding is about, as the jury reads it ('bib_dup' -> 'Dorsale doppio')."""
-    return CODES.get(code, str(code).replace("_", " ").capitalize())
-
-
-def status_name(code: str) -> str:
-    """Spelled-out status, for the pickers ('DNF' -> 'Ritirato')."""
-    return STATUS_NAMES.get(str(code).upper(), str(code))
-
-
-def penalty_name(code: str) -> str:
-    """Spelled-out degree of a penalty ('C' -> 'Retrocessione')."""
-    return PENALTIES.get(str(code).upper(), str(code))
-
-
-def note_kind_name(kind: str) -> str:
-    """What a block on a sheet is ('relegation' -> 'Retrocessione')."""
-    return NOTE_KINDS.get(str(kind), str(kind))
-
-
-def plural(n: int, one: str, many: str) -> str:
-    """Pick the form that agrees with `n` ('passa' / 'passano')."""
-    return one if n == 1 else many
-
-
-def gendered(female: bool, key_m: str, key_f: str, **kwargs) -> str:
-    """The form written about the riders in front of the jury.
-
-    A sheet is written about who rides it: *la vincitrice* of a batteria in a
-    categoria femminile, *il vincitore* in a maschile. `Competition.female`
-    decides, and this picks the wording.
-    """
-    return msg(key_f if female else key_m, **kwargs)

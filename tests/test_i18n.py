@@ -1,15 +1,18 @@
-"""The translation document is the only place with Italian in it.
+"""The catalogues are the only place with prose in them.
 
-Two guards, because the catalogue only works if both hold: every key the code
-asks for has to exist (or a field comes out with no label and nobody notices),
-and no module may go back to writing Italian of its own (or the catalogue stops
-being the one place to edit).
+Three guards, because a catalogue only works if all three hold: every key the
+code asks for has to exist (or a field comes out with no label and nobody
+notices), no module may go back to writing Italian of its own (or the
+catalogue stops being the one place to edit), and every language has to answer
+every key the same way (or switching the language moves a word and drops the
+one beside it).
 """
 
 from __future__ import annotations
 
 import ast
 import re
+import string
 from pathlib import Path
 
 import pytest
@@ -18,21 +21,30 @@ from core import checks
 from core import i18n as I
 
 TRACK = Path(__file__).resolve().parent.parent
-CATALOGUE = TRACK / "core" / "i18n.py"
+CATALOGUE = TRACK / "core" / "i18n"
+
+#: The dictionaries every language module defines, and must define in full.
+DICTIONARIES = ("FIELDS", "RACE", "DOCS", "STATUSES", "STATUS_NAMES",
+                "PENALTIES", "NOTE_KINDS", "CODES", "UI", "HELP", "MSG")
 
 #: The four lookups and the dictionary each one reads.
-LOOKUPS = {"ui": I.UI, "msg": I.MSG, "help_text": I.HELP, "label": I.IT}
+LOOKUPS = {"ui": I.catalogue().UI, "msg": I.catalogue().MSG,
+           "help_text": I.catalogue().HELP, "label": I.labels()}
+
+#: The lookups that are not one of the four, but still read the catalogue.
+EXTRA_LOOKUPS = {"code_name", "status_name", "penalty_name", "note_kind_name",
+                 "ordinal"}
 
 #: `notify.warn("x")` names a message, not a control.
 NOTIFY = {"error", "warn", "info", "ok", "saved"}
 
 
 def _sources():
-    """Every module of the app except the catalogue itself."""
+    """Every module of the app except the catalogues themselves."""
     for p in sorted(TRACK.rglob("*.py")):
         s = str(p.relative_to(TRACK))
         if ("__pycache__" in s or s.startswith(("tests/", "competitions/"))
-                or p == CATALOGUE):
+                or CATALOGUE in p.parents):
             continue
         yield p, ast.parse(p.read_text(encoding="utf-8"))
 
@@ -72,8 +84,8 @@ def test_a_label_key_is_looked_up_where_it_lives():
     """
     crossed = [(str(p.relative_to(TRACK)), line, which, key)
                for p, line, which, key in _keys_used()
-               if which == "label" and key not in I.IT
-               and (key in I.UI or key in I.MSG)]
+               if which == "label" and key not in LOOKUPS["label"]
+               and (key in LOOKUPS["ui"] or key in LOOKUPS["msg"])]
     assert not crossed, crossed
 
 
@@ -99,8 +111,12 @@ _ITALIAN = re.compile(
 #:   (`models.LEGACY_KEYS`), read for compatibility and never written;
 #: * what the federation's workbook spells in a cell, matched on import.
 PROGRAMME_VOCABULARY = {
-    # round keys
+    # round keys - the ones the builder schedules a fase under (`core.rounds`)
+    # included: they are matched by their first letters (`race.is_qualifying`,
+    # `race.is_finals`) and are what makes a saved race findable on disk
     "Turno 1", "Quarti", "Semifinali", "Finali", "Recuperi",
+    "Qualificazioni", "Finale", "Batteria",
+    "Composizione coppie", "Composizione batterie",
     "Scratch", "Tempo Race", "Eliminazione", "Corsa a Punti",
     "qualificazioni", "final", "tempo race", "corsa a punti", "eliminazione",
     "scratch", "quarti", "semi", "batteria-",
@@ -195,3 +211,104 @@ def test_the_lookup_argument_can_never_be_shadowed():
     assert I.msg("key_in_two_heats", who="7") == "7 è presente in più batterie."
     assert I.msg("xls_duplicate_rider", cat="AL", row=9, name="ROSSI",
                  key="1002") == "[AL] atleta duplicato (riga 9): ROSSI 1002."
+
+
+
+def test_no_module_looks_a_word_up_at_import_time():
+    """A word read into a constant is the language the *process* started in.
+
+    The catalogue moves when the competition is opened (`ui.state.competition`
+    calls `set_language`), and a module-level `ui(...)` has already run by
+    then: the page would keep the wording of whatever competition was loaded
+    first. Constants hold keys; the word is looked up when it is drawn - see
+    `PAGES` in `app.py` or `Scheme.label` in `core.formats.sprint`.
+    """
+    at_import = []
+    for p, tree in _sources():
+        for node in tree.body:
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            for n in ast.walk(node):
+                if (isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                        and n.func.id in set(LOOKUPS) | EXTRA_LOOKUPS):
+                    at_import.append((str(p.relative_to(TRACK)), node.lineno,
+                                      n.func.id))
+                    break
+    assert not at_import, at_import
+
+# ── one catalogue per language, all answering the same keys ─────────────────
+
+def _fields(template: str) -> list[str]:
+    """The named placeholders of a template, as `str.format` will want them."""
+    return sorted({n for _, n, _, _ in string.Formatter().parse(template) if n})
+
+
+@pytest.mark.parametrize("code", [c for c in I.CATALOGUES if c != I.DEFAULT])
+@pytest.mark.parametrize("name", DICTIONARIES)
+def test_every_language_answers_every_key(code, name):
+    """A key the code asks for has to exist in the language it is read in.
+
+    Missing, it falls back to Italian and the page comes out in two languages
+    at once - which is a translation nobody notices is half-finished until a
+    jury reads it at the track.
+    """
+    reference = getattr(I.CATALOGUES[I.DEFAULT], name)
+    theirs = getattr(I.CATALOGUES[code], name)
+    assert [k for k in reference if k not in theirs] == []
+    # and nothing invented on the side: a key only one language has is a key
+    # the code cannot ask for
+    assert [k for k in theirs if k not in reference] == []
+
+
+@pytest.mark.parametrize("code", [c for c in I.CATALOGUES if c != I.DEFAULT])
+@pytest.mark.parametrize("name", DICTIONARIES)
+def test_a_translation_keeps_the_values_it_is_given(code, name):
+    """`{bib}` has to survive being translated, or the message raises.
+
+    `msg("bib_not_entered", bib=17)` formats the template it finds: a
+    translation that drops the placeholder prints a sentence with a hole in
+    it, and one that renames it raises KeyError in front of the jury.
+    """
+    reference = getattr(I.CATALOGUES[I.DEFAULT], name)
+    theirs = getattr(I.CATALOGUES[code], name)
+    wrong = [(k, _fields(v), _fields(theirs[k])) for k, v in reference.items()
+             if k in theirs and _fields(v) != _fields(theirs[k])]
+    assert not wrong, wrong
+
+
+def test_the_language_moves_and_can_be_moved_back():
+    """`set_language` is what a page of Impostazioni switches, once per rerun."""
+    try:
+        assert I.set_language("en") == "en"
+        assert I.language() == "en"
+        assert I.ui("save_pdf") == "Save PDF"
+        assert I.label("bib") == "Bib"
+        assert I.msg("bib_not_entered", bib=17) == "Bib 17 is not a starter."
+        # an unknown code is a settings file written by hand, not a crash
+        assert I.set_language("xx") == I.DEFAULT
+        assert I.ui("save_pdf") == "Salva PDF"
+    finally:
+        I.set_language(I.DEFAULT)
+
+
+def test_a_key_only_the_fallback_has_still_answers():
+    """Half a translation is a word in the other language, never a KeyError."""
+    I.CATALOGUES[I.DEFAULT].UI["_a_key_no_translation_has"] = "una parola"
+    try:
+        I.set_language("en")
+        assert I.ui("_a_key_no_translation_has") == "una parola"
+    finally:
+        I.set_language(I.DEFAULT)
+        del I.CATALOGUES[I.DEFAULT].UI["_a_key_no_translation_has"]
+
+
+def test_the_places_are_written_the_way_the_language_writes_them():
+    """The rank column, and every final named after what it rides for."""
+    assert [I.ordinal(n) for n in (1, 2, 3, 4, 11)] == ["1°", "2°", "3°",
+                                                        "4°", "11°"]
+    try:
+        I.set_language("en")
+        assert [I.ordinal(n) for n in (1, 2, 3, 4, 11, 21)] == [
+            "1st", "2nd", "3rd", "4th", "11th", "21st"]
+    finally:
+        I.set_language(I.DEFAULT)

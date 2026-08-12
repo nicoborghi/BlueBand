@@ -550,8 +550,12 @@ tutto in italiano. Le corrispondenze, se ti capita di leggere un nome di file:
 | Verificato | `checked_in` |
 | Non partente | `not_starting` |
 
-Tutte le diciture italiane stanno in un unico file, `core/i18n.py`: cambiare una
-parola che non piace alla giuria è modificare una riga lì, e vale ovunque.
+Tutte le diciture stanno in un catalogo per lingua sotto `core/i18n/`
+(`it.py`, `en.py`): cambiare una parola che non piace alla giuria è modificare
+una riga lì, e vale ovunque. In che lingua gira la manifestazione si sceglie in
+**Impostazioni → Lingua**; i nomi scritti per esteso in `programme.yaml` -
+categorie, specialità, fasi - si stampano come stanno lì, qualunque sia la
+lingua.
 
 ---
 

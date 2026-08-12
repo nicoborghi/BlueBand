@@ -561,9 +561,9 @@ def test_the_merged_name_column_gives_width_back(entries, comp):
     column left the sheet with a third of the paper under the names and the
     volate squeezed against each other.
     """
-    from render.render import COLS_RIDER, merge_names
+    from render.render import cols_rider, merge_names
 
-    doc = Document(title="X", tables=[Table(columns=list(COLS_RIDER))])
+    doc = Document(title="X", tables=[Table(columns=cols_rider())])
     t = doc.tables[0]
     two = sum(c.pct for c in t.columns if c.key in ("last_name", "first_name"))
     merged = merge_names(doc).tables[0]
@@ -583,9 +583,9 @@ def test_how_wide_the_merged_name_column_is_comes_from_the_settings():
     """
     from core.config import (DEFAULT_NAME_WIDTH, NAME_WIDTH_MAX,
                              NAME_WIDTH_MIN, Branding)
-    from render.render import COLS_RIDER, merge_names
+    from render.render import cols_rider, merge_names
 
-    doc = Document(title="X", tables=[Table(columns=list(COLS_RIDER))])
+    doc = Document(title="X", tables=[Table(columns=cols_rider())])
     narrow = merge_names(doc, 0.5).tables[0]
     wide = merge_names(doc, 0.9).tables[0]
     assert (next(c.pct for c in narrow.columns if c.key == "full_name")

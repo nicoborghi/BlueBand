@@ -181,6 +181,29 @@ class Store:
     def list_races(self) -> list[str]:
         return sorted(p.stem for p in (self.root / "races").glob("*.json"))
 
+    def recent_races(self, n: int = 6) -> list[RaceState]:
+        """The races last saved, most recent first.
+
+        Read off the file times rather than the states themselves: it is one
+        `stat` per race instead of parsing every file on the disk, and a race
+        is written exactly when it is worked on. Only the last few are read.
+
+        Two races written inside the same clock tick cannot be told apart by
+        their time - it happens when a batch is composed, and on a filesystem
+        that keeps whole seconds it happens often. The name breaks the tie, so
+        that the row of pills is at least the *same* row from one rerun to the
+        next: a shortcut that reshuffles itself is not one.
+        """
+        files = sorted((self.root / "races").glob("*.json"),
+                       key=lambda p: (p.stat().st_mtime_ns, p.name),
+                       reverse=True)
+        out = []
+        for path in files[:max(0, n)]:
+            state = self.load_race(path.stem)
+            if state is not None:
+                out.append(state)
+        return out
+
     def delete_race(self, rid: str, *, actor: str = "") -> None:
         rel = self.race_rel(rid)
         if self.exists(rel):

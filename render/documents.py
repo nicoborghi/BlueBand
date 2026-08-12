@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from core import communiques as C
 from core import medals as M
 from core import race as R
 from core import recap as RC
@@ -15,10 +16,10 @@ from core.models import EntryList, RaceState, Rider, Status, race_slug
 from core.i18n import label, msg, plural, ui
 from core.parse import format_time
 
-from .render import (COL_INDEX, COLS_RIDER, COLS_RIDER_MIN, W_GROUP, W_LANE,
-                     W_LAPS, W_POINTS, W_RANK, W_SPRINT, W_TIME, W_TOTAL,
-                     Column, Document, Note, Table, group_start, numbered,
-                     position_label, rider_row, side_start, slugify, zebra)
+from .render import (COL_INDEX, W_GROUP, W_LANE, W_LAPS, W_POINTS, W_RANK,
+                     W_SPRINT, W_TIME, W_TOTAL, Column, Document, Note, Table,
+                     cols_rider, group_start, numbered, position_label,
+                     rider_row, side_start, slugify, zebra)
 
 
 def _sorted(riders: list[Rider]) -> list[Rider]:
@@ -63,8 +64,7 @@ def entry_list(el: EntryList, comp: Competition, cat: str, *,
     contested = set(comp.events_for(cat))
     events = [s for s in comp.event_order() if s != EVENT_ENTRY_LIST and s in contested]
 
-    cols = ([COL_INDEX] if index else []) + \
-        list(COLS_RIDER_MIN if minimal else COLS_RIDER)
+    cols = ([COL_INDEX] if index else []) + cols_rider(minimal)
     legend = ""
     if matrix and events:
         # full event names never fit across the matrix: the columns carry the
@@ -115,7 +115,7 @@ def event_entry_list(el: EntryList, comp: Competition, cat: str,
     head = (label("pair") if ev.fmt == "madison"
             else label("team") if grouped else label("region"))
     cols = [Column("group", head, "l", W_GROUP)]
-    cols += [c for c in COLS_RIDER_MIN if c.key != "region"]
+    cols += [c for c in cols_rider(minimal=True) if c.key != "region"]
     cols.append(Column("club", label("club"), "l", 26))
 
     rows: list[dict] = []
@@ -638,7 +638,7 @@ def race_classification(state: RaceState, result: Result, el: EntryList,
         cols.append(Column("group", label("pair"), "c", W_PAIR_NO, bold=True))
     elif grouped and not team_sheet:
         cols.append(Column("group", label("team"), "l", W_GROUP))
-    for c in COLS_RIDER_MIN:
+    for c in cols_rider(minimal=True):
         if c.key == "region":
             continue
         # the corsa a punti of an omnium wants the width for the volate: the
@@ -1316,3 +1316,99 @@ def _recap_cols(group: str, events: list[str], heads: dict[str, str], *,
             *[Column(f"ev_{s}", heads[s], "c",
                      EVENT_COL_W_SHORT if short_headers else 4.5)
               for s in events]]
+
+
+# ── the programme, and the numbers beside it ────────────────────────────────
+
+def programme_sheet(comp: Competition, *, times: bool = True,
+                    merge_round: bool = False, merge_results: bool = False,
+                    communique: str = "", font_size: int = 9) -> Document:
+    """The running order with the comunicato number of every sheet beside it.
+
+    One row per fase, in the order it is ridden - which is what the jury has on
+    the table all day: *when* it is run, *which* comunicato carries its ordine
+    di partenza, and which ones carry its risultati and its classifica. It is
+    the register and the programme read as one thing, and it is built here so
+    that both pages can print the same sheet.
+
+    Three switches, because the same sheet is read two ways. A day being
+    planned wants the times and the columns apart; a day being run wants it
+    short enough to take in at a glance:
+
+    * `times` - the *Ora* column at all. Off when the programme has none.
+    * `merge_round` - specialità and fase in one column instead of two.
+    * `merge_results` - risultati and classifica in one, the classifica in
+      **bold**, because it is the sheet that closes the specialità and it is
+      the one people look for.
+
+    A fase that files no sheet of a kind leaves that cell empty; a sheet the
+    register carries no number for prints what `number_for` answers, which is
+    what the jury would see on the sheet itself.
+    """
+    cols = ([Column("start", label("programme_start"), "c", 7)] if times else [])
+    cols.append(Column("startlist", label("programme_startlist"), "c", 6))
+    cols.append(Column("cat", label("cat"), "c", 6))
+    if merge_round:
+        cols.append(Column("event", label("event"), "l", 40))
+    else:
+        cols += [Column("event", label("event"), "l", 24),
+                 Column("round", label("round"), "l", 22)]
+    if merge_results:
+        cols.append(Column("results", label("programme_sheets"), "c", 10))
+    else:
+        cols += [Column("results", label("programme_results"), "c", 7),
+                 Column("classification", label("programme_classification"),
+                        "c", 7)]
+
+    rows: list[dict] = []
+    last_day = None
+    for item in comp.programme:
+        ev = comp.event(item.event)
+        for rnd in item.rounds:
+            docs = rnd.docs or []
+            if not docs:
+                continue        # a fase that is composed and not ridden
+            row = _programme_row(comp, item, rnd, ev, merge_round,
+                                 merge_results)
+            if last_day is not None and item.day != last_day:
+                row = group_start(row, strong=True)
+            last_day = item.day
+            rows.append(row)
+
+    return Document(
+        title=f"{comp.name} - {label('programme_title')}",
+        info=msg("programme_count", races=len(comp.programme),
+                 rounds=len(rows), days=len(comp.days())),
+        communique=communique,
+        tables=[Table(columns=cols, rows=zebra(rows), font_size=font_size)],
+        slug=label("programme_slug"),
+    )
+
+
+def _programme_row(comp: Competition, item, rnd, ev, merge_round: bool,
+                   merge_results: bool) -> dict:
+    """One fase: when it runs, what it is, and the numbers it goes out under."""
+    def number(doc: str, round_key: str) -> str:
+        if doc not in (rnd.docs or []):
+            return ""
+        n = C.number_for(comp, item.cat, item.event, round_key, doc)
+        return "" if n == C.UNNUMBERED else n
+
+    start = number(DOC_STARTLIST, rnd.key)
+    results = number(DOC_RESULTS, rnd.key)
+    # the classifica belongs to the specialità and to no fase (see config.Sheet)
+    classification = number(DOC_CLASSIFICATION, "")
+
+    row = {"start": rnd.start or item.time, "startlist": start,
+           "cat": item.cat,
+           "event": f"{ev.short} · {rnd.label}" if merge_round else ev.short,
+           "round": "" if merge_round else rnd.label}
+    if merge_results:
+        # both in one cell, and the classifica in bold: it is the sheet that
+        # closes the specialità, and it is the one anybody scans the column for
+        row["results"] = " · ".join(n for n in (results, classification) if n)
+        if classification:
+            row["_bold"] = {"results"}
+    else:
+        row["results"], row["classification"] = results, classification
+    return row

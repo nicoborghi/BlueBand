@@ -3,7 +3,8 @@
 The page is ordered by what it is: from what the app is working on, down to what
 can destroy work. Eight sections, in this order and no other:
 
-1. **Manifestazione** - which one is loaded, and whether its programme reads.
+1. **Manifestazione** - which one is loaded, and whether its programme reads,
+   and the language it is all read in.
 2. **Elenco iscritti** - which file the riders come from, and the one button
    that reads it again. It lives here and not on Verifica: choosing a file is a
    setting, and re-importing is safe by construction (the jury's edits are an
@@ -16,14 +17,16 @@ can destroy work. Eight sections, in this order and no other:
    set. All of it is "how a sheet looks", so it is one section: before, the two
    images were on the page and the signature was hidden behind an expander
    called *avanzate*, which is not a different kind of choice.
-6. **Programma** - read-only, what the YAML says, with the derived distances.
-   The register is *not* here: Documenti → Registro comunicati is the one
-   place that says what is planned, what has gone out, and prints it.
-7. **Dati e backup** - the folder, the copy, the journal.
-8. **Azzera una gara** - last, alone, and the only thing here that deletes.
+6. **Dati e backup** - the folder, the copy, the journal.
+7. **Azzera una gara** - last, alone, and the only thing here that deletes.
 
-Everything on this page is either a local choice stored in `settings.json` or a
-view of the programme; nothing here is part of a race.
+The programme is *not* here, in any form. It is read and written on the
+Programma page, which is also where it is printed; the register is on Documenti
+→ Registro comunicati. A read-only copy of either on this page was one more
+thing to keep in step, and a second place to look for the same answer.
+
+Everything on this page is a local choice stored in `settings.json`; nothing
+here is part of a race, and nothing here is part of the programme.
 """
 
 from __future__ import annotations
@@ -41,27 +44,53 @@ from core import entries as E
 from core import race as R
 from core import recap as RC
 from core.config import EVENT_ENTRY_LIST, Competition, validate
-from core.i18n import help_text, label, msg, note_kind_name, ui
-from core.store import Store, list_competitions
+from core.i18n import (LANGUAGES, help_text, label, language, msg,
+                       note_kind_name, ui)
+from core.store import Store, list_competitions, open_competition
 from render.render import darken, data_uri
 from ui import notify, state
 
 
-GROUP_LABELS = {RC.BY_REGION: ui("team_group_region"),
-                RC.BY_CLUB: ui("team_group_club"),
-                RC.BY_PROVINCE: ui("team_group_province"),
-                RC.BY_NATION: ui("team_group_nation")}
+# What each option of a picker is called: the value is a key of the catalogue,
+# looked up when the widget is drawn (`format_func=_named`) rather than at
+# import, so the page follows a change of language on the next rerun.
+GROUP_LABELS = {RC.BY_REGION: "team_group_region",
+                RC.BY_CLUB: "team_group_club",
+                RC.BY_PROVINCE: "team_group_province",
+                RC.BY_NATION: "team_group_nation"}
+
+
+def _named(labels: dict[str, str]):
+    """`format_func` reading the catalogue: value -> the word for its key."""
+    return lambda value: ui(labels[value]) if value in labels else str(value)
+
+
+#: Whose it is and under what licence. On this page and no other: it is the
+#: page a jury opens when it wants to know what it is running, and the sidebar
+#: is empty from the page list down. On the others that column is controls.
+AUTHOR = "Nicola Borghi"
+AUTHOR_URL = "https://nicoborghi.github.io/"
 
 
 def render(competition: str, comp: Competition, store: Store) -> None:
     _competition(competition, comp)
+    _language(store)
     _entries(comp, store)
     _team(comp, store)
     _output_folder(store)
     _appearance(comp, store)
-    _programme(comp)
     _data_and_backup(store)
     _reset_event(comp, store)
+    _credit()
+
+
+def _credit() -> None:
+    """The licence notice, at the foot of the sidebar."""
+    st.sidebar.markdown(
+        f'<div class="cmsr-credit">'
+        + ui("credit", name=f'<a href="{AUTHOR_URL}" target="_blank">'
+                            f'{AUTHOR}</a>')
+        + '</div>', unsafe_allow_html=True)
 
 
 # ── 1. which competition is loaded ──────────────────────────────────────────
@@ -69,11 +98,14 @@ def render(competition: str, comp: Competition, store: Store) -> None:
 def _competition(competition: str, comp: Competition) -> None:
     """The competition is set once, here - not on every page."""
     competitions = list_competitions()
-    pick = st.selectbox(ui("competition"), competitions, key="set_competition",
+    c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+    pick = c1.selectbox(ui("competition"), competitions, key="set_competition",
                         index=competitions.index(competition),
                         help=help_text("competition_folder"))
     if pick != competition:
         state.choose_competition(pick)
+    with c2.popover(ui("new_competition")):
+        _new_competition(competitions)
 
     c1, c2, c3 = st.columns(3)
     c1.metric(ui("track"), f"{comp.track_len * 1000:.0f} m")
@@ -86,6 +118,53 @@ def _competition(competition: str, comp: Competition) -> None:
     problems = validate(comp)
     for p in problems:
         notify.text(p)
+
+
+def _language(store: Store) -> None:
+    """What the app and the sheets are written in.
+
+    A setting of the competition and not of the machine: an international
+    meeting is run in English and the championship next month in Italian, on
+    the same laptop, and neither should have to be switched back by hand. It
+    is stored in `settings.json` and read before anything draws a word
+    (`ui.state.competition`).
+
+    It moves the *catalogue*, nothing else: the names of the categories, the
+    events and the rounds are written out in `programme.yaml` and print as
+    they stand there.
+    """
+    codes = list(LANGUAGES)
+    current = language()
+    pick = st.selectbox(ui("language"), codes,
+                        index=codes.index(current) if current in codes else 0,
+                        key="set_language", format_func=LANGUAGES.get,
+                        help=help_text("language"))
+    st.caption(msg("language_caption"))
+    if pick != current:
+        store.set_setting("language", pick)
+        state.refresh()
+
+
+def _new_competition(competitions: list[str]) -> None:
+    """Start next year's championship, from inside the app.
+
+    It creates the folder and nothing else: with no `programme.yaml` in it the
+    app opens on `ui.pages.setup`, which asks for the pista and the categorie
+    and writes the first one. `open_competition` is what makes the folder -
+    `Store.__init__` creates the tree it needs.
+    """
+    st.caption(help_text("new_competition"))
+    name = st.text_input(ui("new_competition_name"), key="new_comp_name",
+                         placeholder="CITA27")
+    name = "".join(name.split())
+    if st.button(ui("create"), key="new_comp_go", type="primary",
+                 disabled=not name):
+        if name in competitions:
+            notify.error("competition_exists", name=name)
+            return
+        open_competition(name)
+        notify.ok("competition_created", name=name)
+        state.choose_competition(name)
 
 
 # ── 2. the entry file: where it is, and reading it again ────────────────────
@@ -181,7 +260,7 @@ def _team(comp: Competition, store: Store) -> None:
     group = st.selectbox(ui("team_group"), groups,
                          index=groups.index(current) if current in groups
                          else 0,
-                         key="team_group", format_func=GROUP_LABELS.get,
+                         key="team_group", format_func=_named(GROUP_LABELS),
                          help=help_text("team_group"))
     if group != current:
         store.set_setting("team_group", group)
@@ -195,7 +274,7 @@ def _team(comp: Competition, store: Store) -> None:
         store.set_setting("team_name", name.strip())
         state.refresh()
     st.caption(msg("team_caption", name=comp.team_name,
-                   group=GROUP_LABELS.get(group, group)))
+                   group=_named(GROUP_LABELS)(group)))
 
 
 def _team_group(comp: Competition, store: Store) -> str:
@@ -343,24 +422,23 @@ def _swatch(kind: str, color: str) -> str:
             f'{note_kind_name(kind)}</div>')
 
 
-SIG_MODE_LABELS = {C.SIG_IMAGE: ui("sig_mode_image"),
-                   C.SIG_TEXT: ui("sig_mode_text")}
-SIG_SCOPE_LABELS = {C.SIG_ALWAYS: ui("sig_scope_always"),
-                    C.SIG_RESULTS: ui("sig_scope_results"),
-                    C.SIG_NEVER: ui("sig_scope_never")}
+SIG_MODE_LABELS = {C.SIG_IMAGE: "sig_mode_image", C.SIG_TEXT: "sig_mode_text"}
+SIG_SCOPE_LABELS = {C.SIG_ALWAYS: "sig_scope_always",
+                    C.SIG_RESULTS: "sig_scope_results",
+                    C.SIG_NEVER: "sig_scope_never"}
 
 
 def _signature(comp: Competition, store: Store) -> None:
     """How the «Per la giuria» block is signed, and where it is offered."""
     b = comp.branding
-    st.caption(msg("signature_caption", label=b.signature_label))
+    st.caption(msg("signature_caption", label=b.signature_caption))
 
     modes = list(C.SIG_MODES)
     mode = st.radio(ui("signature_how"), modes,
                     index=modes.index(b.signature_mode)
                     if b.signature_mode in modes else 0,
                     key="sig_mode", horizontal=True,
-                    format_func=SIG_MODE_LABELS.get)
+                    format_func=_named(SIG_MODE_LABELS))
     if mode != b.signature_mode:
         store.set_setting("signature_mode", mode)
         state.refresh()
@@ -385,7 +463,7 @@ def _signature(comp: Competition, store: Store) -> None:
             store.set_setting("signature_name", value.strip())
             state.refresh()
         if value:
-            c2.markdown(f"{b.signature_label} **{value}**")
+            c2.markdown(f"{b.signature_caption} **{value}**")
         else:
             notify.warn("signature_name_missing", where=c2)
 
@@ -393,15 +471,14 @@ def _signature(comp: Competition, store: Store) -> None:
     scope = st.selectbox(ui("signature_where"), scopes,
                          index=scopes.index(b.signature_scope)
                          if b.signature_scope in scopes else 0,
-                         key="sig_scope", format_func=SIG_SCOPE_LABELS.get,
+                         key="sig_scope", format_func=_named(SIG_SCOPE_LABELS),
                          help=help_text("signature_scope"))
     if scope != b.signature_scope:
         store.set_setting("signature_scope", scope)
         state.refresh()
 
 
-NAME_STYLE_LABELS = {C.NAME_SPLIT: ui("name_split"),
-                     C.NAME_FULL: ui("name_full")}
+NAME_STYLE_LABELS = {C.NAME_SPLIT: "name_split", C.NAME_FULL: "name_full"}
 
 
 def _name_style(comp: Competition, store: Store) -> None:
@@ -411,7 +488,7 @@ def _name_style(comp: Competition, store: Store) -> None:
     style = st.radio(ui("name_style_how"), styles,
                      index=styles.index(b.name_style)
                      if b.name_style in styles else 0,
-                     key="name_style", format_func=NAME_STYLE_LABELS.get,
+                     key="name_style", format_func=_named(NAME_STYLE_LABELS),
                      captions=[ui("name_split_example"),
                                ui("name_full_example")])
     if style != b.name_style:
@@ -476,44 +553,7 @@ def _asset_path(value: str) -> Path | None:
     return p if p.exists() else None
 
 
-# ── 6. what the programme says (read-only) ──────────────────────────────────
-
-def _programme(comp: Competition) -> None:
-    """The flat view of the programme, with the distances it works out.
-
-    The Programma page edits it one day at a time; this reads it whole, with
-    the giri and gli sprint that are *derived* from the track length and never
-    written anywhere. The register used to be here too, and is not any more:
-    Documenti → Registro comunicati says the same and more (emesso o no, il
-    prossimo numero libero, i duplicati) and prints it.
-    """
-    st.subheader(ui("programme_table"))
-    with st.expander(ui("races_scheduled"), expanded=False):
-        rows = []
-        for r in comp.programme:
-            for p in r.rounds:
-                d, laps, spr = comp.distances(r.cat, r.event, p.key)
-                rows.append({
-                    label("day"): r.day, label("cat"): r.cat,
-                    label("event"): comp.event(r.event).short,
-                    label("round"): p.label,
-                    # None, not "": a column mixing numbers and empty strings
-                    # has no Arrow type, and a missing value prints blank
-                    label("distance"): d or None,
-                    label("laps"): laps or None,
-                    label("sprint"): spr or None,
-                    ui("documents"): ", ".join(p.docs),
-                })
-        df = pd.DataFrame(rows)
-        # the missing values made these float columns: 25 laps read better than
-        # 25.0, and Int64 keeps the blanks
-        for col in (label("laps"), label("sprint")):
-            if df[col].dropna().mod(1).eq(0).all():
-                df[col] = df[col].astype("Int64")
-        st.dataframe(df, hide_index=True, use_container_width=True)
-
-
-# ── 7. the data folder and its copies ───────────────────────────────────────
+# ── 6. the data folder and its copies ───────────────────────────────────────
 
 def _data_and_backup(store: Store) -> None:
     st.subheader(ui("backup"))
@@ -533,7 +573,7 @@ def _data_and_backup(store: Store) -> None:
                          use_container_width=True)
 
 
-# ── 8. the one thing here that deletes ──────────────────────────────────────
+# ── 7. the one thing here that deletes ──────────────────────────────────────
 
 def _reset_event(comp: Competition, store: Store) -> None:
     """Throw away everything typed for one (category, event).

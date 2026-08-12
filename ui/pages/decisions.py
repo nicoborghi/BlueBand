@@ -43,6 +43,7 @@ from core.config import EVENT_ENTRY_LIST, Competition
 from core.i18n import help_text, label, msg, note_kind_name, ui
 from core.store import Store
 from render import documents as DOC
+from render.render import to_html
 from ui import decisions_form as DF
 from ui import notify
 from ui.download import save_button
@@ -79,13 +80,43 @@ def _filters(comp: Competition, taken: list[D.Decision]
                           "dec_f_event",
                           format_func=lambda s: comp.event(s).short if s
                           else ui("decisions_all"))
-    warnings = c3.checkbox(ui("include_warnings"), value=True,
-                           key="dec_f_warn", help=help_text("include_warnings"))
+    kept = c3.multiselect(ui("penalties_shown"), FILTERED, default=SHOWN,
+                          key="dec_f_kinds", format_func=_measure_name,
+                          help=help_text("penalties_shown"))
     shown = [d for d in taken
              if (not cat or d.cat == cat)
              and (not event or d.event == event)
-             and (warnings or str(d.penalty).upper() != D.WARNING)]
+             and _is_shown(d, kept)]
     return cat, event, shown
+
+
+#: The provvedimenti the picker offers, in the order of the register.
+#: Deliberately three of the four: an *ammenda* is a sum of money and a *nota*
+#: sanctions nobody, and neither is something a panel reads the register
+#: without.
+FILTERED = (D.WARNING, "C", "D")
+
+#: Which of them the page opens on. Not the retrocessioni: they are decided on
+#: the track and already printed on the sheet of the race they belong to, so
+#: the register the panel reads is the ammonizioni it has to keep count of and
+#: the squalifiche it has to answer for. One tick puts them back.
+SHOWN = (D.WARNING, "D")
+
+
+def _measure_name(code: str) -> str:
+    """`Ammonizioni` - the provvedimento in the plural, as a filter names it."""
+    return ui(f"measure_{code.lower()}")
+
+
+def _is_shown(decision, kept: list[str]) -> bool:
+    """Whether a decision passes the provvedimenti filter.
+
+    Anything the picker does not offer - an ammenda, a plain nota - is not
+    filtered by it and always shows: a control that silently hides what it does
+    not mention is worse than no control.
+    """
+    penalty = str(decision.penalty).upper()
+    return penalty not in FILTERED or penalty in kept
 
 
 # ── filing one from here ────────────────────────────────────────────────────
@@ -133,13 +164,29 @@ def _by_round(comp: Competition, store: Store, taken: list[D.Decision],
 # ── the register ────────────────────────────────────────────────────────────
 
 def _register(comp: Competition, store: Store, shown: list[D.Decision]) -> None:
-    """The table itself, and the one button that puts it on paper."""
+    """What goes on paper: the sheet first, the table it is made of after.
+
+    The register is the sheet the panel signs off at the end of the day, so it
+    is what this half of the page is *for*: the size it prints at, the button
+    that writes it and a preview of the result, before the dataframe it was all
+    read off. Scrolling past a hundred rows to reach the button that prints
+    them is the wrong way up.
+    """
     st.subheader(ui("decisions_register"))
     if not shown:
         notify.info("no_decisions")
         return
-    c1, c2 = st.columns([4, 1], vertical_alignment="bottom")
-    c1.dataframe(pd.DataFrame([{
+
+    font = st.slider(ui("table_font"), 6, 14, 8, key="dec_font",
+                     help=help_text("font_pdf"))
+    doc = DOC.decisions_register(shown, comp, font_size=font)
+    save_button(store, doc, comp, key="decisions",
+                label=ui("save_decisions_pdf"))
+    with st.expander(ui("print_preview")):
+        st.html(to_html(doc, comp, banner=False, signature=False,
+                        footer=False, css=False))
+
+    st.dataframe(pd.DataFrame([{
         label("register_col_n"): d.n,
         label("register_col_day"): d.day or "",
         label("cat"): d.cat,
@@ -149,8 +196,6 @@ def _register(comp: Competition, store: Store, shown: list[D.Decision]) -> None:
         label("penalty_col"): d.code,
         label("decision"): d.text,
     } for d in shown]), hide_index=True, use_container_width=True)
-    save_button(store, DOC.decisions_register(shown, comp), comp,
-                key="decisions", label=ui("save_decisions_pdf"), container=c2)
 
 
 # ── correcting what is already filed ────────────────────────────────────────

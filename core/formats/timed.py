@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ..i18n import msg
+from ..i18n import msg, ordinal
 from ..models import Status
 from ..parse import duplicates, format_heats
 from .base import CLASSIFIED, Placing, Result, sort_by_status
@@ -85,7 +85,7 @@ def final_place(heat: list[str], ranking: list[str]) -> int:
 
 def final_label(place: int) -> str:
     """3 -> '3°/4°'. What the sheet calls the final riding for those places."""
-    return f"{place}°/{place + 1}°" if place else ""
+    return f"{ordinal(place)}/{ordinal(place + 1)}" if place else ""
 
 
 def final_places(final_heats: list[list[str]], ranking: list[str]) -> list[int]:

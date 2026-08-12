@@ -11,18 +11,22 @@ from pathlib import Path
 import streamlit as st
 
 from core.i18n import ui
-from ui import notify, state, style
+from ui import state, style
 from ui.pages import (check_in, decisions, documents, programme, races,
-                      settings, stats)
+                      settings, setup, stats)
 
+#: The pages, by catalogue key: the sidebar holds the key and looks the word
+#: up when it draws the list, so the page stays open across a change of
+#: language - and so nothing here is translated at import, before the
+#: competition (and with it the language) has been read.
 PAGES = {
-    ui("page_races"): races.render,
-    ui("page_check_in"): check_in.render,
-    ui("page_decisions"): decisions.render,
-    ui("page_documents"): documents.render,
-    ui("page_stats"): stats.render,
-    ui("page_programme"): programme.render,
-    ui("page_settings"): settings.render,
+    "page_races": races.render,
+    "page_check_in": check_in.render,
+    "page_decisions": decisions.render,
+    "page_documents": documents.render,
+    "page_stats": stats.render,
+    "page_programme": programme.render,
+    "page_settings": settings.render,
 }
 
 #: What the app is called - the browser tab, and what the jury asks for.
@@ -48,17 +52,25 @@ def main() -> None:
 
     competition = state.selected_competition()
     if not competition:
+        # nothing in the data folder at all - a new installation. Ask for the
+        # first competition rather than reporting the emptiness of the folder
+        # to somebody who has no way to fill it (see `ui.pages.setup`).
+        setup.render_first()
         st.stop()
     comp = state.competition(competition)
     if comp is None:
-        notify.error("no_programme", name=competition)
+        # No programme yet: build one instead of stopping. This used to be
+        # `st.stop()`, one line above the sidebar - which left the jury with an
+        # error message and no way to reach any page at all, Impostazioni
+        # included (see `ui.pages.setup`).
+        setup.render(competition, state.store(competition))
         st.stop()
     state.sidebar_header(comp)
 
     # the label is the accessible name only: over a list of six pages, under
     # the name of the competition, "Pagina" says nothing the list does not
     page = st.sidebar.radio(ui("page"), list(PAGES), key="page",
-                            label_visibility="collapsed")
+                            format_func=ui, label_visibility="collapsed")
     st.sidebar.divider()
     PAGES[page](competition, comp, state.store(competition))
 

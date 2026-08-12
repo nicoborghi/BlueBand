@@ -18,6 +18,8 @@ Both are reached from `ui.pages.documents`, which is the page the jury sees.
 
 from __future__ import annotations
 
+import io
+
 import pandas as pd
 import streamlit as st
 
@@ -27,18 +29,22 @@ from core import race as R
 from core import recap as RC
 from core.config import (DOC_CLASSIFICATION, DOC_RESULTS, DOC_STARTLIST,
                          EVENT_ENTRY_LIST, Competition)
-from core.i18n import help_text, label, plural, ui
+from core.i18n import help_text, label, ui
 from core.store import Store
 from render import documents as D
-from render.render import suffix_titles, to_html
-from ui import notify
+from render.render import to_html
+from ui import notify, publish
 from ui.download import save_button
 
-MODES = [ui("mode_by_category"), ui("mode_by_event"), ui("mode_by_day"),
-         ui("mode_by_communique"), ui("mode_by_team"),
-         ui("mode_speciality_table")]
+#: The batches, each one its own catalogue key: the widget stores the key and
+#: the word is looked up when the radio is drawn, so a change of language does
+#: not lose the batch the jury was printing.
 (BY_CATEGORY, BY_EVENT, BY_DAY, BY_COMMUNIQUE, BY_TEAM,
- SPECIALITY_TABLE) = MODES
+ SPECIALITY_TABLE) = ("mode_by_category", "mode_by_event", "mode_by_day",
+                      "mode_by_communique", "mode_by_team",
+                      "mode_speciality_table")
+MODES = [BY_CATEGORY, BY_EVENT, BY_DAY, BY_COMMUNIQUE, BY_TEAM,
+         SPECIALITY_TABLE]
 
 #: The batches that publish what the register says, not a pick of documents.
 FIXED_DOCS = (BY_COMMUNIQUE, BY_TEAM, SPECIALITY_TABLE)
@@ -55,7 +61,8 @@ def render(competition: str, comp: Competition, store: Store) -> None:
         return
     R.apply_pair_numbers(store, comp, el)   # madison: le coppie hanno un numero
 
-    mode = st.sidebar.radio(ui("print_mode"), MODES, key="stp_mode")
+    mode = st.sidebar.radio(ui("print_mode"), MODES, key="stp_mode",
+                            format_func=ui)
     font = st.sidebar.slider(ui("table_font"), 6, 14, 9, key="stp_font")
     landscape = st.sidebar.checkbox(ui("landscape"), key="stp_land")
     suffix = st.sidebar.text_input(ui("title_suffix"), key="stp_suffix",
@@ -78,20 +85,8 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     if not docs:
         notify.warn("no_documents_for_selection")
         return
-    for d in docs:
-        d.landscape = landscape
-    suffix_titles(docs, suffix)
-
-    c1, c2, _ = st.columns([1, 1, 4])
-    c1.caption(ui("print_hint", n=len(docs),
-                  what=ui(plural(len(docs), "document_one",
-                                 "document_many"))))
-    with c2:
-        save_button(store, docs, comp, number=docs[0].communique, key="stp",
-                    label=ui("save_pdf_all"))
-
-    st.html(to_html(docs, comp, banner=False, signature=False, footer=False,
-                    css=False))
+    publish.batch(docs, comp, store, key="stp", number=docs[0].communique,
+                  label=ui("save_pdf_all"), landscape=landscape, suffix=suffix)
 
 
 # ── batches ─────────────────────────────────────────────────────────────────
@@ -293,11 +288,54 @@ def render_register(competition: str, comp: Competition, store: Store) -> None:
         notify.error("communique_duplicates",
                      list=", ".join(str(d) for d in dup))
 
-    day = st.selectbox(ui("day"), [ui("all_days"), *comp.days()], key="reg_day")
-    if day != ui("all_days"):
-        rows = [r for r in rows if r["day"] == day]
+    # what is being printed, first: the range and the size of it, then the two
+    # ways out, and only then the table it is all read off. Scrolling a
+    # 140-line register to reach the button that prints it is the wrong way up.
+    rows = _register_range(rows)
+    font = st.slider(ui("table_font"), 6, 14, 8, key="reg_font",
+                     help=help_text("font_pdf"))
 
-    st.dataframe(pd.DataFrame([{
+    doc = D.comunicati_register(rows, comp, font_size=font)
+    c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
+    save_button(store, doc, comp, number=label("register_slug"), key="reg",
+                label=ui("save_register_pdf"), container=c1)
+    table = _register_table(rows, comp)
+    c2.download_button(ui("export_xlsx"), _xlsx(table, label("register_slug")),
+                       file_name=f"{label('register_slug')}.xlsx", key="reg_xlsx",
+                       mime="application/vnd.openxmlformats-officedocument."
+                            "spreadsheetml.sheet",
+                       use_container_width=True)
+    with st.expander(ui("print_preview")):
+        st.html(to_html(doc, comp, banner=False, signature=False,
+                        footer=False, css=False))
+
+    st.divider()
+    day = st.selectbox(ui("day"), [ui("all_days"), *comp.days()], key="reg_day")
+    shown = table if day == ui("all_days") else _register_table(
+        [r for r in rows if r["day"] == day], comp)
+    st.dataframe(shown, hide_index=True, use_container_width=True, height=600)
+
+
+def _register_range(rows: list[dict]) -> list[dict]:
+    """The stretch of numbers being printed.
+
+    A championship register runs to 140 entries over four days, and what a
+    jury reprints is usually a handful of them - the ones of the specialità
+    just finished. One slider, and it says which numbers are on the sheet.
+    """
+    numbers = [r["n"] for r in rows if r["n"]]
+    if len(numbers) < 2:
+        return rows
+    lo, hi = min(numbers), max(numbers)
+    first, last = st.slider(ui("register_range_filter"), lo, hi, (lo, hi),
+                            key="reg_range",
+                            help=help_text("register_range_filter"))
+    return [r for r in rows if first <= r["n"] <= last]
+
+
+def _register_table(rows: list[dict], comp: Competition) -> pd.DataFrame:
+    """The register as the page shows it - and as the export writes it."""
+    return pd.DataFrame([{
         label("register_col_n"): r["label"], label("register_col_day"):
         r["day"] or "", label("cat"): r["cat"],
         label("event"): comp.event(r["event"]).short,
@@ -305,11 +343,12 @@ def render_register(competition: str, comp: Competition, store: Store) -> None:
         label("document"): label(r["doc"]), ui("title"): r["title"],
         label("issued"): "✓" if r["issued"] else "",
         label("issued_at"): r["issued_at"],
-    } for r in rows]), hide_index=True, use_container_width=True, height=600)
+    } for r in rows])
 
-    doc = D.comunicati_register(rows, comp)
-    save_button(store, doc, comp, number=label("register_slug"), key="reg",
-                label=ui("save_register_pdf"))
-    with st.expander(ui("print_preview")):
-        st.html(to_html(doc, comp, banner=False, signature=False,
-                            footer=False, css=False))
+
+def _xlsx(table: pd.DataFrame, sheet: str) -> bytes:
+    """The table as a workbook, for whoever asks for it in a spreadsheet."""
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        table.to_excel(writer, index=False, sheet_name=sheet[:31] or "export")
+    return buffer.getvalue()

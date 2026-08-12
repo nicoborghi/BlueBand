@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 from itertools import zip_longest
 
 from .config import (DOC_RESULTS, DOC_RESULTS_58, DOC_RESULTS_B,
-                     DOC_RESULTS_REP, MIN_ELIMINATED, ROUND_SETUP,
-                     Competition, madison_track_teams)
+                     DOC_RESULTS_REP, MIN_ELIMINATED, PREFIX_FINALS,
+                     PREFIX_QUALIFYING, ROUND_SETUP, Competition,
+                     madison_track_teams)
 from .formats import group as G
 from .formats import keirin as K
 from .formats import omnium as O
@@ -155,13 +156,6 @@ def riders_by_bib(el: EntryList, cat: str = "") -> dict[str, Rider]:
 
 # ── state helpers ───────────────────────────────────────────────────────────
 
-# How a round names itself in the programme. Two words carry meaning for the
-# code - a *qualifying* round is ridden against the clock, a *finals* round
-# rides for places instead of qualifying for them - and both are matched on the
-# first letters, so "Finale", "Finali", "Qualificazioni Batteria 1" all read.
-PREFIX_QUALIFYING = "qualificazioni"
-PREFIX_FINALS = "final"
-
 
 #: How a timed round is ridden, as the jury decided it on the day: one start
 #: at a time (an *ordine di partenza*) or two (batterie). The programme states
@@ -174,28 +168,48 @@ def can_choose_starts(comp: Competition, event: str, kind: str,
                       round_key: str) -> bool:
     """Whether this round can be ridden one start at a time at all.
 
-    Only a round against the clock: a finals round and a bracket are ridden
-    man against man whatever anybody chooses.
+    Only a round against the clock: a bracket is ridden man against man
+    whatever anybody chooses, and so is a finals round - it is two teams
+    seeded from a qualification, one per straight.
+
+    A chilometro is the exception, and not really one: its single fase is
+    called *Finale* because it is the whole event, but nobody is seeded into
+    it and it is ridden exactly as the qualification of an inseguimento is -
+    two at a time or one at a time, as the jury decides.
     """
+    if comp.event(event).fmt == "time_trial":
+        return kind in (TIMED, TIMED_TEAM)
     return kind in (TIMED, TIMED_TEAM) and not is_finals(round_key)
 
 
 def solo_starts(comp: Competition, state) -> bool:
     """True when this round runs as a start order rather than as batterie.
 
-    The programme's `teams_per_start` is the default - a velocità a squadre
-    starts one squadra at a time, an inseguimento two - and the jury may say
-    otherwise on the race itself: an inseguimento individuale with an odd or a
-    thin field is often ridden one atleta at a time.
+    Three answers, in this order: what the jury decided on the race itself -
+    an inseguimento individuale with a thin field is often ridden one atleta at
+    a time - then what the programme says about *this* race, then what the
+    specialità says in general (a velocità a squadre starts one squadra at a
+    time, an inseguimento two).
+
+    The middle one exists because the shape is not a property of the
+    specialità: the same chilometro is ridden two at a time by a categoria with
+    thirty entered and one at a time by the eight of another.
     """
     kind = state.fmt or round_format(comp, state.cat, state.event,
                                      state.round_key)
     if not can_choose_starts(comp, state.event, kind, state.round_key):
         return False
     choice = (state.payload or {}).get(SOLO_STARTS)
-    if choice is None:
-        return comp.event(state.event).teams_per_start == 1
-    return bool(choice)
+    if choice is not None:
+        return bool(choice)
+    return starts_per_race(comp, state.cat, state.event) == 1
+
+
+def starts_per_race(comp: Competition, cat: str, event: str) -> int:
+    """How many start together in this race, as the programme has it."""
+    item = comp.scheduled(cat, event)
+    stated = getattr(item, "teams_per_start", None) if item else None
+    return int(stated or comp.event(event).teams_per_start)
 
 
 def is_qualifying(round_key: str) -> bool:
@@ -817,12 +831,21 @@ def sprint_statuses(store, comp: Competition, cat: str, event: str,
 
 
 def sprint_scheme(store, comp: Competition, cat: str, event: str):
-    """How this velocità is being run, as chosen on the qualifying round.
+    """How this velocità is being run - what the day says, then the programme.
 
-    Nothing chosen yet: the programme decides, by whether it schedules a first
-    round at all - with one the event runs twelve, without it the eight of a
-    category too small for the repechages. Every CITA 26 category rides the
-    twelve; the ED was moved onto it on 05.08.2026, with 14 iscritte.
+    Three answers, in this order and no other:
+
+    1. what the jury chose on the qualifying round, which is the decision taken
+       at the track and beats everything;
+    2. what the programme *states* (`ProgrammeItem.scheme`), which is what the
+       builder writes down when the race is scheduled;
+    3. failing both, what the round list *implies* - with a first round the
+       event runs twelve, without it the eight of a category too small for the
+       repechages. Every programme written before the field existed lands here,
+       and lands where it always did.
+
+    Every CITA 26 category rides the twelve; the ED was moved onto it on
+    05.08.2026, with 14 iscritte.
     """
     from .formats import sprint as S
 
@@ -832,19 +855,30 @@ def sprint_scheme(store, comp: Competition, cat: str, event: str):
     if st is not None:
         key = (st.payload or {}).get(SCHEME) or ""
     if not key:
+        key = (comp.scheduled(cat, event) or _unscheduled()).scheme
+    if not key:
         rounds = [r.key for r in comp.rounds(cat, event)]
         key = S.DEFAULT_SCHEME if S.TURNO1 in rounds else "8"
     return S.scheme(key)
 
 
+def _unscheduled():
+    """A race the programme does not schedule, so the fields below read empty."""
+    from .config import ProgrammeItem
+    return ProgrammeItem(cat="", event="")
+
+
 def sprint_has_58(store, comp: Competition, cat: str, event: str) -> bool:
     """Whether this velocità rides its 5°-8° final.
 
-    The programme says what was planned - the finals round files a *risultati
-    5°-8°* or it does not - and the jury can still turn it round on the day,
-    on the qualifying round where it picks the scheme too. It is one decision
-    for the whole specialità: the four beaten in the quarti either have a race
-    left or they are classified 5°-8° on how they got there.
+    The programme says what was planned and the jury can still turn it round on
+    the day, on the qualifying round where it picks the scheme too. It is one
+    decision for the whole specialità: the four beaten in the quarti either
+    have a race left or they are classified 5°-8° on how they got there.
+
+    Same three answers as `sprint_scheme`: the day, then the programme
+    (`ProgrammeItem.final_5_8`), then - for a file written before that field
+    existed - whether the finals round files a *risultati 5°-8°* at all.
     """
     from .formats import sprint as S
 
@@ -853,6 +887,9 @@ def sprint_has_58(store, comp: Competition, cat: str, event: str) -> bool:
     chosen = (st.payload or {}).get(FINAL_58) if st is not None else None
     if chosen is not None:
         return bool(chosen)
+    stated = (comp.scheduled(cat, event) or _unscheduled()).final_5_8
+    if stated is not None:
+        return bool(stated)
     fin = next((r for r in comp.rounds(cat, event) if r.key == S.FINALI), None)
     return bool(fin and DOC_RESULTS_58 in (fin.docs or []))
 
@@ -958,9 +995,14 @@ def sprint_next(store, comp: Competition, el: EntryList, state: RaceState
     return "", {}
 
 
-#: What each final of a velocità rides for, in the order they are ridden. Used
-#: as the batteria column of a finals sheet, where "1" and "2" say nothing.
-FINAL_LABELS = [label("final_3_4"), label("final_1_2")]
+def final_labels() -> list[str]:
+    """What each final of a velocità rides for, in the order they are ridden.
+
+    The batteria column of a finals sheet, where "1" and "2" say nothing. Read
+    when the sheet is built and not once at import: the words come from the
+    catalogue of the language in force.
+    """
+    return [label("final_3_4"), label("final_1_2")]
 
 
 def composition_title(round_name: str) -> str:
@@ -1020,7 +1062,7 @@ def sprint_composition(store, comp: Competition, el: EntryList,
             return []
         # one table: what each final rides for is the batteria column, and two
         # tables of one line each would be two headings for one race
-        labels = FINAL_LABELS[-len(heats):]
+        labels = final_labels()[-len(heats):]
         return [(composition_title(ui("finals_full")), heats, labels)]
     return []
 
@@ -1189,17 +1231,24 @@ def keirin_has_final_b(store, comp: Competition, cat: str, event: str) -> bool:
     UCI 3.2.135 ends every tournament with two finals - 1°-6° and 7°-12° with
     twelve riders in the semifinali - but a programme is free to ride only the
     first and classify the others by how far they got, which is the same
-    decision a velocità takes about its 5°-8°. The register says what was
-    planned (a *risultati finale B* on the finals round, or not) and the jury
-    can turn it round on the day, on the first round: it has to be settled
-    before the last round composes anything, because it is that composition
-    that either splits the qualifiers into two races or does not.
+    decision a velocità takes about its 5°-8°. The programme says what was
+    planned and the jury can turn it round on the day, on the first round: it
+    has to be settled before the last round composes anything, because it is
+    that composition that either splits the qualifiers into two races or does
+    not.
+
+    The day, then `ProgrammeItem.final_b`, then - for a programme written
+    before that field existed - whether the finals round files a *risultati
+    finale B* at all.
     """
     first = keirin_first_round(comp, cat, event)
     st = store.load_race(race_key(cat, event, first)) if first else None
     chosen = (st.payload or {}).get(FINAL_B) if st is not None else None
     if chosen is not None:
         return bool(chosen)
+    stated = (comp.scheduled(cat, event) or _unscheduled()).final_b
+    if stated is not None:
+        return bool(stated)
     fin = next((r for r in comp.rounds(cat, event) if r.key == K.FINALI), None)
     return bool(fin and DOC_RESULTS_B in (fin.docs or []))
 

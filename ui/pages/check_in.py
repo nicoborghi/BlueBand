@@ -32,8 +32,10 @@ from ui import notify
 GRID = ["checked_in", "not_starting", "bib", "last_name", "first_name",
         "uci_id", "cat", "region", "club", "club_code"]
 EDITABLE = ["bib", "last_name", "first_name", "region", "club", "club_code"]
-STATES = [ui("state_all"), ui("state_todo"), ui("state_done"), ui("state_np")]
-ALL, TODO, DONE, NP = STATES
+#: The four states the grid filters on, by catalogue key: the widget holds the
+#: key, the word beside it is looked up when the picker is drawn.
+ALL, TODO, DONE, NP = "state_all", "state_todo", "state_done", "state_np"
+STATES = [ALL, TODO, DONE, NP]
 
 
 def render(competition: str, comp: Competition, store: Store) -> None:
@@ -137,7 +139,8 @@ def _editor(el, comp: Competition, store: Store) -> None:
     group = comp.team_group
     teams = [any_f] + RC.teams(el, group)
     team = c3.selectbox(label(group), teams, key="ver_region")
-    state = c4.selectbox(ui("state"), STATES, key="ver_state")
+    state = c4.selectbox(ui("state"), STATES, key="ver_state",
+                         format_func=ui)
 
     riders = [r for r in el.riders.values() if r.cat in cats]
     if code:
@@ -204,11 +207,15 @@ def _editor(el, comp: Competition, store: Store) -> None:
     )
     _quota_note(edited, lim)
 
+    # The reason and the button that needs it stay together, under the grid
+    # they are about. This is the one save on the app that is *not* pinned to
+    # the sidebar: it does not save "the page", it files a set of edits that
+    # the field above has to justify, and putting the two at opposite ends of
+    # the screen is how a jury presses one without the other.
     reason = st.text_input(ui("edit_reason"), key="ver_reason",
                            help=help_text("edit_reason"))
-    b1, b2 = st.columns([1, 2])
-    if b1.button(ui("save_to_file") if to_file else ui("save_edits"),
-                 type="primary"):
+    if st.button(ui("save_to_file") if to_file else ui("save_edits"),
+                 type="primary", key="ver_save"):
         patches = _diff(df, edited, heads, reason)
         if not patches:
             notify.info("no_edits_to_save")
@@ -231,7 +238,7 @@ def _editor(el, comp: Competition, store: Store) -> None:
     # or the file when it has the column
     todo = [r for r in riders if not r.checked_in and not r.not_starting]
     if todo and (not to_file or "checked_in" in writable) \
-            and b2.button(ui("mark_verified", n=len(todo))):
+            and st.button(ui("mark_verified", n=len(todo))):
         patches = [E.Patch(target=r.key, op="set_checked_in", value=True,
                            reason=ui("check_in_reason")) for r in todo]
         if to_file:

@@ -104,6 +104,55 @@ def test_a_derived_value_is_not_frozen_into_the_file(prog, tmp_path):
         item.cat, item.event, "Prova").laps is None
 
 
+def test_what_the_format_runs_is_written_down_and_read_back(prog, tmp_path):
+    """The builder states it; before it existed the app had to guess.
+
+    Whether a velocità qualifies twelve or eight, whether it rides its 5°-8°
+    final, whether a keirin rides its second one: `core.race` used to infer all
+    three from the round list and from the documents a round files, and the
+    jury re-decided them inside the race. Stated in the programme they have to
+    survive a save - `False` included, which is the one the writer has to
+    special-case.
+    """
+    item = next(i for i in prog.programme if i.event == "velocita")
+    item.scheme, item.final_5_8, item.final_b = "8", False, True
+    item.rounds[0] = dataclasses.replace(item.rounds[0], start="14:30")
+
+    back = _round_trip(prog, tmp_path)
+    got = next(i for i in back.programme
+               if (i.cat, i.event) == (item.cat, item.event))
+    assert (got.scheme, got.final_5_8, got.final_b) == ("8", False, True)
+    assert got.rounds[0].start == "14:30"
+
+
+def test_a_format_option_nobody_stated_stays_unstated(prog, tmp_path):
+    """`None` is not `False`: it is what lets an old file behave as it always did.
+
+    Every programme written before these fields existed says nothing about
+    them, and the resolvers in `core.race` fall back on what they infer. A
+    writer that turned "unstated" into "not ridden" would quietly cancel the
+    keirin's second final at four championships.
+    """
+    assert all(i.final_5_8 is None and i.final_b is None and not i.scheme
+               for i in prog.programme)
+    assert "final_5_8" not in P.dump(prog)
+    back = _round_trip(prog, tmp_path)
+    assert all(i.final_5_8 is None and i.final_b is None
+               for i in back.programme)
+
+
+def test_the_freeze_and_the_pinned_numbers_survive_a_save(prog, tmp_path):
+    """Both say *do not move this*, and a save that lost them would move it."""
+    prog.numbering_frozen = True
+    prog.communiques[0].pinned = True
+
+    back = _round_trip(prog, tmp_path)
+    assert back.numbering_frozen is True
+    assert back.communiques[0].pinned is True
+    # and neither is written by a competition that never asked for them
+    assert "numbering_frozen" not in P.dump(load_competition(programme_path()))
+
+
 # ── a comunicato that carries more than one document ────────────────────────
 
 def test_a_comunicato_carries_one_document_by_default(comp):
@@ -315,3 +364,169 @@ def test_a_gap_in_the_numbering_is_worth_saying(prog):
 ])
 def test_a_value_is_quoted_exactly_when_it_has_to_be(value, written):
     assert P.scalar(value) == written
+
+
+# ── numbering: the register follows the running order ───────────────────────
+#
+# A comunicato number is not a property of a document, it is *when* the
+# document goes out. While the programme is still being built the two are kept
+# in step; the moment a sheet is in somebody's hands, they are not.
+
+def test_the_day_opens_with_its_start_lists(comp):
+    """Every ordine di partenza of the first fasi, before any risultato."""
+    order = C.sheet_order(comp)
+    day1 = [s for s in order
+            if (comp.scheduled(s.cat, s.event) or comp.programme[0]).day == 1
+            and s.event != "entry_list"]
+    docs = [s.doc for s in day1]
+    first_result = docs.index("risultati")
+    assert set(docs[:first_result]) == {"partenti"}
+
+
+def test_a_start_list_never_overtakes_the_results_that_compose_it(comp):
+    """The finali cannot be published before the semifinali they come out of.
+
+    This is the whole reason the sort counts how deep a fase is instead of
+    simply putting every startlist first.
+    """
+    order = C.sheet_order(comp)
+    at = {(s.cat, s.event, s.round_key, s.doc): i for i, s in enumerate(order)}
+    for item in comp.programme:
+        for before, after in zip(item.rounds, item.rounds[1:]):
+            r = at.get((item.cat, item.event, before.key, "risultati"))
+            p = at.get((item.cat, item.event, after.key, "partenti"))
+            if r is not None and p is not None:
+                assert r < p, f"{item.cat} {item.event}: {after.key} before {before.key}"
+
+
+def test_the_elenchi_iscritti_open_the_competition(comp):
+    """They are in no day's running order, and they are comunicato 1 to 4."""
+    numbered = C.autonumber(comp, add_missing=False)
+    first = numbered[:len(comp.cat_order())]
+    assert all(c.event == "entry_list" for c in first)
+    assert [c.n for c in first] == [1, 2, 3, 4]
+
+
+def test_renumbering_the_real_register_loses_nothing(comp):
+    """140 comunicati in, 140 out, and no number handed out twice.
+
+    The register is the jury's own record: a numbering pass that quietly
+    dropped a line - a document the rounds do not declare, a fase spelled two
+    ways - would be worse than one that never ran.
+    """
+    out = C.autonumber(comp, add_missing=False)
+    assert len(out) == len(comp.communiques)
+    assert {c.sheets[0].key for c in out} == {c.sheets[0].key
+                                              for c in comp.communiques}
+    assert len({c.n for c in out}) == len(out)
+
+
+def test_a_number_already_on_paper_never_moves(prog):
+    """The sheet is in somebody's hands: this is the one thing that cannot change."""
+    issued_spec = sorted(prog.communiques, key=lambda c: c.n)[40]
+    issued = [C.Issued(n=issued_spec.n, cat=issued_spec.cat,
+                       event=issued_spec.event,
+                       round_key=issued_spec.round_key, doc=issued_spec.doc)]
+
+    out = C.autonumber(prog, issued, add_missing=False)
+    same = next(c for c in out if c.sheets[0].key == issued_spec.sheets[0].key)
+    assert same.n == issued_spec.n
+
+
+def test_a_number_the_jury_typed_never_moves_either(prog):
+    """`pinned` is the jury saying it: somebody is expecting that number."""
+    spec = sorted(prog.communiques, key=lambda c: c.n)[60]
+    spec.pinned = True
+    spec.n = 999
+
+    out = C.autonumber(prog, add_missing=False)
+    kept = next(c for c in out if c.sheets[0].key == spec.sheets[0].key)
+    assert kept.n == 999
+    # ... and nothing else was given 999 on the way past it
+    assert [c.n for c in out].count(999) == 1
+
+
+def test_the_numbers_flow_around_the_ones_that_are_held(prog):
+    """What is free is redealt; what is fixed stays, and nothing collides."""
+    held = sorted(prog.communiques, key=lambda c: c.n)[10]
+    held.pinned, held.n = True, 3
+
+    out = C.autonumber(prog, add_missing=False)
+    assert len({c.n for c in out}) == len(out)
+    assert next(c for c in out
+                if c.sheets[0].key == held.sheets[0].key).n == 3
+
+
+def test_moving_a_race_moves_its_comunicati(prog):
+    """The point of the whole thing: the register is a view of the order."""
+    def numbers():
+        return {c.sheets[0].key: c.n
+                for c in C.autonumber(prog, add_missing=False)}
+
+    def opening_sheet(item):
+        """The first ordine di partenza that race files - not its setup fase."""
+        rnd = next(r for r in item.rounds if "partenti" in (r.docs or []))
+        return (item.cat, item.event, rnd.key, "partenti")
+
+    day1 = [i for i in prog.programme if i.day == 1 and i.rounds]
+    first, second = day1[0], day1[1]
+    a, b = opening_sheet(first), opening_sheet(second)
+
+    before = numbers()
+    assert before[a] < before[b], "the two races were not in the order assumed"
+
+    prog.programme = P.moved(prog.programme, prog.programme.index(first), +1)
+    after = numbers()
+    assert after[b] < after[a], "the register did not follow the running order"
+
+
+def test_an_annullato_keeps_its_number_and_nobody_else_gets_it(prog):
+    """A number is spent when the sheet is: RET is not a number to hand out."""
+    spec = sorted(prog.communiques, key=lambda c: c.n)[5]
+    spec.ret = True
+    n = spec.n
+
+    out = C.autonumber(prog, add_missing=False)
+    assert next(c for c in out if c.sheets[0].key == spec.sheets[0].key).n == n
+    assert [c.n for c in out].count(n) == 1
+
+
+def test_two_documents_on_one_sheet_take_one_number(prog):
+    """A comunicato that carries two sheets is one comunicato, and one number."""
+    two = _com(prog, "AL", "velocita", "Turno 1", "risultati")
+    two.extra = [Sheet(doc="partenti_recuperi")]
+    out = C.autonumber(prog, add_missing=False)
+    same = [c for c in out if c.sheets[0].key == two.sheets[0].key]
+    assert len(same) == 1 and len(same[0].sheets) == len(two.sheets)
+
+
+def test_the_register_of_a_programme_being_built_gains_what_it_lacks(prog):
+    """Building a new competition: every sheet wants a number, and gets one."""
+    prog.communiques = []
+    out = C.autonumber(prog)
+    assert len(out) == len(C.sheet_order(prog))
+    assert [c.n for c in out] == list(range(1, len(out) + 1))
+    assert all(c.title for c in out), "a proposed comunicato with no title"
+
+
+def test_numbering_writes_nothing(prog):
+    """It returns a list; the page decides whether to put it on the draft."""
+    before = [(c.n, c.sheets[0].key) for c in prog.communiques]
+    C.autonumber(prog)
+    assert [(c.n, c.sheets[0].key) for c in prog.communiques] == before
+
+
+def test_a_race_ridden_first_is_numbered_first(prog):
+    """The 5°-8° final and the keirin's second one go out before the title race.
+
+    The fase's own `docs:` list is the order its sheets are issued in, and it
+    is deliberately not the order of `DOC_ALL_KINDS`: both of those races are
+    ridden before the final for the title, so both file first.
+    """
+    item = next(i for i in prog.programme if i.event == "velocita")
+    finals = next(r for r in item.rounds if r.key == "Finali")
+    finals.docs = ["partenti", "risultati_5-8", "risultati", "classifica"]
+
+    order = [s.doc for s in C.sheet_order(prog)
+             if (s.cat, s.event, s.round_key) == (item.cat, item.event, "Finali")]
+    assert order.index("risultati_5-8") < order.index("risultati")

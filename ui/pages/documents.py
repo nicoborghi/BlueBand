@@ -31,12 +31,15 @@ from core.i18n import ui
 from core.store import Store
 from ui.pages import printing, startlists
 
-GROUPS = [ui("docs_entries"), ui("docs_batch"), ui("docs_register")]
-ENTRIES, BATCH, REGISTER = GROUPS
+#: The three halves of the page, by catalogue key - see `ui.pages.printing`
+#: for why the widget holds the key and not the word.
+ENTRIES, BATCH, REGISTER = "docs_entries", "docs_batch", "docs_register"
+GROUPS = [ENTRIES, BATCH, REGISTER]
 
 
 def render(competition: str, comp: Competition, store: Store) -> None:
-    group = st.sidebar.radio(ui("document_group"), GROUPS, key="doc_group")
+    group = st.sidebar.radio(ui("document_group"), GROUPS, key="doc_group",
+                             format_func=ui)
     st.sidebar.divider()
     if group == ENTRIES:
         startlists.render(competition, comp, store)

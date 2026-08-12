@@ -8,10 +8,16 @@ the line the section starts with - just under the toolbar.
 Only on a *change*: the first render of a page leaves the browser where it is,
 and a rerun caused by typing a time must not move the page under the cursor.
 
-**Only in Gare.** Every page used to do this, and every page switch did it too:
-the result was a page that moved on its own for reasons the jury did not ask
-about, including on the pages where nothing is below the fold to begin with.
-One place where the pickers really do hide the work, and nowhere else.
+**Only in Gare, and only when the jury asked for a different race.** Every page
+used to do this, and every page switch did it too: the result was a page that
+moved on its own for reasons the jury did not ask about, including on the pages
+where nothing is below the fold to begin with.
+
+So it is not a *change of value* that scrolls - a fase replaced because the
+categoria under it changed is not a race anybody chose - but a *press*: the
+fase selectbox and the row of recent races leave a request behind
+(`request`), and the page picks it up at its anchor (`requested`). Nothing
+else in the app moves the page.
 """
 
 from __future__ import annotations
@@ -23,8 +29,6 @@ import streamlit.components.v1 as components
 # so landing exactly on the anchor still leaves the pickers above it on screen.
 # Scroll past it, up to where the title is the first line of the page.
 OFFSET_PX = -48
-
-_MISSING = object()
 
 
 def anchor(name: str) -> None:
@@ -45,14 +49,24 @@ _ANCHOR_CSS = """
 </style>"""
 
 
-def on_change(name: str, value) -> None:
-    """Scroll to `anchor(name)` when `value` differs from the last run."""
-    key = f"_scroll_{name}"
-    previous = st.session_state.get(key, _MISSING)
-    st.session_state[key] = value
-    if previous is _MISSING or previous == value:
-        return
-    scroll(name)
+#: Where a press leaves its request for the run that follows it.
+_REQUEST = "_scroll_request"
+
+
+def request(name: str) -> None:
+    """Ask for a scroll at `anchor(name)`, from a widget callback or a jump.
+
+    A callback runs before the script does, and a jump reruns it: either way
+    what asked for the scroll is gone by the time the anchor is drawn, so the
+    request waits in the session until the page reaches it.
+    """
+    st.session_state[_REQUEST] = name
+
+
+def requested(name: str) -> None:
+    """Scroll to `anchor(name)` if a press asked for it. Consumed once."""
+    if st.session_state.pop(_REQUEST, "") == name:
+        scroll(name)
 
 
 def scroll(name: str) -> None:

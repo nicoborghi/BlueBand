@@ -1,0 +1,79 @@
+{
+ "_last_updated_": "10 August 2026",
+ "velocita": {
+  "fmt": "sprint",
+  "abbr": "SP",
+  "teams_per_start": 1,
+  "name": {"it": "VELOCITÀ", "en": "SPRINT"},
+  "short": {"it": "Velocità", "en": "Sprint"}
+ },
+ "keirin": {
+  "fmt": "keirin",
+  "abbr": "KE",
+  "name": {"it": "KEIRIN", "en": "KEIRIN"},
+  "short": {"it": "Keirin", "en": "Keirin"}
+ },
+ "ins_individuale": {
+  "fmt": "timed",
+  "abbr": "IP",
+  "name": {"it": "INSEGUIMENTO INDIVIDUALE", "en": "INDIVIDUAL PURSUIT"},
+  "short": {"it": "Ins. Individuale", "en": "Ind. Pursuit"}
+ },
+ "ins_squadre": {
+  "fmt": "timed_team",
+  "abbr": "TP",
+  "team_size": 4,
+  "name": {"it": "INSEGUIMENTO A SQUADRE", "en": "TEAM PURSUIT"},
+  "short": {"it": "Ins. Squadre", "en": "Team Pursuit"}
+ },
+ "vel_squadre": {
+  "fmt": "timed_team",
+  "abbr": "TS",
+  "team_size": 3,
+  "teams_per_start": 1,
+  "name": {"it": "VELOCITÀ A SQUADRE", "en": "TEAM SPRINT"},
+  "short": {"it": "Vel. Squadre", "en": "Team Sprint"}
+ },
+ "chilometro": {
+  "fmt": "time_trial",
+  "abbr": "TT",
+  "name": {"it": "CHILOMETRO DA FERMO", "en": "1 KM TIME TRIAL"},
+  "short": {"it": "Chilometro", "en": "Kilometre"}
+ },
+ "500": {
+  "fmt": "time_trial",
+  "abbr": "TT",
+  "name": {"it": "500 METRI", "en": "500 M TIME TRIAL"},
+  "short": {"it": "500 m", "en": "500 m"}
+ },
+ "omnium": {
+  "fmt": "omnium",
+  "abbr": "OM",
+  "name": {"it": "OMNIUM", "en": "OMNIUM"},
+  "short": {"it": "Omnium", "en": "Omnium"}
+ },
+ "madison": {
+  "fmt": "madison",
+  "abbr": "MD",
+  "name": {"it": "MADISON", "en": "MADISON"},
+  "short": {"it": "Madison", "en": "Madison"}
+ },
+ "scratch": {
+  "fmt": "group",
+  "abbr": "SC",
+  "name": {"it": "SCRATCH", "en": "SCRATCH"},
+  "short": {"it": "Scratch", "en": "Scratch"}
+ },
+ "corsa_punti": {
+  "fmt": "group",
+  "abbr": "PR",
+  "name": {"it": "CORSA A PUNTI", "en": "POINTS RACE"},
+  "short": {"it": "Corsa a Punti", "en": "Points Race"}
+ },
+ "eliminazione": {
+  "fmt": "elimination",
+  "abbr": "EL",
+  "name": {"it": "ELIMINAZIONE", "en": "ELIMINATION RACE"},
+  "short": {"it": "Eliminazione", "en": "Elimination"}
+ }
+}

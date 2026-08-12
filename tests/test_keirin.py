@@ -423,3 +423,27 @@ def test_a_category_of_twenty_rides_three_batterie(ev, comp, entries):
     # six from the batterie, six from the recuperi
     assert len(sf.entrants) == 12
     assert {k for h in heats for k in h[:2]} <= set(sf.entrants)
+
+
+# ── what the programme states, and who overrules it ─────────────────────────
+
+def test_the_second_final_is_stated_by_the_programme_before_it_is_inferred(
+        ev, comp, entries):
+    """The keirin's own version of the velocità's 5°-8°: three answers, in order."""
+    import dataclasses
+
+    # inferred: the CITA26 finals round files a risultati finale B
+    assert R.keirin_has_final_b(ev, comp, "AL", EVENT) is True
+
+    item = comp.scheduled("AL", EVENT)
+    stated = dataclasses.replace(comp, programme=[
+        dataclasses.replace(i, final_b=False) if i is item else i
+        for i in comp.programme])
+    assert R.keirin_has_final_b(ev, stated, "AL", EVENT) is False
+
+    # ... and the jury on the day still beats it
+    first = R.keirin_first_round(stated, "AL", EVENT)
+    st = R.ensure_state(ev, stated, "AL", EVENT, first, entries)
+    st.payload[R.FINAL_B] = True
+    ev.save_race(st)
+    assert R.keirin_has_final_b(ev, stated, "AL", EVENT) is True

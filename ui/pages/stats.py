@@ -29,7 +29,7 @@ import streamlit as st
 from core import entries as E
 from core import medals as M
 from core.config import Competition, EVENT_ENTRY_LIST
-from core.i18n import help_text, label, ui
+from core.i18n import help_text, label, ordinal, ui
 from core.store import Store
 from render import documents as D
 from render.render import to_html
@@ -71,8 +71,8 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     if provisional:
         notify.warn("stats_counting_unfinished", n=len(provisional))
 
-    _medal_table(table)
-    _print(comp, store, found)
+    df = _medal_table(table)
+    _print(comp, store, found, df)
     _detail(comp, found)
     _open_events(comp, found)
 
@@ -109,25 +109,21 @@ def _counters(found: M.Survey) -> None:
 
 # ── the medagliere ──────────────────────────────────────────────────────────
 
-def _medal_table(table: list[M.TeamMedals]) -> None:
+def _medal_table(table: list[M.TeamMedals]):
     """The table the page is for: one line per squadra, best first."""
     st.subheader(ui("medal_table"), help=help_text("medal_table"))
-    rows = [{ui("stats_position"): f"{pos}°", label("team"): t.team,
+    rows = [{ui("stats_position"): ordinal(pos), label("team"): t.team,
              ui("gold"): t.gold, ui("silver"): t.silver,
              ui("bronze"): t.bronze, ui("total"): t.total}
             for pos, t in M.ranked(table)]
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True, hide_index=True)
-    st.download_button(ui("stats_download"),
-                       df.to_csv(index=False).encode("utf-8"),
-                       file_name=f"{label('medal_table_slug')}.csv",
-                       mime="text/csv",
-                       key="stats_csv")
+    return df
 
 
 # ── the same table, on paper ────────────────────────────────────────────────
 
-def _print(comp: Competition, store: Store, found: M.Survey) -> None:
+def _print(comp: Competition, store: Store, found: M.Survey, df) -> None:
     """The medagliere as a sheet: saved where every other document is saved.
 
     The same reading the page is showing - filters, open specialità and all -
@@ -144,9 +140,17 @@ def _print(comp: Competition, store: Store, found: M.Survey) -> None:
                                    key="stats_no_printed_at",
                                    help=help_text("stats_no_printed_at"))
     doc = D.medal_table(found, comp, detail=detail)
+    # the sheet the premiazione is read from, and the file the federation asks
+    # for: the same table, two ways out, on one row under it
+    c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
     save_button(store, doc, comp, number=label("medal_table_slug"),
                 key="stats", label=ui("save_medals_pdf"),
-                timestamp=not no_stamp)
+                timestamp=not no_stamp, container=c1)
+    c2.download_button(ui("stats_download"),
+                       df.to_csv(index=False).encode("utf-8"),
+                       file_name=f"{label('medal_table_slug')}.csv",
+                       mime="text/csv", key="stats_csv",
+                       use_container_width=True)
     with st.expander(ui("print_preview")):
         st.html(to_html(doc, comp, banner=False, signature=False,
                         footer=False, css=False))
@@ -160,7 +164,7 @@ def _detail(comp: Competition, found: M.Survey) -> None:
             rows.append({
                 label("cat"): p.cat,
                 ui("event"): comp.event(p.event).short,
-                ui("stats_position"): f"{p.position}°",
+                ui("stats_position"): ordinal(p.position),
                 label("team"): ", ".join(p.teams),
                 ui("stats_who"): ", ".join(p.names) or p.label,
                 # not which fase it came from: a specialità is counted once,

@@ -120,3 +120,37 @@ def test_write_out_is_journalled_with_the_full_path(store: Store, tmp_path):
     store.write_out("007_prova.html", "<p>x</p>")
     entry = [e for e in store.read_journal() if e["action"] == "archive_document"]
     assert entry and entry[-1]["target"].endswith("esiti/007_prova.html")
+
+
+def test_the_races_last_worked_on_come_back_first(store):
+    """What the pills on the Gare page offer: the sheets being worked on now.
+
+    Read off the file times, because a race is written exactly when somebody
+    is on it - and the jury moves between four or five fasi all afternoon.
+    """
+    import time
+
+    from core.models import RaceState
+
+    for cat, event, rnd in (("AL", "velocita", "Quarti"),
+                            ("ES", "madison", "Finale"),
+                            ("DA", "omnium", "Scratch")):
+        store.save_race(store.get_race(cat, event, rnd))
+        # a jury works on one race at a time, minutes apart; three saves inside
+        # one clock tick is a test artefact, and what it would be testing is
+        # the resolution of the filesystem
+        time.sleep(0.02)
+
+    recent = store.recent_races(6)
+    assert all(isinstance(r, RaceState) for r in recent)
+    assert [(r.cat, r.round_key) for r in recent] == [
+        ("DA", "Scratch"), ("ES", "Finale"), ("AL", "Quarti")]
+    # saving one again brings it back to the front: it is where the jury is
+    time.sleep(0.02)
+    store.save_race(store.get_race("AL", "velocita", "Quarti"))
+    assert store.recent_races(1)[0].cat == "AL"
+    assert len(store.recent_races(2)) == 2
+
+
+def test_a_competition_with_no_races_offers_none(store):
+    assert store.recent_races() == []

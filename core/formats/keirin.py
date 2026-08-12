@@ -33,6 +33,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..i18n import ordinal
 from ..models import Status
 from .base import CLASSIFIED, Placing, Result, sort_by_status
 
@@ -300,12 +301,13 @@ def final_labels(n_top: int, n_rest: int) -> tuple[str, str]:
     Not a constant: ten riders in two batterie make a final 1°-6° and a final
     7°-10°, which is the smallest keirin 3.2.135 allows.
     """
-    top = f"1°-{n_top}°" if n_top > 1 else "1°"
+    top = f"{ordinal(1)}-{ordinal(n_top)}" if n_top > 1 else ordinal(1)
     if n_rest <= 0:
         return top, ""
     first = n_top + 1
     last = n_top + n_rest
-    return top, (f"{first}°-{last}°" if last > first else f"{first}°")
+    return top, (f"{ordinal(first)}-{ordinal(last)}" if last > first
+                 else ordinal(first))
 
 
 def in_bib_order(heats: list[list[str]]) -> list[list[str]]:

@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
+from ..i18n import ordinal
 from ..models import LEFT_RACE, STATUS_ORDER, Status, status_of
 
 
@@ -36,10 +37,10 @@ class Placing:
         2°, or both 4°, and the place above stays empty.
         """
         if self.status is Status.REL:
-            return f"{self.position}° REL" if self.position else "REL"
+            return f"{ordinal(self.position)} REL" if self.position else "REL"
         if self.status is not Status.OK:
             return self.status.value
-        return f"{self.position}°" if self.position else ""
+        return ordinal(self.position) if self.position else ""
 
 
 @dataclass

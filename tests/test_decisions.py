@@ -182,9 +182,11 @@ def test_both_regulation_tables_say_when_they_were_updated():
 
 @pytest.mark.parametrize("code", D.CLASSES)
 def test_every_degree_of_penalty_has_a_name(code):
-    from core.i18n import PENALTIES, penalty_name
+    """In every language: a letter with no word behind it prints as the letter."""
+    from core.i18n import CATALOGUES, penalty_name
 
-    assert code in PENALTIES and penalty_name(code) != code
+    assert all(code in c.PENALTIES for c in CATALOGUES.values())
+    assert penalty_name(code) != code
 
 
 def test_the_regulation_files_are_json_the_app_can_read():
@@ -215,10 +217,12 @@ def test_a_penalty_without_an_article_still_has_a_code():
 
 def test_every_kind_a_block_can_have_is_one_the_sheets_can_colour():
     from core.config import NOTE_COLORS
-    from core.i18n import NOTE_KINDS as NAMES
+    from core.i18n import CATALOGUES
 
     assert set(D.KINDS.values()) | {D.NOTE} == set(D.NOTE_KINDS)
-    assert set(D.NOTE_KINDS) == set(NOTE_COLORS) == set(NAMES)
+    assert set(D.NOTE_KINDS) == set(NOTE_COLORS)
+    for lang in CATALOGUES.values():
+        assert set(D.NOTE_KINDS) == set(lang.NOTE_KINDS)
 
 
 def test_the_article_is_kept_across_a_reload(store):

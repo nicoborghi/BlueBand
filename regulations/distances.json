@@ -1,0 +1,93 @@
+{
+ "_last_updated_": "10 August 2026",
+ "_laps_per_sprint_": 5.0,
+ "ins_individuale": {
+  "AL": {
+   "*": 3.0
+  },
+  "DA": {
+   "*": 2.0
+  }
+ },
+ "ins_squadre": {
+  "AL": {
+   "*": 3.0
+  },
+  "DA": {
+   "*": 3.0
+  }
+ },
+ "madison": {
+  "ES": {
+   "qualificazioni": 8.0,
+   "final": 16.0
+  },
+  "ED": {
+   "*": 16.0
+  },
+  "AL": {
+   "qualificazioni": 10.0,
+   "final": 20.0
+  },
+  "DA": {
+   "*": 15.0
+  }
+ },
+ "omnium": {
+  "ES": {
+   "qualificazioni": 8.0,
+   "Scratch": 4.0,
+   "Tempo Race": 4.0,
+   "Corsa a Punti": 12.0
+  },
+  "ED": {
+   "Scratch": 4.0,
+   "Tempo Race": 4.0,
+   "Corsa a Punti": 12.0
+  },
+  "AL": {
+   "qualificazioni": 10.0,
+   "Scratch": 5.0,
+   "Tempo Race": 5.0,
+   "Corsa a Punti": 15.0
+  },
+  "DA": {
+   "qualificazioni": 8.0,
+   "Scratch": 4.0,
+   "Tempo Race": 4.0,
+   "Corsa a Punti": 12.0
+  }
+ },
+ "vel_squadre": {
+  "AL": {
+   "*": 0.5
+  },
+  "DA": {
+   "*": 0.5
+  }
+ },
+ "velocita": {
+  "ES": {
+   "qualificazioni": 0.2
+  },
+  "ED": {
+   "qualificazioni": 0.2
+  },
+  "AL": {
+   "qualificazioni": 0.2
+  },
+  "DA": {
+   "qualificazioni": 0.2
+  }
+ },
+ "chilometro": {
+  "*": {
+   "*": 1
+  }
+ },
+ "500": {
+  "*": {
+   "*": 0.5
+  }
+ }
+}

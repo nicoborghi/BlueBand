@@ -19,15 +19,18 @@ from core import communiques as C
 from core import entries as E
 from core import race as R
 from core.config import DOC_STARTLIST, EVENT_ENTRY_LIST, Competition
-from core.i18n import help_text, label, plural, ui
+from core.i18n import help_text, label, ui
 from core.store import Store
 from render import documents as D
-from render.render import SIG_PREVIEW_PX, archive, suffix_titles, to_html
-from ui import notify
-from ui.download import save_button
+from render.render import archive
+from ui import notify, publish
 
-MODES = [ui("mode_by_category"), ui("mode_by_event"), ui("mode_all_events")]
-BY_CATEGORY, BY_EVENT, ALL_EVENTS = MODES
+#: The three ways an entry list is printed. A mode *is* its catalogue key:
+#: that is what the widget stores and what the code below compares, so the
+#: pick survives a change of language - only the word beside it moves.
+BY_CATEGORY, BY_EVENT, ALL_EVENTS = ("mode_by_category", "mode_by_event",
+                                     "mode_all_events")
+MODES = [BY_CATEGORY, BY_EVENT, ALL_EVENTS]
 
 
 def render(competition: str, comp: Competition, store: Store) -> None:
@@ -40,7 +43,8 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     with st.sidebar:
         # no heading of its own: the group radio right above already says
         # which half of Documenti these controls belong to
-        mode = st.radio(ui("print_mode"), MODES, key="pa_mode")
+        mode = st.radio(ui("print_mode"), MODES, key="pa_mode",
+                        format_func=ui)
         cats = comp.cat_order()
         cat = st.selectbox(ui("category"), cats, key="pa_cat")
         event = ""
@@ -103,23 +107,9 @@ def render(competition: str, comp: Competition, store: Store) -> None:
         notify.warn("no_riders_for_selection")
         return
     for d in docs:
-        d.landscape = landscape
         d.draft = draft
-    suffix_titles(docs, suffix)
-
-    c1, c2, _ = st.columns([1, 1, 4])
-    c1.caption(ui("print_hint", n=len(docs),
-                  what=ui(plural(len(docs), "document_one",
-                                 "document_many"))))
-    with c2:
-        save_button(store, docs, comp, number="" if draft else com, key="pa",
-                    signature=sign)
-
-    # the banner is the letterhead of the printed sheet: on screen it would only
-    # push the table below the fold
-    st.html(to_html(docs, comp, banner=False, signature=sign, footer=False,
-                    css=False,
-                    sig_px=SIG_PREVIEW_PX))
+    publish.batch(docs, comp, store, key="pa", number="" if draft else com,
+                  signature=sign, landscape=landscape, suffix=suffix)
 
 
 def _quick_print(el, comp: Competition, store, font: int, matrix: bool,
