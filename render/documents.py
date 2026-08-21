@@ -95,8 +95,8 @@ def entry_list(el: EntryList, comp: Competition, cat: str, *,
         communique=communique,
         tables=[Table(columns=cols, rows=zebra(rows), font_size=font_size)],
         decision=decision,
-        slug=f"{cat}_{label('entry_list_slug' if include_np
-                             else 'startlist_slug')}",
+        slug=f"{cat}_"
+             f"{label('entry_list_slug' if include_np else 'startlist_slug')}",
     )
 
 

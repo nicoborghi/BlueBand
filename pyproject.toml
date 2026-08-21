@@ -32,7 +32,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov", "ruff"]
+# ruff is pinned like the runtime deps: its default rule set grows with the
+# version, and an unpinned linter turns a release into a red branch on code
+# nobody touched.
+dev = ["pytest>=8", "pytest-cov", "ruff==0.16.4"]
 build = ["pyinstaller==6.11.1"]
 
 [project.urls]
@@ -48,6 +51,13 @@ filterwarnings = ["ignore::DeprecationWarning"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+
+[tool.ruff.lint]
+# Spelled out rather than inherited: correctness (pyflakes) and the parts of
+# pycodestyle that are not a matter of taste. Style rules - import order,
+# comprehension idioms - are deliberately out: the hanging-indent imports and
+# the explicit loops here are how the code is written.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.coverage.run]
 # the app, not the tests and not the packaging scripts: what is measured is

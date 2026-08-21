@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="https://github.com/nicoborghi/BlueBand/"><img src="https://img.shields.io/badge/GitHub-BlueBand-9e8ed7" alt="GitHub"></a>
-  <a href="https://github.com/nicoborghi/BlueBand/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+  <a href="https://github.com/nicoborghi/BlueBand/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-blue" alt="License: MIT"></a>
   <a href="https://github.com/nicoborghi/BlueBand/actions/workflows/tests.yml"><img src="https://github.com/nicoborghi/BlueBand/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="https://codecov.io/gh/nicoborghi/BlueBand"><img src="https://img.shields.io/codecov/c/github/nicoborghi/BlueBand" alt="Coverage"></a>
   <a href="https://claude.ai"><img src="https://img.shields.io/badge/built_with-Claude-orange?logo=anthropic&logoColor=white" alt="Built with Claude"></a>
