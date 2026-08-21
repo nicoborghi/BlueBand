@@ -64,16 +64,15 @@ def plan_from_programme(comp: Competition) -> list[CommuniqueSpec]:
                                   doc=DOC_STARTLIST,
                                   title=f"{label('entered').capitalize()} {cat}"))
     for day in comp.days():
-        for r in [r for r in comp.programme if r.day == day]:
+        for r, rnd in comp.rounds_on(day):
             ev = comp.event(r.event)
-            for rnd in r.rounds:
-                for doc in rnd.docs:
-                    n += 1
-                    bits = [r.cat, ev.short, rnd.label, "-", label(doc)]
-                    out.append(CommuniqueSpec(
-                        n=n, day=day, cat=r.cat, event=r.event,
-                        round_key=rnd.key, doc=doc,
-                        title=" ".join(b for b in bits if b)))
+            for doc in rnd.docs:
+                n += 1
+                bits = [r.cat, ev.short, rnd.label, "-", label(doc)]
+                out.append(CommuniqueSpec(
+                    n=n, day=day, cat=r.cat, event=r.event,
+                    round_key=rnd.key, doc=doc,
+                    title=" ".join(b for b in bits if b)))
     return out
 
 
@@ -164,8 +163,16 @@ def sheet_order(comp: Competition) -> list[Sheet]:
         ((1, -1, 0, i, 0), Sheet(cat=cat, event=EVENT_ENTRY_LIST,
                                  round_key="", doc=DOC_STARTLIST))
         for i, cat in enumerate(comp.cat_order())]
+    # the running order of each giornata, as the jury numbered it: a fase moved
+    # up the scaletta takes its comunicati with it, which is the whole point of
+    # the register being a view of the programme (`config.rounds_on`)
+    rank = {(id(item), id(rnd)): (day, n)
+            for day in comp.days()
+            for n, (item, rnd) in enumerate(comp.rounds_on(day))}
     for index, item in enumerate(comp.programme):
         for depth, rnd in enumerate(item.rounds):
+            day, place = rank.get((id(item), id(rnd)),
+                                  (comp.day_of(item, rnd), index))
             # the fase's own `docs` list is the order its sheets go out in, and
             # it is not always the order of `DOC_ALL_KINDS`: a velocità rides
             # the 5°-8° before the finals 1°-4°, a keirin its second final
@@ -174,8 +181,8 @@ def sheet_order(comp: Competition) -> list[Sheet]:
                 # a classifica belongs to the specialità and to no fase: it is
                 # the last thing that specialità files, whatever fase produced
                 # the result behind it (see `config.Sheet`)
-                key = (item.day, depth, 0 if doc == DOC_STARTLIST else 1,
-                       index, order)
+                key = (day, depth, 0 if doc == DOC_STARTLIST else 1,
+                       place, order)
                 out.append((key, Sheet(
                     cat=item.cat, event=item.event,
                     round_key="" if doc == DOC_CLASSIFICATION else rnd.key,

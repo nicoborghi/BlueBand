@@ -75,6 +75,11 @@ class Options:
     heats: int = 0                  # batterie di qualificazione (0 = none)
     eliminate: int = 0              # eliminated from each of them
     qualify: int = FINALISTS        # through from a qualification to the finals
+    #: inseguimento (individuale or a squadre): ridden as one race against the
+    #: clock, with the classifica made straight from the times, instead of a
+    #: qualification and the two finals it seeds. It is what a categoria with
+    #: five squadre entered does, and the programme has to be able to say it.
+    direct_final: bool = False
     # how many start together in a round against the clock: two, one per
     # straight, or one at a time. It differs by categoria - thirty entered ride
     # a chilometro two at a time, eight ride it one at a time - which is why it
@@ -88,8 +93,8 @@ OPTIONS = {
     "keirin": ("final_b",),
     "madison": ("heats", "eliminate"),
     "omnium": ("heats", "eliminate"),
-    "timed": ("qualify", "per_start"),
-    "timed_team": ("qualify", "per_start"),
+    "timed": ("direct_final", "qualify", "per_start"),
+    "timed_team": ("direct_final", "qualify", "per_start"),
     "time_trial": ("per_start",),
 }
 
@@ -97,6 +102,15 @@ OPTIONS = {
 def options_for(fmt: str) -> tuple[str, ...]:
     """The fields of `Options` this format actually uses ( () for the rest)."""
     return OPTIONS.get(fmt, ())
+
+
+#: The options that change *which fasi there are*, or what they file - as
+#: opposed to how one of them is ridden. Answering one of these is answering a
+#: different question about the race, so the fasi follow at once: an
+#: inseguimento set to «Finale diretta» must not go on offering a
+#: Qualificazioni nobody is going to ride. The others (`per_start`, `qualify`)
+#: leave the list alone and are simply written down.
+SHAPE = ("scheme", "heats", "direct_final", "final_5_8", "final_b")
 
 
 # ── proposing ───────────────────────────────────────────────────────────────
@@ -142,10 +156,27 @@ def _keys(fmt: str, opts: Options) -> list[tuple[str, str]]:
         return ([(HEAT_SETUP, ROUND_SETUP)] if opts.heats else []) \
             + _heats(opts) + [(k, "") for k in O.ROUNDS]
     if fmt in ("timed", "timed_team"):
-        # ridden twice: against the clock, then the finals it seeds
+        # one race against the clock, and the classifica comes out of the times
+        # - what a categoria too small for finals rides (3.2.086: the finals are
+        # ridden by the four fastest, and there have to be four)
+        if opts.direct_final:
+            return [(FINAL, "")]
+        # otherwise ridden twice: against the clock, then the finals it seeds
         return [(QUALIFYING, ""), (FINALS, "")]
     # time_trial, group, elimination: one race, and it is the whole event
     return [(FINAL, "")]
+
+
+def setup_key(fmt: str, opts: Options | None = None) -> str:
+    """The composizione this format runs before it is ridden, '' if none.
+
+    The coppie of a madison, the batterie of an omnium that has any: a
+    `ROUND_SETUP` round, which is a job of the jury and not a fase of the race
+    (it files no comunicato and rides on no giornata). The Programma page shows
+    it as such, so it asks here rather than reading the round list.
+    """
+    return next((k for k, kind in _keys(fmt, opts or Options())
+                 if kind == ROUND_SETUP), "")
 
 
 def _heats(opts: Options) -> list[tuple[str, str]]:
@@ -311,6 +342,10 @@ def options_of(comp: Competition, cat: str, event: str) -> Options:
     setup = next((r for r in rounds if r.kind == ROUND_SETUP), None)
     qualifying = next((r for r in rounds if r.key == QUALIFYING), None)
     return Options(
+        # a race against the clock ridden as one fase *is* the direct final:
+        # nothing is stored to say so, the fasi say it (see `_keys`)
+        direct_final=(comp.event(event).fmt in ("timed", "timed_team")
+                      and FINAL in keys and QUALIFYING not in keys),
         scheme=S.DEFAULT_SCHEME if S.TURNO1 in keys else "8",
         final_5_8=DOC_RESULTS_58 in docs,
         final_b=DOC_RESULTS_B in docs,

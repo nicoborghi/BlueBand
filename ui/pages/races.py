@@ -64,8 +64,7 @@ def _status_fields(kind: str) -> list[Status]:
 def render(competition: str, comp: Competition, store: Store) -> None:
     el, _stale = E.effective_entries(store, comp)
     if el is None:
-        notify.info("import_entries_first")
-        return
+        return          # the menu does not offer this page without one (`app`)
     # the madison coppie wear the numbers assigned in their setup round: stamp
     # them on the entry list before anything reads a number off it
     R.apply_pair_numbers(store, comp, el)
@@ -2698,9 +2697,18 @@ def _default_notes(state, comp: Competition, store: Store,
                    ) -> dict[str, str]:
     """What each sheet of this round says by itself, before the jury edits it.
 
-    The start order gets its text from `Event.note()`; the risultati of a
-    qualifying round open on the same line that announces the cut, which is
-    what that sheet is read for - it is the one that says who went through.
+    **The programme has the last word.** What a fase announces is decided when
+    the programme is written - the regulation proposes it and the jury may
+    write its own (`core.notes`) - so a fase that states a line for a sheet
+    *is* that sheet's line, and nothing is stacked on top of it. What is
+    generated here fills in for the sheets the programme cannot state: the
+    recuperi, the finale B, and every count that is only known once the riders
+    are in front of the jury - how many coppie a batteria actually sent
+    through, how many turned up for a keirin.
+
+    `Event.note()` is the older way of saying the same thing, one line per
+    specialità typed into `programme.yaml`, and it still opens the ordini di
+    partenza of a file written that way.
     """
     notes = dict(_madison_notes(state, comp, store))
     notes.update(_velocita_notes(state, comp, scheme))
@@ -2713,6 +2721,14 @@ def _default_notes(state, comp: Competition, store: Store,
     qualifying = comp.event(state.event).qualifying_note
     if qualifying and not finals:
         notes.setdefault(DOC_RESULTS, qualifying)
+    rnd = comp.round_of(state.cat, state.event, state.round_key)
+    if rnd.results_note:
+        notes[DOC_RESULTS] = rnd.results_note
+    if rnd.sheet_note:
+        notes[DOC_STARTLIST] = "\n".join(p for p in (
+            rnd.sheet_note,
+            comp.event(state.event).note(finals=finals,
+                                         female=comp.female(state.cat))) if p)
     return notes
 
 

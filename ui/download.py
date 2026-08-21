@@ -15,6 +15,7 @@ import streamlit as st
 
 from core.config import Competition
 from core.i18n import msg, ui
+from core import paths
 from core.store import Store
 from render import pdf as _pdf
 from render.render import archive
@@ -24,7 +25,7 @@ from ui import notify
 # A copy of the last few PDFs lives here only so the toast can offer a link the
 # browser will actually follow: a file:// URL is refused by Chrome, and the
 # output folder is usually on Drive, outside anything the app serves.
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static" / "recenti"
+STATIC_DIR = paths.served() / "recenti"
 KEEP = 20  # copies kept before the oldest are dropped
 
 

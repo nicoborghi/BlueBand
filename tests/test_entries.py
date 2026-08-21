@@ -98,7 +98,7 @@ def test_teams_are_never_split_automatically(entries):
           if t.cat == "AL" and t.event == "ins_squadre" and t.riders]
     labels = {t.label for t in al}
     assert "LOMBARDIA" in labels and "LAZIO" in labels
-    assert not any(l.startswith("LOMBARDIA ") for l in labels)
+    assert not any(name.startswith("LOMBARDIA ") for name in labels)
     big = next(t for t in al if t.label == "LOMBARDIA")
     assert len(big.riders) > 4
     assert any("LOMBARDIA" in e and "invece di 4" in e

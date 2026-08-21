@@ -10,7 +10,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from core.i18n import ui
+from core.i18n import msg, ui
 from ui import state, style
 from ui.pages import (check_in, decisions, documents, programme, races,
                       settings, setup, stats)
@@ -29,18 +29,25 @@ PAGES = {
     "page_settings": settings.render,
 }
 
+#: The pages that are about the riders, and cannot open without them. They are
+#: the first five, and they are not offered until the elenco iscritti has been
+#: built (Programma → Gara): every one of them used to open on the same line of
+#: apology, five times over, under a menu that had let the jury in anyway.
+NEEDS_ENTRIES = ("page_races", "page_check_in", "page_decisions",
+                 "page_documents", "page_stats")
+
 #: What the app is called - the browser tab, and what the jury asks for.
 APP_NAME = "Blue Band"
 
 LOGO = Path(__file__).resolve().parent / "header" / "track.svg"
-LOGO_TEXT = Path(__file__).resolve().parent / "header" / "track_text.svg"
+LOGO_TEXT = Path(__file__).resolve().parent / "header" / "track_text_ink.svg"
 
 
 def main() -> None:
     st.set_page_config(page_title=APP_NAME, layout="wide",
                        page_icon=str(LOGO) if LOGO.exists() else "🚲",
                        initial_sidebar_state="expanded")
-    if LOGO.exists():
+    if LOGO_TEXT.exists():
         # top of the sidebar, above everything: st.logo owns that strip, so it
         # cannot push the page selector or the race controls around
         st.logo(str(LOGO_TEXT), size="large")
@@ -69,8 +76,13 @@ def main() -> None:
 
     # the label is the accessible name only: over a list of six pages, under
     # the name of the competition, "Pagina" says nothing the list does not
-    page = st.sidebar.radio(ui("page"), list(PAGES), key="page",
+    pages = list(PAGES)
+    if not state.has_entries(competition):
+        pages = [p for p in pages if p not in NEEDS_ENTRIES]
+    page = st.sidebar.radio(ui("page"), pages, key="page",
                             format_func=ui, label_visibility="collapsed")
+    if len(pages) < len(PAGES):
+        st.sidebar.caption(msg("pages_need_entries"))
     st.sidebar.divider()
     PAGES[page](competition, comp, state.store(competition))
 

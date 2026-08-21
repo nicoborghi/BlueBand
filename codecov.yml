@@ -1,0 +1,17 @@
+# Codecov reads a third of the suite less than a laptop does: the tests that
+# need the federation's entry workbook are skipped in CI (see
+# .github/workflows/tests.yml), so the target is "do not regress", not a number.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: true

@@ -270,3 +270,47 @@ def test_reproposing_a_race_keeps_what_no_regulation_can_propose():
     assert back[0].note == "da confermare"   # kept: it is the jury's own line
     assert back[0].label == "200 m"          # kept: what the sheets call it
     assert back[0].laps != 99                # put back: it is a proposal
+
+
+# ── the inseguimento that has no finals ─────────────────────────────────────
+
+def test_a_pursuit_can_be_ridden_as_one_race_against_the_clock():
+    """«Finale diretta»: the times *are* the classification.
+
+    Four squadre are needed for two finals; a categoria that has three rides
+    once and is placed on the clock, which the programme has to be able to
+    state. It is one fase, it files the classifica of the specialità, and
+    nothing qualifies for anything.
+    """
+    comp = _comp("timed_team")
+    rounds = RD.propose(comp, "AL", "ev", RD.Options(direct_final=True))
+    assert [r.key for r in rounds] == [RD.FINAL]
+    assert rounds[0].qualify is None
+    assert rounds[0].docs[-1] == "classifica"
+
+
+def test_how_a_pursuit_is_ridden_is_read_back_off_its_fasi(comp):
+    """Nothing records the choice: the fasi are the statement.
+
+    A file written by hand says it the same way - one `Finale` and no
+    qualification - so the ↩ button re-proposes what is actually there.
+    """
+    from core.config import ProgrammeItem
+
+    assert RD.options_of(comp, "AL", "ins_squadre").direct_final is False
+
+    comp.programme.append(ProgrammeItem(cat="ES", event="ins_squadre", day=1))
+    item = comp.programme[-1]
+    item.rounds = RD.propose(comp, "ES", "ins_squadre",
+                             RD.Options(direct_final=True))
+    opts = RD.options_of(comp, "ES", "ins_squadre")
+    assert opts.direct_final is True
+    assert [r.key for r in RD.propose(comp, "ES", "ins_squadre", opts)] \
+        == [RD.FINAL]
+    comp.programme.remove(item)
+
+
+def test_the_direct_final_still_chooses_one_or_two_at_a_time():
+    """The other question a race against the clock asks is not this one's."""
+    assert "per_start" in RD.options_for("timed_team")
+    assert "direct_final" in RD.options_for("timed_team")

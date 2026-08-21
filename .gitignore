@@ -11,3 +11,15 @@ competitions/
 
 # copies of the last saved PDFs, served to the browser
 static/
+
+# the build: PyInstaller's work and dist trees, and the generated icon
+/build/
+/dist/
+packaging/blueband.ico
+
+# coverage and build metadata
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/

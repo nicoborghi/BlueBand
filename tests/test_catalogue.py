@@ -68,6 +68,43 @@ def test_a_language_the_catalogue_has_no_name_for_falls_back():
     assert CAT.name("boh") == "boh"
 
 
+# ── the categorie ───────────────────────────────────────────────────────────
+
+def test_the_shipped_categories_are_json_the_app_can_read():
+    with CAT.CATEGORIES_FILE.open(encoding="utf-8") as fh:
+        data = json.load(fh)
+    assert isinstance(data, dict) and data.get(CAT.META)
+    assert CAT.category_codes(), "the catalogue offers no categoria"
+
+
+@pytest.mark.parametrize("code", CAT.category_codes())
+def test_every_categoria_comes_out_named_and_sexed(code):
+    """Sex decides the feminine wording of every sheet: it cannot be blank."""
+    cat = CAT.category(code)
+    assert cat.code == code and cat.name
+    assert cat.sex in ("M", "F")
+
+
+def test_the_usual_sigle_are_the_ones_a_programme_is_written_in():
+    assert set(CAT.category_codes()) >= {"ES", "ED", "AL", "DA",
+                                         "JU", "DJ", "UN", "DU"}
+    assert CAT.category("DA", order=4) \
+        == type(CAT.category("DA"))(code="DA", name="ALLIEVE FEMMINE",
+                                    sex="F", order=4)
+
+
+def test_one_the_catalogue_does_not_know_is_still_a_categoria():
+    cat = CAT.category("MA")           # master, or whatever the meeting invents
+    assert cat.code == "MA" and cat.name == "MA" and cat.sex == ""
+
+
+def test_the_categoria_name_follows_the_language_too():
+    assert CAT.category_name("JU") == "JUNIORES MASCHI"
+    I.set_language("en")
+    assert CAT.category_name("JU") == "JUNIOR MEN"
+    assert CAT.category_name("boh") == "boh"
+
+
 # ── the chilometro, on the machinery of the inseguimento ────────────────────
 
 def test_the_chilometro_is_ridden_against_the_clock_like_a_pursuit():

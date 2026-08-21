@@ -1,32 +1,32 @@
-"""SETTINGS ("Impostazioni") - what holds for the whole competition.
+"""SETTINGS ("Impostazioni") - what holds beyond this competition.
 
 The page is ordered by what it is: from what the app is working on, down to what
-can destroy work. Eight sections, in this order and no other:
+can destroy work. Seven sections, in this order and no other:
 
-1. **Manifestazione** - which one is loaded, and whether its programme reads,
-   and the language it is all read in.
-2. **Elenco iscritti** - which file the riders come from, and the one button
-   that reads it again. It lives here and not on Verifica: choosing a file is a
-   setting, and re-importing is safe by construction (the jury's edits are an
-   overlay keyed by UCI ID, re-applied on top of every new export).
-3. **Squadra** - regione, società, provincia o nazione: what the app groups
-   riders by, and the word every sheet calls that column.
-4. **Cartella dei comunicati** - where a saved sheet lands. The one setting
+1. **Manifestazione** - which one is loaded, whether its programme reads, and
+   the language it is all read in.
+2. **Cartella dei comunicati** - where a saved sheet lands. The one setting
    that has to be right before the first comunicato goes out.
-5. **Aspetto dei comunicati** - the letterhead, the signature, how a name is
+3. **Aspetto dei comunicati** - the letterhead, the signature, how a name is
    set. All of it is "how a sheet looks", so it is one section: before, the two
    images were on the page and the signature was hidden behind an expander
    called *avanzate*, which is not a different kind of choice.
+4. **Specialità** - what each one *is*: sigla UCI, formato, atleti per squadra,
+   the column it is called in the entry file. The same at every championship,
+   so it is a table of the installation (`regulations/events.json`) and not
+   seven fields typed into every new programme.
+5. **Righe dei comunicati** - the sentences a sheet opens on, worded once
+   (`core.notes`). Which line goes on which sheet is the regulation's; how it
+   is worded is decided here.
 6. **Dati e backup** - the folder, the copy, the journal.
 7. **Azzera una gara** - last, alone, and the only thing here that deletes.
 
-The programme is *not* here, in any form. It is read and written on the
-Programma page, which is also where it is printed; the register is on Documenti
-→ Registro comunicati. A read-only copy of either on this page was one more
-thing to keep in step, and a second place to look for the same answer.
-
-Everything on this page is a local choice stored in `settings.json`; nothing
-here is part of a race, and nothing here is part of the programme.
+**Nothing about one competition is here.** The elenco iscritti is built in
+Programma → Gara, and so is what a squadra is at this meeting: both are
+statements about the championship being run, and they live in its programme.
+What is left on this page is either a choice of this machine (`settings.json`)
+or a table of this installation (`regulations/`) - and either way it outlives
+the competition that is open.
 """
 
 from __future__ import annotations
@@ -39,13 +39,14 @@ import pandas as pd
 import streamlit as st
 
 from core import config as C
+from core import catalogue as CAT
 from core import decisions as DEC
-from core import entries as E
+from core import notes as NOTES
 from core import race as R
 from core import recap as RC
 from core.config import EVENT_ENTRY_LIST, Competition, validate
-from core.i18n import (LANGUAGES, help_text, label, language, msg,
-                       note_kind_name, ui)
+from core.i18n import (LANGUAGES, help_text, label, language,
+                       language_name, msg, note_kind_name, ui)
 from core.store import Store, list_competitions, open_competition
 from render.render import darken, data_uri
 from ui import notify, state
@@ -75,10 +76,10 @@ AUTHOR_URL = "https://nicoborghi.github.io/"
 def render(competition: str, comp: Competition, store: Store) -> None:
     _competition(competition, comp)
     _language(store)
-    _entries(comp, store)
-    _team(comp, store)
     _output_folder(store)
     _appearance(comp, store)
+    _events()
+    _sheet_lines(store)
     _data_and_backup(store)
     _reset_event(comp, store)
     _credit()
@@ -87,7 +88,7 @@ def render(competition: str, comp: Competition, store: Store) -> None:
 def _credit() -> None:
     """The licence notice, at the foot of the sidebar."""
     st.sidebar.markdown(
-        f'<div class="cmsr-credit">'
+        '<div class="cmsr-credit">'
         + ui("credit", name=f'<a href="{AUTHOR_URL}" target="_blank">'
                             f'{AUTHOR}</a>')
         + '</div>', unsafe_allow_html=True)
@@ -167,121 +168,7 @@ def _new_competition(competitions: list[str]) -> None:
         state.choose_competition(name)
 
 
-# ── 2. the entry file: where it is, and reading it again ────────────────────
-
-def _entries(comp: Competition, store: Store) -> None:
-    """Import and re-import the elenco iscritti.
-
-    It is a setting, not a step of the verifica: the file is chosen once, and
-    then *reloaded* every time the federation sends a new export. Reloading is
-    safe by construction - the import is a read-only snapshot and every jury
-    edit lives in the overlay, keyed by UCI ID, so dorsali, regioni and
-    specialità typed in the app are re-applied on top of the new file.
-    """
-    st.subheader(ui("entries"))
-    st.caption(msg("entries_caption"))
-
-    current = E.source_path(store, comp)
-    value = st.text_input(ui("entries_source"), value=current,
-                          key="entries_src", help=help_text("entries_source"))
-    path = Path(value.strip()).expanduser() if value.strip() else None
-    exists = path is not None and path.exists()
-
-    c1, c2, c3 = st.columns([1, 1, 2])
-    if not exists and value.strip():
-        notify.error("file_not_found", where=c1)
-    elif exists and E.source_changed(store, path):
-        notify.warn("source_changed", where=c1)
-
-    if c1.button(ui("import_reload"), key="entries_import",
-                 type="primary", disabled=not exists):
-        with st.spinner(ui("reading_entries")):
-            if value.strip() != current:
-                E.set_source_path(store, value)
-            el = E.import_entries(path, comp)
-            E.save_import(store, el)
-        notify.ok("entries_imported", n=len(el.riders), file=path.name)
-
-    el = E.load_import(store)
-    if el is None:
-        notify.info("import_entries_here")
-        return
-    c2.caption(ui("last_import", when=el.imported_at or ui("never_saved"))
-               + "  \n" + ui("import_summary", n=len(el.riders),
-                             file=Path(el.source_file).name))
-    if c3.button(ui("export_effective"), key="entries_export"):
-        eff, _ = E.effective_entries(store, comp)
-        store.out_dir.mkdir(parents=True, exist_ok=True)
-        out = store.out_dir / "iscritti_effettivo.xlsx"
-        E.export_xlsx(eff, comp, out)
-        notify.ok("exported_to", path=out)
-
-    patches = E.load_overlay(store)
-    if patches:
-        st.caption(ui("overlay_kept", n=len(patches)))
-
-    _overlay_switch(store, len(patches))
-
-
-def _overlay_switch(store: Store, n_patches: int) -> None:
-    """Whether the jury's edits are a layer on top, or go into the file.
-
-    On, they are patches applied over each import - the app never writes the
-    workbook. Off, Verifica edits the workbook itself: the cell is written,
-    the file is re-imported, and the patches already recorded are set aside
-    rather than thrown away - they come back whole when this goes back on.
-    """
-    on = E.overlay_on(store)
-    new = st.toggle(ui("use_overlay"), value=on, key="use_overlay",
-                    help=help_text("use_overlay"))
-    if new != on:
-        E.set_overlay_on(store, new)
-        state.refresh()
-    if not new:
-        # verificati and NP live in the overlay and nowhere else: the workbook
-        # has no column for either, so with it off the licence check reads
-        # empty. It is not lost - it is not being applied.
-        notify.warn("overlay_off", n=n_patches)
-
-
-# ── 3. what a squadra is, and what it is called ─────────────────────────────
-
-def _team(comp: Competition, store: Store) -> None:
-    """Regione, società, provincia or nazione - and the word printed for it.
-
-    A rule at an Italian championship (the rappresentative enter the riders)
-    and a different one at an open meeting (the società do), so the programme
-    states it (`entries.team_group`) and this overrides it on this machine.
-    The name is a second, separate choice: what a sheet *calls* that column.
-    """
-    st.subheader(ui("team"))
-    groups = list(RC.GROUPS)
-    current = _team_group(comp, store)
-    group = st.selectbox(ui("team_group"), groups,
-                         index=groups.index(current) if current in groups
-                         else 0,
-                         key="team_group", format_func=_named(GROUP_LABELS),
-                         help=help_text("team_group"))
-    if group != current:
-        store.set_setting("team_group", group)
-        state.refresh()
-
-    c1, c2 = st.columns([1, 2])
-    name = c1.text_input(ui("team_name"), value=comp.team_name,
-                         key="team_name", help=help_text("team_name"))
-    if c2.button(ui("save_named", what=ui("team_name").lower()),
-                 key="save_team_name", disabled=name.strip() == comp.team_name):
-        store.set_setting("team_name", name.strip())
-        state.refresh()
-    st.caption(msg("team_caption", name=comp.team_name,
-                   group=_named(GROUP_LABELS)(group)))
-
-
-def _team_group(comp: Competition, store: Store) -> str:
-    return store.settings.get("team_group") or comp.team_group
-
-
-# ── 4. where a saved comunicato lands ───────────────────────────────────────
+# ── 2. where a saved comunicato lands ───────────────────────────────────────
 
 def _output_folder(store: Store) -> None:
     """Where the comunicati are written. Free choice: a Drive folder, a stick."""
@@ -344,7 +231,7 @@ def _first_existing_parent(path: Path) -> Path | None:
     return None
 
 
-# ── 5. how a comunicato looks ───────────────────────────────────────────────
+# ── 3. how a comunicato looks ───────────────────────────────────────────────
 
 def _appearance(comp: Competition, store: Store) -> None:
     """What every sheet of this competition looks like.
@@ -551,6 +438,168 @@ def _asset_path(value: str) -> Path | None:
     if not p.is_absolute():
         p = Path(__file__).resolve().parents[2] / p
     return p if p.exists() else None
+
+
+# ── 4. what a specialità is, once for every championship ────────────────────
+
+#: The formats a specialità can be run under - what `race.round_format` knows.
+FORMATS = ("group", "elimination", "timed", "timed_team", "sprint", "keirin",
+           "omnium", "madison", "time_trial", "entrylist")
+
+
+def _events() -> None:
+    """The specialità this installation knows, and what each one *is*.
+
+    Sigla UCI, formato, atleti per squadra, quante partono insieme, e come si
+    chiama la colonna nel file iscritti: facts that are the same at every
+    championship. They used to be typed into the Programma page of every new
+    meeting - seven fields per specialità, per year, and getting one wrong is a
+    programme that runs the wrong machinery.
+
+    So they live in `regulations/events.json` and are edited here. A programme
+    reads them (`config._events_of`) and writes down only what it does
+    *differently*, so correcting the sigla of the madison here corrects it in
+    every file that never disagreed with it. The **name** is not here: it is
+    printed on every sheet and belongs to the meeting that wrote it.
+    """
+    st.subheader(ui("events"))
+    st.caption(msg("events_settings_caption"))
+    with st.expander(ui("events_settings_edit"), expanded=False):
+        table = CAT.load()
+        rows = [{"code": code,
+                 "short": CAT.name(code, short=True),
+                 "abbr": str(entry.get("abbr") or ""),
+                 "fmt": str(entry.get("fmt") or "group"),
+                 "team_size": int(entry.get("team_size") or 0),
+                 "teams_per_start": int(entry.get("teams_per_start") or 2),
+                 "entry_columns": ", ".join(entry.get("entry_columns") or [])}
+                for code, entry in table.items()]
+        edited = st.data_editor(
+            pd.DataFrame(rows), key="set_events_grid", hide_index=True,
+            use_container_width=True, num_rows="fixed",
+            column_order=["code", "short", "abbr", "fmt", "team_size",
+                          "teams_per_start", "entry_columns"],
+            column_config={
+                "code": st.column_config.TextColumn(ui("code"), disabled=True,
+                                                    width="small"),
+                "short": st.column_config.TextColumn(ui("short_name"),
+                                                     disabled=True),
+                "abbr": st.column_config.TextColumn(ui("abbr"), width="small",
+                                                    help=help_text("abbr")),
+                "fmt": st.column_config.SelectboxColumn(
+                    ui("format"), options=list(FORMATS),
+                    help=help_text("event_format")),
+                "team_size": st.column_config.NumberColumn(
+                    ui("team_size"), min_value=0, max_value=12, step=1,
+                    width="small", help=help_text("team_size")),
+                "teams_per_start": st.column_config.NumberColumn(
+                    ui("per_start"), min_value=1, max_value=2, step=1,
+                    width="small", help=help_text("starts_per_race")),
+                "entry_columns": st.column_config.TextColumn(
+                    ui("entry_columns"), help=help_text("entry_columns")),
+            })
+        if st.button(ui("save_events"), key="set_events_save"):
+            _save_events(table, edited)
+            notify.ok("events_saved", path=str(CAT.FILE))
+            state.refresh()
+
+
+def _save_events(table: dict, edited) -> None:
+    """Write the grid back into the catalogue, and only what it is about.
+
+    The name of a specialità is per language and is not in the grid, so it is
+    carried over untouched: reading a table in Italian and writing it back must
+    not be what drops the English one.
+    """
+    for _i, row in edited.iterrows():
+        entry = table.get(str(row["code"]))
+        if entry is None:
+            continue
+        entry["abbr"] = str(row["abbr"] or "").strip()
+        entry["fmt"] = str(row["fmt"] or "group").strip()
+        size = int(row["team_size"] or 0)
+        entry["team_size"] = size
+        entry["teams_per_start"] = int(row["teams_per_start"] or 2)
+        columns = [c.strip() for c in str(row["entry_columns"] or "").split(",")
+                   if c.strip()]
+        entry["entry_columns"] = columns
+        # what says nothing is not written down: an empty value in this table
+        # would be a statement that a specialità has no sigla
+        for name in ("abbr", "team_size", "entry_columns"):
+            if not entry.get(name):
+                entry.pop(name, None)
+        if entry.get("teams_per_start") == 2:
+            entry.pop("teams_per_start", None)
+    CAT.save(table)
+
+
+# ── 5. what a specialità announces on its sheets ────────────────────────────
+
+def _sheet_lines(store: Store) -> None:
+    """The lines a comunicato opens on, worded once for the installation.
+
+    *Non si qualificano per la finale le ultime 2 coppie tra le partenti*, *La
+    prima squadra parte sul rettilineo d'arrivo*: sentences that come out of
+    the regulation and are the same at every championship, which is why they
+    are here and not in a programme. Which line goes on which sheet is the
+    table `core.notes` reads; what is edited here is **how it is worded**, in
+    the language of the competition, and the app's own wording is what a field
+    left empty falls back to.
+
+    They are written into the programme when a race is added, with the numbers
+    of that race in them - so what the jury reads in Programmazione is what
+    will print - and re-proposed when one of those numbers moves.
+    """
+    st.subheader(ui("sheet_lines"))
+    st.caption(msg("sheet_lines_caption"))
+    with st.expander(ui("sheet_lines_edit"), expanded=False):
+        lang = language()
+        st.caption(ui("sheet_lines_language", language=language_name(lang)))
+        mine = NOTES.texts()
+        edited = dict(mine.get(lang) or {})
+        for key in NOTES.keys():
+            shipped = NOTES.shipped(key, lang)
+            value = st.text_area(
+                _line_title(key), edited.get(key, shipped),
+                key=f"set_note_{lang}_{key}", height=68,
+                help=msg("sheet_line_default", text=shipped))
+            edited[key] = value
+        c1, c2 = st.columns([1, 3], vertical_alignment="center")
+        if c1.button(ui("save_sheet_lines"), key="set_notes_save"):
+            NOTES.save_texts({**mine, lang: edited})
+            notify.ok("sheet_lines_saved", path=str(NOTES.FILE))
+            state.refresh()
+        if c2.button(ui("restore_sheet_lines"), key="set_notes_reset",
+                     help=help_text("restore_sheet_lines")):
+            NOTES.save_texts({**mine, lang: {}})
+            _forget_note_widgets(lang)
+            notify.ok("sheet_lines_restored")
+            state.refresh()
+
+
+def _line_title(key: str) -> str:
+    """What a wording is called in the list: the key, said in words.
+
+    The genere is part of it - *maschile* and *femminile* are two lines and two
+    fields - and the rest is the key as the table names it, which is what the
+    rules in `regulations/notes.json` refer to.
+    """
+    for suffix, word in (("_m", ui("masculine")), ("_f", ui("feminine"))):
+        if key.endswith(suffix):
+            return f"{key[:-len(suffix)]} · {word}"
+    return key
+
+
+def _forget_note_widgets(lang: str) -> None:
+    """Drop the fields, so restoring the defaults shows them.
+
+    A `st.text_area` owns its value once it exists: without this the boxes go
+    on showing what was typed into them after the file underneath has been put
+    back to what the app ships.
+    """
+    for key in list(st.session_state):
+        if key.startswith(f"set_note_{lang}_"):
+            del st.session_state[key]
 
 
 # ── 6. the data folder and its copies ───────────────────────────────────────

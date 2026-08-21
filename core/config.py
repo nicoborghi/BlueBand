@@ -78,6 +78,10 @@ DOC_RESULTS_B = "risultati_finale_b"
 DOC_PARTIAL = "classifica_parziale"
 DOC_RACE = "gara"
 
+#: The two sheets of the recuperi: a velocità and a keirin file them, and
+#: they are the pair a programme turns on or off together.
+DOC_REPECHAGE_KINDS = (DOC_STARTLIST_REP, DOC_RESULTS_REP)
+
 DOC_ALL_KINDS = (DOC_STARTLIST, DOC_STARTLIST_REP, DOC_RACE, DOC_RESULTS,
                  DOC_RESULTS_REP, DOC_RESULTS_58, DOC_RESULTS_B,
                  DOC_PARTIAL, DOC_CLASSIFICATION)
@@ -241,7 +245,33 @@ class Round:
     # measured time: what a rider does over the distance is a `time` on a
     # result, and the two must not be confusable - hence `start`.
     start: str = ""
+    #: The jury's own note about this fase. It is *not* printed: it stays in
+    #: the programme, where a comment would not survive a save.
     note: str = ""
+    #: The line this fase opens its ordine di partenza on, above what the
+    #: specialità always says (`Event.note`). This one *is* printed.
+    #:
+    #: It is the programme's, and the programme is where it is decided: the
+    #: regulation says what a fase announces - who it qualifies, where the
+    #: first squadra lines up - and `core.notes` resolves that onto the fase
+    #: when the race is added. Typed over, it stays typed over.
+    sheet_note: str = ""
+    #: The same for the risultati of this fase: the sheet that says who went
+    #: through is the one that has to say how many do. Two fields and not a
+    #: mapping per document, because those are the two sheets a fase files that
+    #: open on a decision (`core.notes` writes both).
+    results_note: str = ""
+    #: The giornata this fase is ridden on, when it is not the one of the race
+    #: it belongs to. A velocità qualifies on the Saturday and rides its finali
+    #: on the Sunday, and it is one race either way: the fasi carry the day, the
+    #: race stays one `ProgrammeItem` (which is what every lookup reads).
+    #: `0` = the day of the race, which is what a file that splits nothing says.
+    day: int = 0
+    #: Where this fase runs in its giornata: 1, 2, 3 … as the jury numbers the
+    #: scaletta. `0` = wherever the programme order puts it, which is what every
+    #: file that has never been reordered says. It is the running order, so the
+    #: register follows it (`communiques.sheet_order`).
+    seq: int = 0
 
     def __post_init__(self):
         self.label = self.label or self.key
@@ -698,8 +728,43 @@ class Competition:
         item = self.scheduled(cat, event)
         return list(item.rounds) if item else []
 
+    def day_of(self, item: ProgrammeItem, rnd: Round) -> int:
+        """The giornata a fase is ridden on - its own, or the race's.
+
+        The one place the rule is written. A fase says nothing about the day
+        unless it is somewhere else than the rest of its race (`Round.day`).
+        """
+        return rnd.day or item.day
+
     def days(self) -> list[int]:
-        return sorted({r.day for r in self.programme if r.day})
+        """Every giornata something is ridden on, fasi that moved included."""
+        return sorted({self.day_of(i, r) for i in self.programme
+                       for r in i.rounds if self.day_of(i, r)}
+                      | {i.day for i in self.programme if i.day})
+
+    def rounds_on(self, day: int) -> list[tuple[ProgrammeItem, Round]]:
+        """The fasi ridden on one giornata, in the order they are ridden.
+
+        The order is the running order, and the jury states it by numbering the
+        scaletta (`Round.seq`): 1, 2, 3 … A fase with no number of its own
+        keeps the place the programme puts it in, so a file nobody has
+        reordered comes out exactly as it always did - and two specialità can
+        be interleaved, which is what a giornata actually looks like.
+
+        The composizione is not one of them (`ROUND_SETUP`): the coppie of a
+        madison are made up before anybody rides, by the jury and not on the
+        track, and a round nobody rides has no place in a running order.
+
+        It is what the register is numbered from (`communiques.sheet_order`)
+        and what the giornata is edited as.
+        """
+        pairs = [(item, r) for item in self.programme for r in item.rounds
+                 if r.kind != ROUND_SETUP and self.day_of(item, r) == day]
+        # by position and not by identity: two fasi of two races can be equal
+        # dataclasses, and `list.index` would find the first of them
+        order = sorted(range(len(pairs)),
+                       key=lambda i: (pairs[i][1].seq or i + 1, i))
+        return [pairs[i] for i in order]
 
     # -- derived distances / laps / sprints -----------------------------------
 
@@ -775,6 +840,32 @@ def _mk_map(cls, raw: Any, key_name: str = "code") -> dict:
     return out
 
 
+def _events_of(raw: Any) -> dict[str, Event]:
+    """The specialità of a programme, over what the catalogue already knows.
+
+    What a specialità *is* technically - its sigla UCI, its formato, how many
+    ride a squadra, how many start together, what its column is called in the
+    entry file - is the same at every championship, so it lives in one place
+    (`catalogue.FIELDS`, edited in Impostazioni) and not copied into every
+    file. A programme that states one of them anyway still wins: a meeting that
+    runs a specialità its own way has to be able to say so.
+
+    The **name is not one of them**. It is printed on every sheet and it is the
+    meeting's: a programme written in Italian goes on printing Italian names
+    whoever opens it, which is the whole reason it is written down.
+    """
+    from . import catalogue as CAT
+    out: dict[str, Event] = {}
+    items = (raw.items() if isinstance(raw, dict)
+             else [(d.get("code"), d) for d in (raw or [])])
+    for i, (code, d) in enumerate(items):
+        d = dict(d or {})
+        d.pop("code", None)
+        d.setdefault("order", i)
+        out[code] = Event(code=code, **{**CAT.event_fields(code), **d})
+    return out
+
+
 def load_competition(path: str | Path) -> Competition:
     """Read a programme.yaml into a Competition (raises on malformed YAML)."""
     path = Path(path)
@@ -800,7 +891,7 @@ def load_competition(path: str | Path) -> Competition:
         dates=[str(d) for d in raw.get("dates", []) or []],
         track_len=float(raw.get("track_len", DEFAULT_TRACK_LEN)),
         categories=_mk_map(Category, raw.get("categories")),
-        events=_mk_map(Event, raw.get("events")),
+        events=_events_of(raw.get("events")),
         programme=programme,
         communiques=[_communique(c) for c in raw.get("communiques", []) or []],
         entry_sheet=EntrySheet(**entries),

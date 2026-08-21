@@ -1322,6 +1322,7 @@ def _recap_cols(group: str, events: list[str], heads: dict[str, str], *,
 
 def programme_sheet(comp: Competition, *, times: bool = True,
                     merge_round: bool = False, merge_results: bool = False,
+                    numbers: bool = True, race: bool = True,
                     communique: str = "", font_size: int = 9) -> Document:
     """The running order with the comunicato number of every sheet beside it.
 
@@ -1340,39 +1341,46 @@ def programme_sheet(comp: Competition, *, times: bool = True,
     * `merge_results` - risultati and classifica in one, the classifica in
       **bold**, because it is the sheet that closes the specialità and it is
       the one people look for.
+    * `numbers` - the comunicato numbers at all. Off is the programme as it
+      goes on a noticeboard, before there is a register to quote.
+    * `race` - what each fase is ridden over, in brackets after the specialità:
+      *(8 km · 25 giri · 5 volate)*. It is what a rider asks and what a jury
+      checks the distances against.
 
     A fase that files no sheet of a kind leaves that cell empty; a sheet the
     register carries no number for prints what `number_for` answers, which is
     what the jury would see on the sheet itself.
     """
     cols = ([Column("start", label("programme_start"), "c", 7)] if times else [])
-    cols.append(Column("startlist", label("programme_startlist"), "c", 6))
+    if numbers:
+        cols.append(Column("startlist", label("programme_startlist"), "c", 6))
     cols.append(Column("cat", label("cat"), "c", 6))
+    wide = 8 if race else 0
     if merge_round:
-        cols.append(Column("event", label("event"), "l", 40))
+        cols.append(Column("event", label("event"), "l", 40 + wide))
     else:
-        cols += [Column("event", label("event"), "l", 24),
+        cols += [Column("event", label("event"), "l", 24 + wide),
                  Column("round", label("round"), "l", 22)]
-    if merge_results:
+    if numbers and merge_results:
         cols.append(Column("results", label("programme_sheets"), "c", 10))
-    else:
+    elif numbers:
         cols += [Column("results", label("programme_results"), "c", 7),
                  Column("classification", label("programme_classification"),
                         "c", 7)]
 
     rows: list[dict] = []
     last_day = None
-    for item in comp.programme:
-        ev = comp.event(item.event)
-        for rnd in item.rounds:
-            docs = rnd.docs or []
-            if not docs:
+    # giornata by giornata and fase by fase: a specialità split over two days
+    # prints under each of them, which is the only order this sheet is read in
+    for day in comp.days():
+        for item, rnd in comp.rounds_on(day):
+            if not (rnd.docs or []):
                 continue        # a fase that is composed and not ridden
-            row = _programme_row(comp, item, rnd, ev, merge_round,
-                                 merge_results)
-            if last_day is not None and item.day != last_day:
+            row = _programme_row(comp, item, rnd, comp.event(item.event),
+                                 merge_round, merge_results, race)
+            if last_day is not None and day != last_day:
                 row = group_start(row, strong=True)
-            last_day = item.day
+            last_day = day
             rows.append(row)
 
     return Document(
@@ -1385,8 +1393,24 @@ def programme_sheet(comp: Competition, *, times: bool = True,
     )
 
 
+def _race_line(comp: Competition, item, rnd) -> str:
+    """`(8 km · 25 giri · 5 volate)` - what a fase is ridden over.
+
+    Derived, never read raw: a fase states what it wants to and the rest comes
+    from the track (`config.Competition.distances`), which is why a programme
+    can leave the giri out and still print them.
+    """
+    km, laps, sprints = comp.distances(item.cat, item.event, rnd.key)
+    bits = [ui(key, n=f"{value:g}")
+            for key, value in (("n_km", km), ("n_laps", laps))
+            if value]
+    if sprints > 1:
+        bits.append(ui("n_sprints", n=sprints))
+    return f" ({' · '.join(bits)})" if bits else ""
+
+
 def _programme_row(comp: Competition, item, rnd, ev, merge_round: bool,
-                   merge_results: bool) -> dict:
+                   merge_results: bool, race: bool = False) -> dict:
     """One fase: when it runs, what it is, and the numbers it goes out under."""
     def number(doc: str, round_key: str) -> str:
         if doc not in (rnd.docs or []):
@@ -1399,9 +1423,10 @@ def _programme_row(comp: Competition, item, rnd, ev, merge_round: bool,
     # the classifica belongs to the specialità and to no fase (see config.Sheet)
     classification = number(DOC_CLASSIFICATION, "")
 
+    name = ev.short + (_race_line(comp, item, rnd) if race else "")
     row = {"start": rnd.start or item.time, "startlist": start,
            "cat": item.cat,
-           "event": f"{ev.short} · {rnd.label}" if merge_round else ev.short,
+           "event": f"{name} · {rnd.label}" if merge_round else name,
            "round": "" if merge_round else rnd.label}
     if merge_results:
         # both in one cell, and the classifica in bold: it is the sheet that

@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blueband"
+version = "0.3.0"
+description = "Commissaire console for track cycling competitions"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Nicola Borghi" }]
+
+# Pinned, not ranged. This list is also the installer's manifest: the Windows
+# build freezes exactly what is here, and a version that drifts between the
+# laptop it was tested on and the one it was built on is a version nobody
+# tested.
+#
+# pandas is declared even though Streamlit already requires it: the app imports
+# it directly (the grids and the tables are frames), and a dependency that is
+# used should be named by whoever uses it rather than inherited.
+dependencies = [
+    "streamlit==1.45.1",
+    "pandas==2.2.3",
+    "jinja2==3.1.6",
+    "PyYAML==6.0.2",
+    # the entry lists. openpyxl reads and writes the modern master workbook
+    # directly; xlrd is what pandas reaches for behind `read_excel` on the
+    # legacy `.xls` the federal system still exports.
+    "openpyxl==3.1.5",
+    "xlrd==2.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov", "ruff"]
+build = ["pyinstaller==6.11.1"]
+
+[project.urls]
+Homepage = "https://github.com/nicoborghi/BlueBand"
+
+[tool.setuptools]
+packages = ["core", "core.formats", "core.i18n", "render", "ui", "ui.pages"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.coverage.run]
+# the app, not the tests and not the packaging scripts: what is measured is
+# what a jury runs
+source = ["core", "render", "ui", "app.py", "launcher.py"]
+branch = true
+omit = ["*/__pycache__/*", "tests/*"]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == \"__main__\":",
+]

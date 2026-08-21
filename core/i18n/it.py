@@ -258,6 +258,9 @@ CODES = {
     "quota_club": "Quota società",
     "quota_club_region": "Quota società per squadra",
     "quota_teams": "Quota squadre",
+    "round_no_day": "Fase senza giornata",
+    "cat_no_event": "Categoria senza specialità",
+    "day_empty": "Giornata vuota",
 }
 
 
@@ -612,7 +615,18 @@ UI = {
 
     # -- programme ("Programma") ---------------------------------------------
     "prog_tab_competition": "Gara",
-    "prog_tab_events": "Specialità",
+    "entry_format": "Formato del file",
+    "entry_upload": "File iscritti (.xls / .xlsx)",
+    "entry_read": "Letti {n} atleti · {cats}",
+    "entry_numbering": "Come assegno i dorsali",
+    "entry_bibs_as_imported": "1…N come sono nel file",
+    "entry_bibs_by_cat": "1…N per categoria, di seguito",
+    "entry_bibs_by_cat_restart": "Da 1 per ogni categoria",
+    "entry_build": "Crea l'elenco della manifestazione",
+    "entry_book_here": "Elenco della manifestazione: `{path}`",
+    "entry_book_sync": "↻ Aggiorna al programma",
+    "prog_tab_categories": "Categorie, specialità e giornate",
+    "prog_tab_days": "Programmazione",
     "save_programme": "💾 Salva programme.yaml",
     "reload_programme": "↩ Ricarica dal file",
     "programme_counts": "{events} gare in programma · {communiques} comunicati · `{path}`",
@@ -628,8 +642,36 @@ UI = {
                      "una data, una scheda «Giorno».",
     "categories_caption": "Le categorie in gara, nell'ordine in cui compaiono "
                           "ovunque nell'app.",
-    "events_caption": "Il catalogo delle specialità: si tocca di rado. Quali "
-                      "categorie le corrono si decide nelle schede Giorno.",
+    "events_of_category": "Specialità in gara",
+    "prog_tab_events": "Specialità",
+    "events_caption": "Che cos'è ogni specialità, per tutte le categorie che la "
+                      "corrono. I valori sono quelli UCI: si tocca solo nei casi "
+                      "particolari.",
+    "rounds_of_race_caption": "Quali fasi si corrono e in quale giornata. "
+                              "Togliendo la spunta la fase esce dal programma "
+                              "(un omnium senza scratch parte dall'eliminazione).",
+    "round_ridden": "In gara",
+    "running_order": "N.",
+    "composition_round": "{name}: la compone la giuria in Gare, prima che si corra.",
+    "round_start_optional": "Ora (facoltativa)",
+    "round_start_hint": "14:30",
+    "round_sheet_note": "Nota sull'ordine di partenza",
+    "round_sheet_note_hint": "Si stampa sull'ordine di partenza",
+    "round_results_note": "Nota sui risultati",
+    "round_results_note_hint": "Si stampa sul foglio dei risultati",
+    "round_note": "Nota di servizio",
+    "round_note_hint": "Resta nel programma, non si stampa",
+    "event_settings_caption": "Valgono per ogni categoria che corre questa "
+                              "specialità.",
+    "event_settings_under": "Impostazioni di {event}: sotto {cat}, la prima "
+                            "categoria che la corre.",
+    "add_category_code": "Sigla nuova",
+    "add_category_hint": "MA",
+    "programme_matrix": "Categorie × specialità",
+    "programme_matrix_caption": "Quante fasi e in quali giornate. Casella "
+                                "vuota: la categoria non corre quella "
+                                "specialità.",
+    "rounds_no_day": "{n} senza giornata",
     "event_notes": "Note di partenza",
     "event_notes_caption": "La riga da cui parte il campo «Decisione / note» di "
                            "ogni ordine di partenza.",
@@ -637,6 +679,15 @@ UI = {
     "note_qualifying": "Solo sulle qualificazioni",
     "note_finals": "Solo sulle finali",
     "feminine": "femminile",
+    "events": "Specialità",
+    "events_settings_edit": "Che cos'è ogni specialità",
+    "save_events": "💾 Salva le specialità",
+    "sheet_lines": "Righe dei comunicati",
+    "sheet_lines_edit": "Come sono scritte",
+    "sheet_lines_language": "Nella lingua della manifestazione: {language}.",
+    "save_sheet_lines": "💾 Salva le righe",
+    "restore_sheet_lines": "↩ Torna a quelle predefinite",
+    "masculine": "maschile",
     "code": "Codice",
     "short_name": "Nome breve",
     "abbr": "Sigla UCI",
@@ -646,12 +697,42 @@ UI = {
     "entry_columns": "Colonne file iscritti",
     "order": "Ordine",
     "day_line": "Giornata {day} · {date}",
-    "races_of_day": "Gare della giornata",
-    "races_of_day_caption": "Quali categorie corrono quali specialità, e in "
-                            "quali fasi. L'ordine è quello in cui si corrono.",
-    "rounds_of": "Fasi · {cat} {event}",
+    "rounds_of_day": "Fasi della giornata",
+    "rounds_of_day_caption": "Le fasi corse in questa giornata, nell'ordine "
+                             "in cui vanno in pista. Una specialità può "
+                             "essere spezzata su più giornate.",
+    "round_of": "{cat} · {event} · {round}",
+    "off_day": "Togli",
+    "assign_docs": "Assegna i documenti",
+    "assign_docs_go": "Assegna a tutte le fasi",
+    "docs_classification": "Classifica sull'ultima fase di ogni specialità",
+    "docs_repechages": "Fogli dei recuperi (velocità e keirin)",
+    "docs_keep_edited": "Non toccare le fasi già cambiate a mano",
+    "propose_register_go": "Proponi i numeri",
+    "register_entry_lists": "Elenchi iscritti in testa alla giornata",
+    "register_ahead": "Ordini di partenza in anticipo",
+    "register_classification": "Classifica con la fase che chiude la specialità",
+    "register_follow": "Rinumera anche le giornate successive",
+    "com_partenti": "Com. partenti",
+    "com_risultati": "Com. risultati",
+    "com_classifica": "Com. classifica",
+    "communiques_of_round": "Comunicati di questa fase",
+    "merge_communiques": "⇄ Un solo comunicato",
+    "show_communiques": "Numeri dei comunicati",
+    "show_race_line": "Km, giri e volate",
+    "communiques_left_caption": "Quello che esce in questa giornata e non è una "
+                                "fase della scaletta qui sopra.",
+    "n_km": "{n} km",
+    "n_laps": "{n} giri",
+    "n_sprints": "{n} volate",
+    "laps_derived": "{km} km su una pista di {track} m sono {laps} giri.",
+    "round_to_edit": "Fase da modificare",
     "n_rounds": "{n} fasi",
-    "add_race": "Aggiungi una gara alla giornata",
+    "day_n": "Giorno {n}",
+    "day_short": "G{n}",
+    "day_none": "—",
+    "add_rounds": "Aggiungi fasi alla giornata",
+    "rounds_to_add": "Fasi",
     "add": "Aggiungi",
     "round_default": "Finale",
     "qualify": "Qualif.",
@@ -728,13 +809,16 @@ UI = {
     "new_competition_name": "Nome della cartella",
     "create": "Crea",
     "add_event": "Aggiungi una specialità",
+    "add_categories": "Categorie standard",
     "add_event_other": "Altra (a mano)",
     "event_code_new": "Codice",
     "starts_per_race": "Come partono",
     "starts_pairs": "A coppie (due alla volta)",
     "starts_single": "Uno alla volta",
-    "events_of_competition": "Specialità in programma",
     "option_per_start": "Come partono",
+    "option_direct_final": "Come si corre l'inseguimento",
+    "timed_with_finals": "Qualifiche + Finale a 4",
+    "timed_direct": "Finale diretta",
     "recent_races": "Ultime gare",
     "penalties_shown": "Provvedimenti",
     "measure_a": "Ammonizioni",
@@ -1026,6 +1110,9 @@ HELP = {
                   "l'inseguimento, 1 la velocità a squadre e i 200 m."),
     "entry_columns": ("Come si chiama la colonna nel file iscritti, se non "
                       "coincide col nome. Più varianti separate da virgola."),
+    "restore_sheet_lines": ("Cancella le righe riscritte in questa lingua: "
+                            "tornano quelle dell'app. Non tocca le altre "
+                            "lingue."),
     "note_feminine": ("La stessa riga scritta al femminile. Vuota: si usa "
                       "quella accanto."),
     "programme_note": ("Nota tua sulla gara: sopravvive al salvataggio, un "
@@ -1037,6 +1124,13 @@ HELP = {
                      "escono le fasi, con distanze, giri e volate proposti dal "
                      "regolamento e dalla lunghezza della pista. Tutto "
                      "modificabile dopo, e riproponibile con ↩."),
+    "option_direct_final": ("«Qualifiche + Finale a 4»: si qualifica contro il "
+                            "tempo e i quattro migliori corrono le due finali. "
+                            "«Finale diretta»: una prova sola, si prendono i "
+                            "tempi e da quelli esce la classifica - è quello "
+                            "che corre una categoria che non ha quattro "
+                            "squadre. In tutti e due i casi si sceglie qui "
+                            "accanto se si parte a due o a uno alla volta."),
     "repropose": ("Rifà le fasi dal regolamento, tenendo le tue note e le ore "
                   "di partenza. Quello che avevi corretto a mano torna alla "
                   "proposta."),
@@ -1048,6 +1142,10 @@ HELP = {
                         "spazi - CITA26."),
     "track_len_m": ("In metri: 250, 333.33, 400. Da qui escono i giri di ogni "
                     "distanza e quante coppie tiene la madison."),
+    "add_categories": ("Le categorie di sempre, già pronte: sigla, nome e "
+                       "sesso a posto. Spunta quelle in gara e aggiungile - "
+                       "nella tabella qui sotto si rinominano, si riordinano "
+                       "o si tolgono."),
     "add_event": ("Le specialità del catalogo: codice, sigla UCI, formato e "
                   "atleti per squadra già a posto. Tutto resta modificabile "
                   "nella tabella qui sotto."),
@@ -1055,11 +1153,29 @@ HELP = {
                         "macchina: a coppie, uno per rettilineo, o uno alla "
                         "volta. È il valore di partenza - la giuria può "
                         "cambiarlo sulla singola gara."),
-    "events_of_competition": ("Le specialità che questa manifestazione mette in "
-                             "programma. Qui si scelgono e basta: quante "
-                             "batterie, che distanze e come partono cambiano da "
-                             "categoria a categoria, e si decidono aggiungendo "
-                             "la gara alla giornata."),
+    "events_of_category": ("Le specialità che questa categoria corre. "
+                          "Spuntandone una la gara entra in programma con le "
+                          "fasi che il regolamento propone; togliendo la "
+                          "spunta la gara sparisce, fasi comprese."),
+    "category_name": ("Come si chiama la categoria su ogni documento: ordini "
+                      "di partenza, risultati, classifiche, comunicati."),
+    "add_category_code": ("Una sigla che il catalogo non ha. Nome e sesso si "
+                          "scrivono poi nel blocco della categoria."),
+    "remove_category": ("Toglie la categoria. Prima vanno tolte le sue "
+                        "specialità: le gare resterebbero appese a una "
+                        "categoria che il file non dichiara più."),
+    "remove_from_day": ("Toglie la fase dalla giornata. Resta in programma, "
+                        "senza giornata, e si rimette dove serve. Si spunta "
+                        "e si applica insieme a tutto il resto della "
+                        "tabella."),
+    "round_to_edit": ("Di quale fase della scaletta si stanno modificando i "
+                      "campi qui sotto. Una per volta: sono una dozzina di "
+                      "campi e una giornata ne ha trenta di fasi."),
+    "round_day": ("In quale giornata si corre questa fase. «—»: in nessuna, "
+                  "ancora. Fasi di giornate diverse sono una specialità "
+                  "spezzata - qualificazioni il sabato, finali la domenica."),
+    "rounds_to_add": ("Le fasi di questa gara che non sono ancora in questa "
+                      "giornata."),
     "recent_races": ("Le fasi su cui hai lavorato per ultime: un tocco e la "
                      "pagina ci torna, senza ripassare dai tre menu."),
     "penalties_shown": ("Quali provvedimenti compaiono qui e sul registro "
@@ -1070,6 +1186,82 @@ HELP = {
     "register_range_filter": ("Da quale a quale numero. Il registro di una "
                              "manifestazione di quattro giorni è lungo: si "
                              "stampa il pezzo che serve, non tutto."),
+    "abbr": ("La sigla UCI, quella che sta nelle colonne strette: SP, KE, IP, "
+             "TP, MD. Vuota, la ricava dal codice o dal formato."),
+    "communique_in_scaletta": ("Il numero di comunicato con cui esce questo "
+                               "foglio. Lo stesso numero su due fogli è **un "
+                               "comunicato solo con due documenti sopra** - "
+                               "è quello che fa una velocità ogni turno. "
+                               "0 lo toglie dal registro."),
+    "merge_communiques": ("Mette tutti i fogli di questa fase sullo stesso "
+                          "comunicato, quello del primo."),
+    "show_communiques": ("Mostra nella scaletta il numero di comunicato di "
+                         "ordine di partenza, risultati e classifica, e li "
+                         "lascia scrivere lì."),
+    "show_race_line": ("Mostra accanto a ogni specialità che cosa si corre: "
+                       "chilometri, giri e volate, come vengono dalla pista "
+                       "quando la fase non li dichiara."),
+    "entry_format": ("In che forma è arrivato il file. «ksport» è l'export "
+                     "federale, una riga per atleta; «per categorie» è il "
+                     "foglio già impaginato, quello che questa pagina "
+                     "produce."),
+    "entry_upload": ("Il file che manda la federazione. Viene copiato nella "
+                     "cartella della manifestazione: è la prova di che cosa è "
+                     "stato ricevuto."),
+    "entry_numbering": ("Tre modi, tutti in uso da qualche parte. «Da 1 per "
+                        "ogni categoria» si può usare solo se due categorie "
+                        "non vanno mai in pista insieme: altrimenti due atleti "
+                        "hanno lo stesso dorsale."),
+    "entry_book_sync": ("Riscrive i fogli e le colonne secondo il programma di "
+                        "adesso. Dorsali, spunte e iscrizioni alle specialità "
+                        "restano: il file viene riletto prima di essere "
+                        "riscritto."),
+    "assign_docs": ("Riscrive i documenti di ogni fase del programma secondo il "
+                    "regolamento. È il modo di non spuntarli a mano trenta "
+                    "volte."),
+    "docs_classification": ("La classifica di una specialità esce con la fase "
+                            "che la chiude - la finale, l'ultima prova "
+                            "dell'omnium."),
+    "docs_repechages": ("Velocità e keirin filano i fogli dei recuperi: "
+                        "partenti e risultati, sullo stesso comunicato del "
+                        "turno che li ha composti."),
+    "docs_keep_edited": ("Lascia stare le fasi che dichiarano documenti "
+                         "diversi da quelli del regolamento: sono scelte che "
+                         "qualcuno ha già fatto."),
+    "register_entry_lists": ("Un elenco iscritti per ogni categoria che corre "
+                             "quel giorno, in testa alla giornata: escono "
+                             "prima che si corra qualsiasi cosa."),
+    "register_ahead": ("Quanti ordini di partenza escono prima che si corra: "
+                       "sono le fasi che aprono la giornata, quelle che "
+                       "nessun risultato compone. A CITA26 sono 5."),
+    "register_classification": ("Altrimenti le classifiche non entrano nel "
+                                "registro: si numerano a mano."),
+    "register_follow": ("Una giornata che guadagna o perde fogli sposta tutto "
+                        "quello che viene dopo. Spento, le giornate successive "
+                        "restano dove sono - e due fogli possono finire con lo "
+                        "stesso numero."),
+    "running_order": ("Il posto della fase nella giornata: scrivi il numero e "
+                      "la scaletta si riordina intorno, rinumerata da 1. Se ne "
+                      "possono scrivere più d'uno prima di applicare: la "
+                      "giornata si rimescola in un colpo solo. È l'ordine in "
+                      "cui si corre, quindi i comunicati la seguono: una fase "
+                      "spostata in su porta con sé i suoi numeri."),
+    "round_ridden": ("Se questa fase si corre. Il regolamento la propone, la "
+                     "giuria decide: un omnium può correrre senza scratch e "
+                     "partire dall'eliminazione. Tolta la spunta esce dal "
+                     "programma e non produce comunicati; ↩ Riproponi rimette "
+                     "tutto il regolamento."),
+    "round_sheet_note": ("Si stampa: è la riga da cui parte il campo «Decisione "
+                         "/ note» dell'ordine di partenza di questa fase, sopra "
+                         "a quella della specialità."),
+    "round_results_note": ("Si stampa: è la riga da cui parte il foglio dei "
+                           "risultati di questa fase - quello che dice chi è "
+                           "passato è quello che deve dire quanti ne passano. "
+                           "La propone il regolamento e segue i numeri della "
+                           "fase; riscritta a mano, resta com'è."),
+    "round_note": ("Non si stampa da nessuna parte: è la nota della giuria sul "
+                   "programma, e sopravvive al salvataggio (un commento scritto "
+                   "a mano nel file no)."),
     "round_distance": "Km. Vuoto: la fase non ha una distanza dichiarata.",
     "round_laps": ("Vuoto: si calcolano dalla lunghezza della pista. Scrivili "
                    "solo se la gara non segue la formula."),
@@ -1219,8 +1411,7 @@ MSG = {
                           "{rounds}."),
 
     # -- races: what the page says while a race is being entered -------------
-    "import_entries_first": "Importa l'elenco iscritti nella pagina Verifica.",
-    "import_entries_here": "Importa l'elenco iscritti per iniziare.",
+    "pages_need_entries": ("Verifica, Documenti, Gare, Decisioni e Statistiche si aprono quando c'è un elenco iscritti: si crea in Programma → Gara."),
     "import_entries_in_settings": ("Nessun elenco iscritti: importalo in "
                                    "Impostazioni → Elenco iscritti."),
     "entries_caption": ("Il file della federazione non viene mai modificato. "
@@ -1348,7 +1539,66 @@ MSG = {
                               "batterie e dei recuperi, appena ogni batteria "
                               "ha un risultato."),
 
+    "events_settings_caption": ("Che cos'è ogni specialità: sigla UCI, "
+                                "formato, atleti per squadra, quante partono "
+                                "insieme, come si chiama la sua colonna nel "
+                                "file iscritti. Sono i valori UCI e sono gli "
+                                "stessi a ogni campionato, quindi si scrivono "
+                                "qui una volta e non in ogni programma. Un "
+                                "programma che fa diversamente lo dice per "
+                                "conto suo e vince."),
+    "events_saved": "Specialità salvate in {path}.",
+    "entry_book_caption": ("L'elenco su cui gira tutta la manifestazione: un "
+                           "foglio per categoria con una colonna per ogni sua "
+                           "specialità, più l'export federale tenuto intero. "
+                           "Si costruisce da qui, una volta, dal file che manda "
+                           "la federazione."),
+    "entry_book_needs_categories": ("Prima le categorie: un foglio per "
+                                    "categoria non si scrive finché non c'è "
+                                    "nessuna categoria. Scheda «Categorie, "
+                                    "specialità e giornate»."),
+    "entry_book_needs_events": ("Prima le specialità: le colonne da spuntare "
+                                "sono le specialità di ogni categoria. Scheda "
+                                "«Categorie, specialità e giornate»."),
+    "entry_book_read_nothing": ("Il file non contiene atleti leggibili con "
+                                "questo formato. Controlla il formato scelto."),
+    "entry_book_built": "Elenco creato: {n} atleti in `{path}`.",
+    "entry_book_needs_building": ("Non c'è ancora un elenco iscritti: si crea in **Programma → Gara**, dopo aver definito categorie e specialità."),
+    "entry_book_synced": "`{path}` aggiornato al programma.",
+    "entry_book_sync_caption": ("Da premere quando cambi categorie o "
+                                "specialità: i fogli e le colonne seguono, e "
+                                "tutto quello che è già stato spuntato resta."),
+    "entry_no_bibs": ("{n} atleti non hanno un dorsale nel file ({list}{more}). "
+                      "Scegli come assegnarli."),
+    "assign_docs_caption": ("Quali fogli produce ogni fase: lo dice il "
+                            "regolamento — ordine di partenza e risultati, la "
+                            "classifica su chi chiude la specialità, i fogli "
+                            "dei recuperi dove ci sono. Si scrive su **tutte "
+                            "le fasi del programma** in un colpo solo."),
+    "docs_assigned": "Documenti assegnati: {n} fasi cambiate.",
+    "propose_register_caption": ("I numeri della giornata {day}, nell'ordine in "
+                                 "cui i fogli escono davvero: gli elenchi "
+                                 "iscritti, poi gli ordini di partenza di chi "
+                                 "apre, poi fase per fase i risultati e subito "
+                                 "dopo l'ordine di partenza di ciò che "
+                                 "compongono."),
+    "sheet_lines_caption": ("Le righe con cui si aprono i comunicati: che cosa "
+                            "qualifica una batteria, dove si schiera la prima "
+                            "squadra. Vengono dal regolamento e sono uguali a "
+                            "ogni manifestazione, quindi si scrivono qui una "
+                            "volta e non in ogni programma. Quale riga vada su "
+                            "quale foglio lo decide il regolamento; qui si "
+                            "decide **come è scritta**."),
+    "sheet_line_default": "Predefinita: {text}",
+    "event_notes_moved": ("Le righe che questa specialità scriveva su ogni foglio ora le decide il regolamento, fase per fase: si leggono in **Programmazione** e si scrivono in **Impostazioni → Righe dei comunicati**. Quelle che il file porta con sé si stampano ancora."),
+    "sheet_lines_saved": "Righe salvate in {path}.",
+    "sheet_lines_restored": "Rimesse le righe predefinite dell'app.",
     # -- sheet notes the jury starts from ------------------------------------
+    "register_is_in_the_scaletta": ("I numeri dei comunicati di questa giornata "
+                                    "si scrivono nella scaletta qui sopra, "
+                                    "accanto alla fase che li produce."),
+    "laps_do_not_match": ("{km} km su una pista di {track} m sono {expected} "
+                          "giri, non {laps}: uno dei due numeri è sbagliato."),
     "note_scheme_12": "Si qualificano per il 1° turno i migliori 12 tempi.",
     "note_scheme_8": "Si qualificano direttamente ai quarti i migliori 8 tempi.",
     "team_letter": "{where} squadra {letter}",
@@ -1369,6 +1619,20 @@ MSG = {
                                    "ai quarti di finale."),
     "note_sprint_repechage": ("Due prove + ev. bella. {winners} passano alle "
                               "semifinali, {others} alla finale 5°-8° posto."),
+    # -- inseguimenti e velocità a squadre: dove si parte, cosa qualifica ----
+    # Le une dipendono dalla pista (il cambio di una velocità a squadre su un
+    # 333), le altre dai giri: due squadre partono a mezzo giro l'una
+    # dall'altra, quindi una distanza che non è un numero intero di giri mette
+    # la prima sul rettilineo opposto invece che su quello d'arrivo.
+    "note_change_half_lap": "Cambio ogni mezzo giro.",
+    "note_qualify_teams": "Si qualificano per le finali le prime {n} squadre.",
+    "note_qualify_times": "Si qualificano per le finali i migliori {n} tempi.",
+    "note_first_team_finish": "La prima squadra parte sul rettilineo d'arrivo.",
+    "note_first_team_back": "La prima squadra parte sul rettilineo opposto.",
+    "note_first_rider_m": "Il primo atleta parte sul rettilineo d'arrivo.",
+    "note_first_rider_f": "La prima atleta parte sul rettilineo d'arrivo.",
+    "note_first_rider_back_m": "Il primo atleta parte sul rettilineo opposto.",
+    "note_first_rider_back_f": "La prima atleta parte sul rettilineo opposto.",
     "note_keirin_stage": "{round}: {heats} batterie. {first} di ogni batteria {to}{rest}",
     "note_keirin_repechages": ", {rest} ai recuperi.",
     "note_keirin_rep_stage": ("Recuperi: {heats} batterie. {first} di ogni "
@@ -1488,6 +1752,7 @@ MSG = {
                     "# generato: le note vanno nei campi `note:`, che\n"
                     "# sopravvivono a un salvataggio - un commento no.\n"),
     "yaml_day": "giorno {n}",
+    "yaml_no_day": "senza giornata",
     "yaml_competition": "manifestazione",
     "yaml_entries": "elenco iscritti: dove sta il file e come si chiamano le colonne",
     "yaml_branding": "testata, piè di pagina, firma",
@@ -1501,6 +1766,9 @@ MSG = {
                          "ora è «{now}». Il foglio in mano alla giuria e il "
                          "registro direbbero due cose diverse."),
     "no_communique_planned": "{cat} {event}: nessun comunicato previsto.",
+    "round_without_day": "{cat} {event} · {round}: non è in nessuna giornata.",
+    "category_without_event": "{cat}: nessuna specialità in programma.",
+    "day_without_race": "Giornata {day}{date}: nessuna fase in programma.",
     "programme_count": "{races} gare  ·  {rounds} fasi  ·  {days} giornate",
     "numbering_free": ("I numeri seguono l'ordine del programma: spostare una "
                        "gara li rinumera. {n} fissati a mano restano dove "
@@ -1521,10 +1789,18 @@ MSG = {
     "competition_created": "«{name}» creata.",
     "event_exists": "«{name}» è già in programma.",
     "event_added": "«{name}» aggiunta.",
-    "event_in_programme": "«{name}» è in programma: toglila dalle giornate prima.",
     "programme_saved": "Programma salvato in {path}",
     "no_race_on_day": "Nessuna gara in programma nella giornata {day}.",
-    "race_already_scheduled": "{cat} {event} è già in programma.",
+    "all_rounds_on_day": "{cat} {event}: tutte le fasi sono già nella "
+                         "giornata {day}.",
+    "category_in_programme": "{cat} ha specialità in programma: togli prima "
+                             "quelle.",
+    "no_categories_yet": "Nessuna categoria: aggiungine una qui sopra.",
+    "no_events_yet": "Nessuna specialità in programma: spuntane una sotto "
+                     "una categoria.",
+    "race_removed": "{cat} {event}: tolta dal programma con le sue {n} fasi.",
+    "register_proposed": "Giornata {day}: {n} comunicati proposti dalla scaletta; le giornate successive sono state rinumerate.",
+    "rounds_still_loose": "{n} fasi non sono in nessuna giornata: {list}{more}",
     "declare_cats_and_events": ("Dichiara prima categorie e specialità nelle "
                                 "schede Gara e Specialità."),
     "docs_not_of_format": ("Documenti non previsti da un formato {fmt}: {list}. "

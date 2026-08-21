@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from . import paths
 from .models import RaceState, race_id as make_race_id
 
 SNAP_DIR = ".snapshots"
@@ -298,7 +299,9 @@ def competitions_root() -> Path:
     env = os.environ.get("COMMISSAIRE_TRACK_DATA")
     if env:
         return Path(env)
-    here = Path(__file__).resolve().parent.parent
+    # in a checkout this is the repository, as it always was; installed it is
+    # the jury's own folder under Documenti, which an uninstall does not touch
+    here = paths.data()
     legacy = here / "events"
     return legacy if legacy.is_dir() else here / "competitions"
 

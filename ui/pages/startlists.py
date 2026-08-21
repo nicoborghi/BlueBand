@@ -36,8 +36,7 @@ MODES = [BY_CATEGORY, BY_EVENT, ALL_EVENTS]
 def render(competition: str, comp: Competition, store: Store) -> None:
     el, stale = E.effective_entries(store, comp)
     if el is None:
-        notify.info("import_entries_first")
-        return
+        return          # the menu does not offer this page without one (`app`)
     R.apply_pair_numbers(store, comp, el)   # madison: le coppie hanno un numero
 
     with st.sidebar:

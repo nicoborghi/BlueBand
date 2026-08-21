@@ -1,11 +1,12 @@
 <p align="center">
-  <img src="header/track_text.svg" alt="" width="370">
+  <img src="header/track_text_ink.svg" alt="" width="370">
 </p>
 
 
 <p align="center">
   <a href="https://github.com/nicoborghi/BlueBand/"><img src="https://img.shields.io/badge/GitHub-BlueBand-9e8ed7" alt="GitHub"></a>
   <a href="https://github.com/nicoborghi/BlueBand/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+  <a href="https://github.com/nicoborghi/BlueBand/actions/workflows/tests.yml"><img src="https://github.com/nicoborghi/BlueBand/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="https://codecov.io/gh/nicoborghi/BlueBand"><img src="https://img.shields.io/codecov/c/github/nicoborghi/BlueBand" alt="Coverage"></a>
   <a href="https://claude.ai"><img src="https://img.shields.io/badge/built_with-Claude-orange?logo=anthropic&logoColor=white" alt="Built with Claude"></a>
 </p>
@@ -17,12 +18,21 @@ classifications, decisions, communiqués. Based on streamlit.
 > **Experimental** - used at the Italian Youth Track Championships (2025, 2026)
 > and nowhere else. Most of the codebase relies heavily on AI-generated code.
 
+On a jury laptop: install
+[the latest `BlueBand-setup.exe`](https://github.com/nicoborghi/BlueBand/releases)
+and start it from the desktop. No Python, no command line; the championships it
+writes live in `Documenti\BlueBand` and an uninstall does not touch them.
+
+From a checkout:
+
 ```bash
-streamlit run app.py
+pip install -e .
+streamlit run app.py          # or: python launcher.py, as the .exe runs it
 ```
 
 Guide: [`docs/GUIDA.md`](docs/GUIDA.md) (italiano) ·
-[`docs/GUIDE.md`](docs/GUIDE.md) (English)
+[`docs/GUIDE.md`](docs/GUIDE.md) (English) ·
+building the installer: [`docs/BUILD.md`](docs/BUILD.md)
 
 ## Pages
 
@@ -51,6 +61,7 @@ core/       the domain, without streamlit: all of it testable headless
   i18n/       THE TRANSLATION DOCUMENT: one catalogue per language
                 (it.py, en.py) behind one set of lookups
   config.py   programme.yaml -> dataclass;  programme.py: and back again
+  paths.py    checkout or installed program: where the data and the files are
   rounds.py   what a format runs: the fasi proposed from the regulation
   distances.py  regulations/distances.json - how long, and how often it sprints
   catalogue.py  regulations/events.json - the specialità, ready to add

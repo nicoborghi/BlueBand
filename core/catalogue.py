@@ -22,6 +22,10 @@ The **name is per language**, because it is not a label: it is written into
 name, and it prints in English next year too, whoever opens the file.
 
 Seeded from CITA 26 and extended with the events its programme did not contest.
+
+`regulations/categories.json` is the same table for the categorie - the sigle a
+FCI programme is written in - read through `category_codes`, `category_name`
+and `category`.
 """
 
 from __future__ import annotations
@@ -30,30 +34,37 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config import Event
+from .config import Category, Event
 from .i18n import DEFAULT, language
 
-FILE = Path(__file__).resolve().parent.parent / "regulations" / "events.json"
+REGULATIONS = Path(__file__).resolve().parent.parent / "regulations"
+FILE = REGULATIONS / "events.json"
+CATEGORIES_FILE = REGULATIONS / "categories.json"
 
 #: Same convention as the rest of `regulations/`.
 META = "_last_updated_"
 
 
-def load() -> dict[str, Any]:
-    """The catalogue, or an empty one when the file is missing or unreadable.
+def _table(path: Path) -> dict[str, Any]:
+    """One `regulations/` table, or an empty one when it cannot be read.
 
-    Missing, the Specialità grid is what it always was: seven fields typed by
-    hand. Nothing here is load-bearing enough to take a page down over.
+    Missing, the grid it feeds is what it always was: fields typed by hand.
+    Nothing here is load-bearing enough to take a page down over.
     """
-    if not FILE.exists():
+    if not path.exists():
         return {}
     try:
-        with FILE.open(encoding="utf-8") as fh:
+        with path.open(encoding="utf-8") as fh:
             data = json.load(fh)
     except (OSError, json.JSONDecodeError):
         return {}
     return {k: v for k, v in data.items()
             if k != META and isinstance(v, dict)} if isinstance(data, dict) else {}
+
+
+def load() -> dict[str, Any]:
+    """The catalogue of specialità."""
+    return _table(FILE)
 
 
 def codes() -> list[str]:
@@ -73,6 +84,49 @@ def name(code: str, *, short: bool = False) -> str:
     if not isinstance(names, dict):
         return str(names or code)
     return str(names.get(language()) or names.get(DEFAULT) or code)
+
+
+#: What the table states about a specialità, as opposed to what a programme
+#: does. The *name* is not in it: a name is printed on every sheet and belongs
+#: to the meeting that wrote it (see the module docstring). These are the
+#: technical facts - the ones that are the same at every championship and have
+#: no business being retyped into every file.
+FIELDS = ("abbr", "fmt", "team_size", "teams_per_start", "entry_columns")
+
+
+def event_fields(code: str) -> dict[str, Any]:
+    """What the table says about a specialità, ready to be merged under a file.
+
+    Only what it actually states: a key the table is silent about is left to
+    the dataclass default, so adding a field to `Event` does not turn every
+    catalogue entry into a statement about it.
+    """
+    entry = load().get(code)
+    if entry is None:
+        return {}
+    out: dict[str, Any] = {}
+    for name in FIELDS:
+        if entry.get(name) is not None:
+            out[name] = entry[name]
+    return out
+
+
+def save(table: dict[str, Any]) -> Path:
+    """Write the catalogue back, keeping the note at the top of the file."""
+    data = {}
+    if FILE.exists():
+        try:
+            with FILE.open(encoding="utf-8") as fh:
+                was = json.load(fh)
+            data[META] = was.get(META, "")
+        except (OSError, json.JSONDecodeError):
+            pass
+    data.update(table)
+    FILE.parent.mkdir(parents=True, exist_ok=True)
+    with FILE.open("w", encoding="utf-8") as fh:
+        json.dump(data, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    return FILE
 
 
 def event(code: str, order: int = 0) -> Event:
@@ -95,3 +149,49 @@ def event(code: str, order: int = 0) -> Event:
         teams_per_start=int(entry.get("teams_per_start") or 2),
         order=order,
     )
+
+
+# ── the categorie ───────────────────────────────────────────────────────────
+#
+# Same idea, same shape, other table:
+#
+#     regulations/categories.json
+#
+#     "AL": {"sex": "M", "name": {"it": "ALLIEVI MASCHI", "en": "U17 MEN"}}
+#
+# The sigle are the ones the FCI programmes are written in - ES/ED, AL/DA,
+# JU/DJ, UN/DU - and they are what the jury types anyway; ticking them beats
+# keying four fields eight times. A meeting with categorie of its own still
+# declares them by hand in the grid, and anything added from here stays
+# editable there.
+
+def category_codes() -> list[str]:
+    """Every categoria the table knows, in the order it is written in.
+
+    The file's order and not alphabetical: it runs from the youngest to the
+    oldest, alternating maschile and femminile, which is the order a programme
+    is read in.
+    """
+    return list(_table(CATEGORIES_FILE))
+
+
+def category_name(code: str) -> str:
+    """What a categoria is called, in the language the competition is run in."""
+    entry = _table(CATEGORIES_FILE).get(code) or {}
+    names = entry.get("name") or {}
+    if not isinstance(names, dict):
+        return str(names or code)
+    return str(names.get(language()) or names.get(DEFAULT) or code)
+
+
+def category(code: str, order: int = 0) -> Category:
+    """The categoria as a programme entry, ready to be raced.
+
+    Unknown to the table comes back as a bare `Category` under that code -
+    exactly what the grid would have made of a code typed into it.
+    """
+    entry = _table(CATEGORIES_FILE).get(code)
+    if entry is None:
+        return Category(code=code, order=order)
+    return Category(code=code, name=category_name(code),
+                    sex=str(entry.get("sex") or ""), order=order)

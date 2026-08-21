@@ -31,8 +31,12 @@ spesso ci si torna:
 
 1. **Manifestazione** — quale campionato è aperto. Se il programma ha problemi,
    compaiono qui in giallo.
-2. **Elenco iscritti** — il file mandato dalla federazione e il pulsante
-   *Importa / Ricarica*. Va bene sia l'export ksport piatto
+2. **Elenco iscritti** — qui c'è solo *quale file è in uso* e che cosa ci ha
+   trovato l'ultimo import. **L'elenco si crea in Programma → Gara**, dopo aver
+   definito categorie e specialità: prima non esiste, perché è un foglio per
+   categoria con una colonna per ogni sua specialità. Finché non c'è, le prime
+   cinque voci del menu (Verifica, Documenti, Gare, Decisioni, Statistiche) non
+   compaiono: non hanno niente da mostrare. Il pulsante *Ricarica*. Va bene sia l'export ksport piatto
    (`Iscritti_NNNNNN_KSPORT.xlsx`, una riga per atleta) sia il workbook con un
    foglio per categoria: l'app riconosce da sola quale dei due è.
    **Ricaricare non rompe niente**: il file non viene mai modificato e tutto
@@ -91,12 +95,25 @@ spesso ci si torna:
    il colore di squalifica, retrocessione, ammenda e ammonizione, e se stampare
    il codice UCI compatto (`A1`, `C3`) in testa al riquadro — di norma no. La
    nota resta grigia: non sanziona nessuno.
-6. **Programma** — sola lettura: che cosa dice il file della manifestazione, con
+6. **Specialità** — che cos'è ogni specialità: sigla UCI, formato, atleti per
+   squadra, quante partono insieme, come si chiama la sua colonna nel file
+   iscritti. Sono i valori UCI, uguali a ogni campionato, e da qui valgono per
+   tutte le manifestazioni: il programma li legge e scrive nel proprio file
+   solo ciò che fa diversamente.
+7. **Righe dei comunicati** — le righe con cui si aprono i fogli: *Non si
+   qualificano per la finale le ultime 2 coppie tra le partenti*, *La prima
+   squadra parte sul rettilineo d'arrivo*, *Cambio ogni mezzo giro*. Vengono
+   dal regolamento e sono uguali a ogni manifestazione, quindi si scrivono qui
+   una volta e non in ogni programma. Quale riga vada su quale foglio lo decide
+   il regolamento; qui si decide **come è scritta**, nella lingua della
+   manifestazione, con maschile e femminile separati. Un campo lasciato com'è
+   resta quello dell'app.
+8. **Programma** — sola lettura: che cosa dice il file della manifestazione, con
    distanze e giri calcolati. Il registro dei comunicati non è più qui: sta in
    *Documenti → Registro comunicati*, che dice anche quali sono già usciti e lo
    stampa.
-7. **Backup** — copia di tutto, e registro di ogni operazione fatta.
-8. **Azzera una gara** — l'unica cosa in tutta la pagina che cancella qualcosa.
+9. **Backup** — copia di tutto, e registro di ogni operazione fatta.
+10. **Azzera una gara** — l'unica cosa in tutta la pagina che cancella qualcosa.
    Sta in fondo, da sola, e chiede una conferma esplicita.
 
 ---
@@ -440,25 +457,145 @@ Sotto, due tabelle che si consultano e basta:
 quando esce ogni comunicato. Non tocca nessuna gara e non scrive niente finché
 non premi *Salva*.
 
-In cima: **Gara** (nome, sede, date, pista, categorie), **Specialità** (il
-catalogo: come si corre ognuna), e poi **una scheda per giornata**.
+In cima solo i **controlli** (che cosa manca o non torna, richiuso finché non
+ci sono errori). Le schede: **Gara** (nome, sede, date, pista), **Categorie**
+(chi corre, che cosa, e che cos'è ogni specialità), **Programmazione** e il
+foglio programma. *Congela i numeri* sta nella barra laterale, insieme a
+*Salva*: vale per tutto il file.
 
-Le date decidono le giornate: tre date, tre schede. Una gara di un giorno ha una
-scheda sola.
+Le date decidono le giornate: tre date, tre pulsanti in cima alla scheda
+**Giornate**, e se ne lavora una per volta. Una gara di un giorno ne ha uno
+solo.
 
-Dentro una giornata ci sono due cose:
+### Elenco iscritti (scheda *Gara*)
 
-**Gare della giornata** — quali categorie corrono quali specialità, e in quali
-fasi. Ogni fase dichiara distanza, giri, sprint e **quali documenti produce**.
+L'elenco su cui gira tutta la manifestazione si costruisce qui, una volta, e
+**dopo** aver definito categorie e specialità: è un foglio `KSPORT` con l'export
+federale intero (più le colonne *Verificato* e *NP*, che il file federale non
+ha) e poi un foglio per categoria, con una colonna per ogni specialità che
+quella categoria corre — le colonne dove si mettono le X.
+
+1. scegli **il formato** del file arrivato (di default *ksport*, l'export
+   federale: una riga per atleta);
+2. **carica il file**. Viene copiato nella cartella della manifestazione: è la
+   prova di che cosa è stato ricevuto;
+3. se il file **non ha i dorsali**, l'app lo dice e chiede come assegnarli:
+   `1…N` come sono nel file, `1…N` per categoria di seguito, oppure da `1` per
+   ogni categoria (quest'ultima solo se due categorie non vanno mai in pista
+   insieme, altrimenti due atleti hanno lo stesso numero);
+4. *Crea l'elenco della manifestazione*.
+
+Se poi cambi categorie o specialità, `↻ Aggiorna al programma` riscrive fogli e
+colonne: **quello che è già stato spuntato resta**, perché il file viene riletto
+prima di essere riscritto. Di regola dopo l'import si cambia la
+programmazione, non le categorie o le specialità.
+
+### Categorie
+
+L'unità del programma è la categoria, e il lavoro è tutto qui:
+
+1. **aggiungi la categoria** — le otto sigle di sempre (ES, ED, AL, DA, JU, DJ,
+   UN, DU) si spuntano da *Categorie standard* e arrivano con nome e sesso già
+   a posto; una sigla che il catalogo non ha si scrive nel campo accanto;
+2. **correggi il nome** se serve: è la dicitura che finisce su ogni documento;
+3. **spunta le specialità che quella categoria corre**. La spunta *è* la gara:
+   entra in programma con le fasi che il regolamento propone — distanze, giri,
+   sprint e documenti compresi — e su **nessuna giornata**.
+
+Sotto ogni specialità spuntata c'è solo quello che cambia **da categoria a
+categoria**: come la corre quella categoria (schema della velocità, finale
+5°-8°, finale B, quanti partono insieme), l'elenco delle sue fasi con due
+risposte per ciascuna — **in gara** e **giornata** — e `↩ Riproponi`, che rifà
+le fasi dal regolamento tenendo orari e note.
+
+**In gara** è una spunta, e toglierla è una decisione vera: un omnium si può
+correre senza scratch e partire dall'eliminazione. La fase esce dal programma e
+non produce comunicati; `↩ Riproponi` rimette tutto il regolamento.
+
+**La composizione non è una fase, e non è nemmeno un'opzione.** Le coppie della
+madison e le batterie di qualificazione dell'omnium si compongono prima che si
+corra: si fa in **Gare**, è lavoro della giuria, non va in nessuna giornata e
+non produce comunicati. Il programma la porta con sé e lo dice in una riga; la
+scaletta della giornata parte dalla prima fase vera.
+
+**Inseguimento e velocità a squadre — come si corre.** Due risposte:
+*Qualifiche + Finale a 4* (si qualifica contro il tempo e i quattro migliori
+corrono le due finali) e **Finale diretta** (una prova sola: si prendono i
+tempi e da quelli esce la classifica, che è quello che corre una categoria
+senza quattro squadre). Vale anche per l'inseguimento individuale. In tutti e
+due i casi si sceglie a parte se si parte **a due o a uno alla volta**.
+Cambiando questa risposta le fasi si rifanno subito: scelta la finale diretta
+non compare più una Qualificazioni che nessuno correrà.
+
+In fondo, **Categorie × specialità**: righe le categorie, colonne le
+specialità, e in ogni casella quante fasi, in quali giornate e quante sono
+ancora senza. È il riassunto da guardare prima di chiudere il programma.
+
+### Le specialità non si dichiarano più qui
+
+Che cos'è una specialità — sigla UCI, formato, atleti per squadra, quante
+partono insieme, come si chiama la sua colonna nel file iscritti — è uguale a
+ogni campionato, e sta in *Impostazioni → Specialità*. Il programma legge da lì
+e scrive nel file **solo quello che fa diversamente**: correggere la sigla della
+madison in Impostazioni la corregge in ogni manifestazione che non l'aveva
+contraddetta. Il **nome** resta nel programma, perché è quello che si stampa e
+appartiene alla manifestazione che l'ha scritto.
+
+Le **righe che finiscono sui fogli** non si scrivono più qui, e non si
+riscrivono a ogni manifestazione: *Non si qualificano per la finale le ultime 2
+coppie tra le partenti*, *La prima squadra parte sul rettilineo d'arrivo*,
+*Cambio ogni mezzo giro* vengono dal regolamento. Quale riga va su quale foglio
+lo decide il regolamento (pista, giri, formato, quante coppie si eliminano);
+**come è scritta** si decide una volta in *Impostazioni → Righe dei comunicati*.
+La riga viene risolta con i numeri della fase quando la gara entra in programma
+— si legge e si corregge in **Programmazione**, sotto la fase — e si rifà da
+sola quando quel numero cambia, a meno che tu non l'abbia riscritta a mano.
 
 > Per keirin e velocità le fasi che si corrono davvero le decide il giorno di
 > gara — il numero di iscritti per il keirin (tabella UCI), lo schema scelto sul
 > 200 m per la velocità. Qui dichiari quali sono *possibili*.
 
-**Comunicati della giornata** — l'ordine di questa tabella **è** l'ordine in cui
-escono. Si riordina, si rinumera, e c'è un pulsante che propone un comunicato
-per ogni documento previsto (una proposta da sistemare: l'ordine vero intreccia
-le specialità).
+Dentro una giornata ci sono due cose:
+
+**Una sola tabella.** Una riga per fase, nell'ordine in cui vanno in pista: il
+**numero**, il comunicato dei partenti, categoria, specialità (con tra parentesi
+km, giri e volate), fase, il comunicato dei risultati e quello della classifica,
+l'**ora (facoltativa)** e la casella *Togli*. Il registro dei comunicati non è
+più una seconda tabella sotto: sono tre colonne di questa.
+
+L'ordine si cambia scrivendo il numero: scrivi `1` sulla fase che apre la
+giornata e la scaletta si richiude intorno, rinumerata da 1. **Si possono
+scrivere più numeri prima di applicare**: la giornata si rimescola in un colpo
+solo, e due specialità si intrecciano come in una scaletta vera.
+
+I **numeri dei comunicati** si scrivono nelle tre colonne. Lo stesso numero su
+due fogli è **un comunicato solo con due documenti sopra** — è quello che fa una
+velocità ogni turno — e `0` toglie il foglio dal registro. *Proponi dalla
+programmazione* li scrive tutti: prima tutti gli ordini di partenza, poi i
+risultati, e le classifiche in fondo, ognuno nell'ordine della scaletta. Sa che
+l'omnium dopo la prima prova riparte dalla classifica provvisoria (niente
+partenti) e che la madison pubblica la classifica senza risultati sotto.
+
+Sotto la tabella si sceglie **la fase da modificare** — sono elencate col loro
+numero di scaletta — e sotto ci sono i valori proposti dal regolamento
+(distanza, giri, sprint, qualificati, eliminati, quali documenti produce), un
+controllo che dice se km e giri tornano sulla pista di questa manifestazione, i
+comunicati di quella fase con il pulsante per **metterli su un comunicato solo**,
+e due note diverse:
+
+- **nota sui fogli** — si stampa: è la riga da cui parte il campo *Decisione /
+  note* dell'ordine di partenza di quella fase, sopra a quella della specialità;
+- **nota di servizio** — non si stampa da nessuna parte, resta nel programma.
+
+*Aggiungi fasi alla giornata* ne mette una, alcune o tutte: **una specialità può
+essere spezzata su più giornate** — qualificazioni il sabato, finali la domenica
+— e resta una gara sola. La casella *Togli* toglie la fase dalla giornata senza
+toglierla dal programma, e finché una fase non è in nessuna giornata la pagina
+lo dice, in cima alla scheda e nei controlli.
+
+**Foglio programma** — la stessa tabella, stampata. Lì si sceglie se portare i
+numeri dei comunicati e le caratteristiche di gara: in Programmazione la tabella
+si vede sempre intera, sul foglio si decide che cosa stampare.
 
 ### Un comunicato con due documenti
 

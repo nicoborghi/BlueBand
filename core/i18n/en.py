@@ -259,6 +259,9 @@ CODES = {
     "quota_club": "Club quota",
     "quota_club_region": "Club-per-team quota",
     "quota_teams": "Team quota",
+    "round_no_day": "Round with no day",
+    "cat_no_event": "Category with no event",
+    "day_empty": "Empty day",
 }
 
 
@@ -608,7 +611,18 @@ UI = {
 
     # -- programme -----------------------------------------------------------
     "prog_tab_competition": "Competition",
-    "prog_tab_events": "Events",
+    "entry_format": "File format",
+    "entry_upload": "Entry file (.xls / .xlsx)",
+    "entry_read": "{n} riders read · {cats}",
+    "entry_numbering": "How to hand out the bibs",
+    "entry_bibs_as_imported": "1…N as they are in the file",
+    "entry_bibs_by_cat": "1…N per category, running on",
+    "entry_bibs_by_cat_restart": "From 1 in every category",
+    "entry_build": "Build the entry list of the competition",
+    "entry_book_here": "Entry list of the competition: `{path}`",
+    "entry_book_sync": "↻ Follow the programme",
+    "prog_tab_categories": "Categories, events and days",
+    "prog_tab_days": "Schedule",
     "save_programme": "💾 Save programme.yaml",
     "reload_programme": "↩ Reload from the file",
     "programme_counts": "{events} races scheduled · {communiques} communiqués · `{path}`",
@@ -624,8 +638,36 @@ UI = {
                      "one date, one «Day» tab.",
     "categories_caption": "The categories racing, in the order they appear in "
                           "everywhere in the app.",
-    "events_caption": "The catalogue of events: rarely touched. Which "
-                      "categories contest them is decided in the Day tabs.",
+    "events_of_category": "Events contested",
+    "prog_tab_events": "Events",
+    "events_caption": "What each event is, for every category riding it. The "
+                      "values are the UCI ones: touched only in the particular "
+                      "cases.",
+    "rounds_of_race_caption": "Which rounds are ridden, and on which day. "
+                              "Unticking one takes it out of the programme (an "
+                              "omnium without the scratch starts on the "
+                              "elimination).",
+    "round_ridden": "Ridden",
+    "running_order": "No.",
+    "composition_round": "{name}: the jury composes it in Gare, before the race is ridden.",
+    "round_start_optional": "Time (optional)",
+    "round_start_hint": "14:30",
+    "round_sheet_note": "Start order note",
+    "round_sheet_note_hint": "Printed on the start order",
+    "round_results_note": "Results note",
+    "round_results_note_hint": "Printed on the results sheet",
+    "round_note": "Working note",
+    "round_note_hint": "Stays in the programme, never printed",
+    "event_settings_caption": "They hold for every category riding this "
+                              "event.",
+    "event_settings_under": "Settings of {event}: under {cat}, the first "
+                            "category riding it.",
+    "add_category_code": "New code",
+    "add_category_hint": "MA",
+    "programme_matrix": "Categories × events",
+    "programme_matrix_caption": "How many rounds, and on which days. An empty "
+                                "box: the category does not ride that event.",
+    "rounds_no_day": "{n} with no day",
     "event_notes": "Start notes",
     "event_notes_caption": "The line the «Decision / notes» field of every "
                            "start order begins from.",
@@ -633,6 +675,15 @@ UI = {
     "note_qualifying": "On the qualifying rounds only",
     "note_finals": "On the finals only",
     "feminine": "feminine",
+    "events": "Events",
+    "events_settings_edit": "What each event is",
+    "save_events": "💾 Save the events",
+    "sheet_lines": "Sheet lines",
+    "sheet_lines_edit": "How they are worded",
+    "sheet_lines_language": "In the language of the competition: {language}.",
+    "save_sheet_lines": "💾 Save the lines",
+    "restore_sheet_lines": "↩ Back to the shipped ones",
+    "masculine": "masculine",
     "code": "Code",
     "short_name": "Short name",
     "abbr": "UCI code",
@@ -642,13 +693,42 @@ UI = {
     "entry_columns": "Entry file columns",
     "order": "Order",
     "day_line": "Day {day} · {date}",
-    "races_of_day": "Races of the day",
-    "races_of_day_caption": "Which categories contest which events, and in "
-                            "which rounds. The order is the order they are "
-                            "run in.",
-    "rounds_of": "Rounds · {cat} {event}",
+    "rounds_of_day": "Rounds of the day",
+    "rounds_of_day_caption": "The rounds ridden on this day, in the order "
+                             "they go on the track. An event can be split "
+                             "over more than one day.",
+    "round_of": "{cat} · {event} · {round}",
+    "off_day": "Remove",
+    "assign_docs": "Assign the documents",
+    "assign_docs_go": "Assign to every round",
+    "docs_classification": "Classification on the round that closes an event",
+    "docs_repechages": "Repechage sheets (sprint and keirin)",
+    "docs_keep_edited": "Leave the rounds already changed by hand",
+    "propose_register_go": "Propose the numbers",
+    "register_entry_lists": "Entry lists at the head of the day",
+    "register_ahead": "Start orders published ahead",
+    "register_classification": "Classification with the round that closes the event",
+    "register_follow": "Renumber the days after this one too",
+    "com_partenti": "Start order no.",
+    "com_risultati": "Results no.",
+    "com_classifica": "Classification no.",
+    "communiques_of_round": "Communiqués of this round",
+    "merge_communiques": "⇄ One communiqué",
+    "show_communiques": "Communiqué numbers",
+    "show_race_line": "Km, laps and sprints",
+    "communiques_left_caption": "What goes out on this day and is not a round "
+                                "of the running order above.",
+    "n_km": "{n} km",
+    "n_laps": "{n} laps",
+    "n_sprints": "{n} sprints",
+    "laps_derived": "{km} km on a {track} m track is {laps} laps.",
+    "round_to_edit": "Round to edit",
     "n_rounds": "{n} rounds",
-    "add_race": "Add a race to the day",
+    "day_n": "Day {n}",
+    "day_short": "D{n}",
+    "day_none": "—",
+    "add_rounds": "Add rounds to the day",
+    "rounds_to_add": "Rounds",
     "add": "Add",
     "round_default": "Final",
     "qualify": "Qualify",
@@ -725,13 +805,16 @@ UI = {
     "new_competition_name": "Folder name",
     "create": "Create",
     "add_event": "Add an event",
+    "add_categories": "Standard categories",
     "add_event_other": "Another (by hand)",
     "event_code_new": "Code",
     "starts_per_race": "How they start",
     "starts_pairs": "In pairs (two at a time)",
     "starts_single": "One at a time",
-    "events_of_competition": "Events contested",
     "option_per_start": "How they start",
+    "option_direct_final": "How the pursuit is ridden",
+    "timed_with_finals": "Qualifying + final for four",
+    "timed_direct": "Direct final",
     "recent_races": "Latest races",
     "penalties_shown": "Measures",
     "measure_a": "Warnings",
@@ -1018,6 +1101,9 @@ HELP = {
     "entry_columns": ("What the column is called in the entry file, when it "
                       "does not match the name. Several variants separated by "
                       "commas."),
+    "restore_sheet_lines": ("Drops the lines rewritten in this language: the "
+                            "ones the app ships come back. The other languages "
+                            "are not touched."),
     "note_feminine": ("The same line written in the feminine. Empty: the one "
                       "beside it is used."),
     "programme_note": ("Your own note on the race: it survives a save, a "
@@ -1029,6 +1115,13 @@ HELP = {
                      "of it, with distances, laps and sprints proposed from the "
                      "regulation and the track length. All of it editable "
                      "afterwards, and re-proposable with ↩."),
+    "option_direct_final": ("«Qualifying + final for four»: the teams qualify "
+                            "against the clock and the fastest four ride the "
+                            "two finals. «Direct final»: one race, the times "
+                            "are taken and the classification comes straight "
+                            "out of them - what a category without four teams "
+                            "rides. Either way, whether they start two or one "
+                            "at a time is chosen next to it."),
     "repropose": ("Rebuilds the fasi from the regulation, keeping your notes "
                   "and your start times. Whatever you had corrected by hand "
                   "goes back to the proposal."),
@@ -1039,6 +1132,10 @@ HELP = {
                         "the championship's: short, no spaces - CITA26."),
     "track_len_m": ("In metres: 250, 333.33, 400. The laps of every distance "
                     "come from it, and how many pairs the madison holds."),
+    "add_categories": ("The usual categories, ready made: code, name and sex "
+                       "already right. Tick the ones this competition races "
+                       "and add them - the table below is where they are then "
+                       "renamed, reordered or removed."),
     "add_event": ("The events of the catalogue: code, UCI abbreviation, format "
                   "and riders per team already right. All of it stays editable "
                   "in the table below."),
@@ -1046,11 +1143,29 @@ HELP = {
                         "machinery: in pairs, one per straight, or one at a "
                         "time. It is the starting value - the jury can change "
                         "it on the individual race."),
-    "events_of_competition": ("The events this competition contests. Here they "
-                             "are only chosen: how many heats, what distances "
-                             "and how they start differ from categoria to "
-                             "categoria, and are decided when the race is added "
-                             "to the day."),
+    "events_of_category": ("The events this category rides. Ticking one puts "
+                          "the race in the programme with the rounds the "
+                          "regulation proposes; unticking it removes the "
+                          "race, rounds and all."),
+    "category_name": ("What the category is called on every document: start "
+                      "orders, results, classifications, communiqués."),
+    "add_category_code": ("A code the catalogue has not got. Name and sex are "
+                          "then written in the category's own block."),
+    "remove_category": ("Removes the category. Its events have to go first: "
+                        "the races would be left hanging off a category the "
+                        "file no longer declares."),
+    "remove_from_day": ("Takes the round off this day. It stays in the "
+                        "programme, on no day, ready to be put elsewhere. "
+                        "Tick it and it is applied with the rest of the "
+                        "table."),
+    "round_to_edit": ("Which round of the running order the fields below are "
+                      "about. One at a time: they are a dozen fields, and a "
+                      "day has thirty rounds."),
+    "round_day": ("Which day this round is ridden on. «—»: none yet. Rounds "
+                  "on different days are an event split - qualifying on the "
+                  "Saturday, finals on the Sunday."),
+    "rounds_to_add": ("The rounds of this race that are not on this day "
+                      "yet."),
     "recent_races": ("The fasi you worked on last: one tap and the page goes "
                      "back to one, without walking through the three pickers "
                      "again."),
@@ -1062,6 +1177,80 @@ HELP = {
     "register_range_filter": ("From which number to which. The register of a "
                              "four-day meeting is long: print the piece that is "
                              "needed, not all of it."),
+    "abbr": ("The UCI code, the one that goes in the narrow columns: SP, KE, "
+             "IP, TP, MD. Empty, it comes from the code or from the format."),
+    "communique_in_scaletta": ("The communiqué number this sheet goes out "
+                               "under. The same number on two sheets is **one "
+                               "communiqué carrying two documents** - which is "
+                               "what a sprint does every round. 0 takes it out "
+                               "of the register."),
+    "merge_communiques": ("Puts every sheet of this round on one communiqué, "
+                          "the first one's."),
+    "show_communiques": ("Shows the communiqué number of the start order, the "
+                         "results and the classification in the running order, "
+                         "and lets them be typed there."),
+    "show_race_line": ("Shows what each event rides next to its name: "
+                       "kilometres, laps and sprints, as they come from the "
+                       "track when the round does not state them."),
+    "entry_format": ("The shape the file arrived in. «ksport» is the federal "
+                     "export, one row per rider; «per category» is the laid-out "
+                     "workbook, the one this page produces."),
+    "entry_upload": ("The file the federation sends. It is copied into the "
+                     "folder of the competition: it is the record of what was "
+                     "received."),
+    "entry_numbering": ("Three ways, all of them ridden somewhere. «From 1 in "
+                        "every category» is only usable where two categories "
+                        "never line up together: two riders share a number the "
+                        "moment they do."),
+    "entry_book_sync": ("Writes the sheets and the columns again for the "
+                        "programme as it is now. Bibs, ticks and event entries "
+                        "stay: the file is read back before it is written."),
+    "assign_docs": ("Writes the documents of every round of the programme "
+                    "again, as the regulation has them. It is how not to tick "
+                    "them by hand thirty times."),
+    "docs_classification": ("The classification of an event goes out with the "
+                            "round that closes it - the final, the last prova "
+                            "of an omnium."),
+    "docs_repechages": ("The sprint and the keirin file the sheets of their "
+                        "repechages: a start order and results, on the same "
+                        "communiqué as the round that composed them."),
+    "docs_keep_edited": ("Leaves alone the rounds that state documents other "
+                         "than the regulation's: somebody has already decided "
+                         "those."),
+    "register_entry_lists": ("One entry list per category racing that day, at "
+                             "the head of it: they go out before anything is "
+                             "ridden."),
+    "register_ahead": ("How many start orders go out before the racing: the "
+                       "rounds that open the day, the ones no result composes. "
+                       "At CITA26 there are 5."),
+    "register_classification": ("Without it the classifications are not in the "
+                                "register and are numbered by hand."),
+    "register_follow": ("A day that gains or loses sheets moves everything "
+                        "behind it. Off, the days after this one stay where "
+                        "they are - and two sheets can end up with one "
+                        "number."),
+    "running_order": ("Where the round runs in the day: type the number and "
+                      "the running order closes around it, renumbered from 1. "
+                      "More than one can be typed before it is applied: the "
+                      "day is reshuffled in one go. It is the order they are "
+                      "ridden in, so the communiqués follow it: a round moved "
+                      "up takes its numbers with it."),
+    "round_ridden": ("Whether this round is ridden. The regulation proposes it, "
+                     "the jury decides: an omnium can be run without the scratch "
+                     "and start on the elimination. Unticked it leaves the "
+                     "programme and files no communiqués; ↩ Riproponi puts the "
+                     "whole regulation back."),
+    "round_sheet_note": ("Printed: it is the line the «Decision / notes» field "
+                         "of this round's start order begins from, above the one "
+                         "of the event."),
+    "round_results_note": ("Printed: the line the risultati of this round "
+                           "open on - the sheet that says who went through is "
+                           "the one that has to say how many do. The "
+                           "regulation proposes it and it follows the numbers "
+                           "of the round; typed over, it stays as typed."),
+    "round_note": ("Printed nowhere: the jury's note about the programme, and it "
+                   "survives a save - a comment written by hand in the file does "
+                   "not."),
     "round_distance": "Km. Empty: the round declares no distance.",
     "round_laps": ("Empty: computed from the track length. Write them only if "
                    "the race does not follow the formula."),
@@ -1207,8 +1396,7 @@ MSG = {
     "partial_standings": ("Standings after {done} races of {total}: {rounds}."),
 
     # -- races: what the page says while a race is being entered -------------
-    "import_entries_first": "Import the list of entries on the Check-in page.",
-    "import_entries_here": "Import the list of entries to begin.",
+    "pages_need_entries": ("Verifica, Documenti, Gare, Decisioni and Statistics open once there is an entry list: it is built in Programma → Gara."),
     "import_entries_in_settings": ("No list of entries: import it in Settings "
                                    "→ List of entries."),
     "entries_caption": ("The federation's file is never modified. Reload it "
@@ -1340,6 +1528,65 @@ MSG = {
                               "every heat has a result."),
 
     # -- sheet notes the jury starts from ------------------------------------
+    "events_settings_caption": ("What each event is: UCI code, format, "
+                                "riders per team, how many start together, "
+                                "what its column is called in the entry file. "
+                                "These are the UCI values and they are the "
+                                "same at every championship, so they are "
+                                "written here once and not in every "
+                                "programme. A programme that does otherwise "
+                                "says so itself, and wins."),
+    "events_saved": "Events saved in {path}.",
+    "entry_book_caption": ("The list the whole meeting runs on: a sheet per "
+                           "category with a column for each of its events, "
+                           "plus the federal export kept whole. It is built "
+                           "here, once, from the file the federation sends."),
+    "entry_book_needs_categories": ("Categories first: a sheet per category "
+                                    "cannot be written while there is no "
+                                    "category. Tab «Categories, events and "
+                                    "days»."),
+    "entry_book_needs_events": ("Events first: the columns to tick are the "
+                                "events of each category. Tab «Categories, "
+                                "events and days»."),
+    "entry_book_read_nothing": ("The file holds no rider this format can read. "
+                                "Check the format you picked."),
+    "entry_book_built": "Entry list built: {n} riders in `{path}`.",
+    "entry_book_needs_building": ("There is no entry list yet: it is built in **Programma → Gara**, once the categories and events are "
+                                  "defined."),
+    "entry_book_synced": "`{path}` now follows the programme.",
+    "entry_book_sync_caption": ("Press it when you change categories or "
+                                "events: the sheets and the columns follow, "
+                                "and everything already ticked stays."),
+    "entry_no_bibs": ("{n} riders have no bib in the file ({list}{more}). "
+                      "Choose how to hand them out."),
+    "assign_docs_caption": ("Which sheets each round files: the regulation "
+                            "says it — a start order and its results, the "
+                            "classification on the one that closes the event, "
+                            "the repechage sheets where there are any. It is "
+                            "written onto **every round of the programme** in "
+                            "one go."),
+    "docs_assigned": "Documents assigned: {n} rounds changed.",
+    "propose_register_caption": ("The numbers of day {day}, in the order the "
+                                 "sheets actually go out: the entry lists, "
+                                 "then the start orders of what opens, then "
+                                 "round by round the results and right after "
+                                 "them the start order of what they compose."),
+    "sheet_lines_caption": ("The lines a communiqué opens on: what a heat "
+                            "qualifies for, where the first team lines up. "
+                            "They come out of the regulation and are the same "
+                            "at every meeting, so they are written here once "
+                            "and not in every programme. Which line goes on "
+                            "which sheet is the regulation's; how it is worded "
+                            "is decided here."),
+    "sheet_line_default": "Shipped: {text}",
+    "event_notes_moved": ("The lines this event used to put on every sheet are the regulation's now, round by round: they are read in **Schedule** and worded in **Settings → Sheet lines**. The ones the file carries still print."),
+    "sheet_lines_saved": "Lines saved in {path}.",
+    "sheet_lines_restored": "The lines the app ships are back.",
+    "register_is_in_the_scaletta": ("The communiqué numbers of this day are "
+                                    "typed in the running order above, next to "
+                                    "the round that files them."),
+    "laps_do_not_match": ("{km} km on a {track} m track is {expected} laps, "
+                          "not {laps}: one of the two numbers is wrong."),
     "note_scheme_12": "The best 12 times qualify for the 1st round.",
     "note_scheme_8": "The best 8 times qualify straight for the quarterfinals.",
     "team_letter": "{where} team {letter}",
@@ -1361,6 +1608,16 @@ MSG = {
     "note_sprint_repechage": ("Two runs + a decider. {winners} go through to "
                               "the semifinals, {others} to the final for "
                               "5th-8th place."),
+    # -- pursuits and team sprint: where they start, what qualifies ---------
+    "note_change_half_lap": "Change every half lap.",
+    "note_qualify_teams": "The first {n} teams qualify for the finals.",
+    "note_qualify_times": "The {n} fastest times qualify for the finals.",
+    "note_first_team_finish": "The first team starts on the finishing straight.",
+    "note_first_team_back": "The first team starts on the back straight.",
+    "note_first_rider_m": "The first rider starts on the finishing straight.",
+    "note_first_rider_f": "The first rider starts on the finishing straight.",
+    "note_first_rider_back_m": "The first rider starts on the back straight.",
+    "note_first_rider_back_f": "The first rider starts on the back straight.",
     "note_keirin_stage": "{round}: {heats} heats. {first} of each heat {to}{rest}",
     "note_keirin_repechages": ", {rest} to the repechages.",
     "note_keirin_rep_stage": ("Repechages: {heats} heats. {first} of each heat "
@@ -1477,6 +1734,7 @@ MSG = {
                     "# is generated: notes go in the `note:` fields, which\n"
                     "# survive a save - a comment does not.\n"),
     "yaml_day": "day {n}",
+    "yaml_no_day": "no day",
     "yaml_competition": "competition",
     "yaml_entries": "list of entries: where the file is and what its columns are called",
     "yaml_branding": "letterhead, footer, signature",
@@ -1491,6 +1749,9 @@ MSG = {
                          "hands and the register would say two different "
                          "things."),
     "no_communique_planned": "{cat} {event}: no communiqué planned.",
+    "round_without_day": "{cat} {event} · {round}: on no day of the programme.",
+    "category_without_event": "{cat}: no event in the programme.",
+    "day_without_race": "Day {day}{date}: no round in the programme.",
     "programme_count": "{races} races  ·  {rounds} rounds  ·  {days} days",
     "numbering_free": ("The numbers follow the running order: moving a race "
                        "renumbers them. {n} set by hand stay where they are."),
@@ -1510,10 +1771,18 @@ MSG = {
     "competition_created": "«{name}» created.",
     "event_exists": "«{name}» is already in the programme.",
     "event_added": "«{name}» added.",
-    "event_in_programme": "«{name}» is scheduled: take it off the days first.",
     "programme_saved": "Programme saved in {path}",
     "no_race_on_day": "No race scheduled on day {day}.",
-    "race_already_scheduled": "{cat} {event} is already scheduled.",
+    "all_rounds_on_day": "{cat} {event}: every round is already on day "
+                         "{day}.",
+    "category_in_programme": "{cat} has events in the programme: take those "
+                             "off first.",
+    "no_categories_yet": "No category yet: add one above.",
+    "no_events_yet": "No event in the programme: tick one under a category.",
+    "race_removed": "{cat} {event}: taken off the programme with its {n} "
+                    "rounds.",
+    "register_proposed": "Day {day}: {n} communiqués proposed from the running order; the days after it have been renumbered.",
+    "rounds_still_loose": "{n} rounds are on no day: {list}{more}",
     "declare_cats_and_events": ("Declare the categories and the events first, "
                                 "in the Competition and Events tabs."),
     "docs_not_of_format": ("Documents a {fmt} format does not produce: {list}. "

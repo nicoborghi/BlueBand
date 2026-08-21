@@ -441,21 +441,95 @@ This is the page used **before** the championship: it defines what is ridden and
 when each comunicato goes out. It touches no race and writes nothing until you
 press *Salva*.
 
-At the top: **Gara** (name, venue, dates, track, categories), **Specialità**
-(the catalogue: how each one is ridden), and then **one tab per day**.
+At the top only the **checks** (what is missing or does not add up, folded
+away while there are no errors). The tabs: **Gara** (name, venue, dates,
+track), **Categorie** (who rides, and what), **Specialità** (what each one is,
+for everybody), **Schedule** and the programme sheet. *Freeze the numbers* is
+in the sidebar, next to *Salva*: it holds for the whole file.
 
-The dates decide the days: three dates, three tabs. A one-day meeting has a
-single tab.
+The dates decide the days: three dates, three buttons at the top of the
+**Giornate** tab, and one day is worked on at a time. A one-day meeting has a
+single button.
 
-Inside a day there are two things:
+### Categorie
 
-**Gare della giornata** — which categories ride which events, and in which
-rounds. Every round declares distance, laps, sprints and **which documents it
-produces**.
+The unit of a programme is the category, and the work is all there:
+
+1. **add the category** — the eight usual codes (ES, ED, AL, DA, JU, DJ, UN,
+   DU) are ticked from *Categorie standard* and arrive with their name and sex
+   already right; a code the catalogue has not got is typed in the field next
+   to it;
+2. **correct the name** if it needs it: it is the wording that ends up on every
+   document;
+3. **tick the events that category rides**. The tick *is* the race: it enters
+   the programme with the rounds the regulation proposes — distances, laps,
+   sprints and documents included — and on **no day**.
+
+Under each ticked event there is only what changes **from category to
+category**: how that category rides it (sprint scheme, 5th-8th final, second
+final, how many start together), the list of its rounds with two answers each —
+**ridden** and **day** — and `↩ Riproponi`, which redoes the rounds from the
+regulation keeping start times and notes.
+
+**Ridden** is a tick, and unticking it is a real decision: an omnium can be run
+without the scratch and start on the elimination. The round leaves the
+programme and files no communiqués; `↩ Riproponi` puts the whole regulation
+back.
+
+**The composition is not a round, and not an option either.** The madison pairs
+and the qualifying heats of an omnium are composed before anybody rides: it is
+done in **Gare**, it is the jury's own job, it goes on no day and files no
+communiqué. The programme carries it and says so in one line; the day's running
+order starts on the first real round.
+
+**Team pursuit and team sprint — how it is ridden.** Two answers: *Qualifying +
+final for four* (they qualify against the clock and the fastest four ride the
+two finals) and **Direct final** (one race: the times are taken and the
+classification comes straight out of them, which is what a category without
+four teams rides). The individual pursuit has it too. Either way, whether they
+start two or one at a time is chosen separately. Changing this answer redoes
+the rounds at once: with the direct final chosen there is no Qualificazioni
+left for anybody to ride.
+
+At the bottom, **Categorie × specialità**: rows the categories, columns the
+events, and in each box how many rounds, on which days, and how many are still
+on none. It is the summary to look at before closing the programme.
+
+### Specialità
+
+What each event is, **for every category riding it**: UCI code, format, riders
+per team, what its column is called in the entry file and the start notes. The
+values come from the catalogue and are the UCI ones: this is touched only in
+the particular cases — a note that holds all week, a column named oddly in the
+workbook. **What you change here changes for every category.**
 
 > For the keirin and the sprint, which rounds are actually ridden is decided on
 > the day — the number of entries for the keirin (UCI table), the scheme chosen
 > on the 200 m for the sprint. Here you declare which ones are *possible*.
+
+Inside a day there are two things:
+
+**Fasi della giornata** — a table, one row per round, in the order they go on
+the track: the **number**, category, event, round, the **start time
+(optional)** and the *Togli* box. The order is changed by typing the number:
+type `1` on the round that opens the day and the running order closes around
+it, renumbered from 1. It is the order they are ridden in, so the communiqués
+follow it. **More than one number can be typed before it is applied**: the day
+is reshuffled in one go, and two events interleave the way a real running order
+does.
+
+Under the table you pick **which round to edit**, one at a time, and below it
+are the values the regulation proposed — distance, laps, sprints, qualifiers,
+eliminated, which documents it files — and two different notes:
+
+- **nota sui fogli** — printed: the line the *Decision / notes* field of that
+  round's start order begins from, above the one of the event;
+- **nota di servizio** — printed nowhere, it stays in the programme.
+
+*Aggiungi fasi alla giornata* puts one, some or all of them on it: **an event can be split over more than one day** — qualifying on the
+Saturday, finals on the Sunday — and it stays one race. The *Togli* box takes a
+round off the day without taking it out of the programme, and while a round is
+on no day the page says so, at the top of the tab and in the checks.
 
 **Comunicati della giornata** — the order of this table **is** the order they go
 out in. You reorder it, renumber it, and there is a button that proposes a

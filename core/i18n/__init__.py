@@ -132,11 +132,50 @@ def _entry(name: str, key: str) -> str:
 
     Raises `KeyError` when neither has it, which is what tells a missing label
     from a translated one - see the module docstring.
+
+    A line the jury has rewritten wins over both (`set_texts`): the catalogue
+    is what the app ships, not what this installation says. Only `MSG` - the
+    prose that reaches a sheet. A label or a help text is what the app calls
+    its own controls, and renaming those is a translation, not a decision.
     """
+    edited = _TEXTS.get(_lang, {}).get(key) if name == "MSG" else None
+    if edited is not None:
+        return edited
     table = getattr(catalogue(), name)
     if key in table:
         return table[key]
     return getattr(catalogue(DEFAULT), name)[key]
+
+
+# ── the lines this installation words its own way ───────────────────────────
+#
+# Not a translation and not a competition's own word (`set_overrides`): the
+# sentences a jury writes on its sheets - what a batteria qualifies for, where
+# a squadra lines up - are the same at every meeting and belong to the
+# federation, not to the file. They are shipped in the catalogues, edited in
+# Impostazioni and kept in `regulations/notes.json` (`core.notes`), which is
+# what this layer reads.
+#
+# Set once per run, before anything is drawn or printed.
+
+_TEXTS: dict[str, dict[str, str]] = {}
+
+
+def set_texts(texts: dict[str, dict[str, str]]) -> None:
+    """Replace the lines this installation words its own way ({} clears them).
+
+    `{language: {key: text}}`, keyed exactly as the catalogues are: a key that
+    is not in them is simply never asked for, and one that is comes back
+    rewritten in that language and in no other.
+    """
+    _TEXTS.clear()
+    _TEXTS.update({lang: {k: v for k, v in (entries or {}).items() if v}
+                   for lang, entries in (texts or {}).items()})
+
+
+def texts() -> dict[str, dict[str, str]]:
+    """What `set_texts` is holding, as it was given."""
+    return {lang: dict(entries) for lang, entries in _TEXTS.items()}
 
 
 # ── words this competition spells its own way ───────────────────────────────

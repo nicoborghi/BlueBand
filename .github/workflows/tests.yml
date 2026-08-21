@@ -1,0 +1,55 @@
+name: tests
+
+# The suite on every push and every pull request, with coverage sent to
+# Codecov. The Windows build (`build.yml`) runs its own quick `pytest -q`
+# before it freezes anything; this is the one that gates the branch.
+#
+# Roughly a third of the suite is skipped here on purpose: the tests that read
+# the federation's entry workbook need a file that lives on the commissaire's
+# Drive folder and carries riders' personal data, so it is not in the repo and
+# `tests/conftest.py` skips them wherever it is missing. Coverage from CI is
+# therefore a floor, not the whole picture - read a drop, not the absolute
+# number.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # the floor the project declares and the version the installer freezes
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Tests
+        run: pytest -q --cov --cov-report=xml --cov-report=term-missing
+
+      - name: Codecov
+        # one upload is enough; the second interpreter runs the same lines
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          fail_ci_if_error: true
+          # public repo: the tokenless upload works, and the token is used
+          # when the repo secret is set (it makes uploads less rate-limited)
+          token: ${{ secrets.CODECOV_TOKEN }}

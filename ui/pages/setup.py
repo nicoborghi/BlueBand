@@ -23,7 +23,7 @@ import streamlit as st
 
 from core import programme as P
 from core.config import Competition
-from core.i18n import help_text, msg, ui
+from core.i18n import help_text, ui
 from core.store import (Store, competitions_root, list_competitions,
                         open_competition)
 from ui import notify, state
@@ -43,6 +43,8 @@ def render(competition: str, store: Store) -> None:
     # in here is editable there afterwards, in the same fields - the
     # manifestazione, the pista and the categorie, in that order
     PROG._competition_tab(draft)
+    st.divider()
+    PROG._categories_tab(draft)
 
     st.divider()
     if st.button(ui("setup_create"), type="primary",

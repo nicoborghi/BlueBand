@@ -157,19 +157,35 @@ def _categories(comp: Competition) -> list[str]:
 
 
 def _events(comp: Competition) -> list[str]:
+    """The specialità of this programme - and only what is *this* programme's.
+
+    The name is always written: it is printed on every sheet and it is the
+    meeting's own (`config._events_of`). The technical fields are written only
+    where they differ from the catalogue this installation runs on - so a file
+    says *teams_per_start: 1* because this meeting decided it, and not because
+    a table said so the day the race was added. Nothing is lost by leaving them
+    out: they are read back from the same catalogue.
+    """
+    from . import catalogue as CAT
     lines = []
     for code in comp.event_order():
         ev = comp.events[code]
+        known = CAT.event_fields(code)
         lines.append(f"{INDENT}{scalar(code)}:")
-        for name, value in _kept(ev, "name", "short", "abbr", "fmt"):
+        for name, value in _kept(ev, "name", "short"):
             lines.append(f"{INDENT * 2}{name}: {scalar(value)}")
-        if ev.team_size:
+        for name in ("abbr", "fmt"):
+            value = getattr(ev, name)
+            if value and value != known.get(name):
+                lines.append(f"{INDENT * 2}{name}: {scalar(value)}")
+        if ev.team_size and ev.team_size != known.get("team_size"):
             lines.append(f"{INDENT * 2}team_size: {ev.team_size}")
         # 2 is the default and means nothing; 1 is the fact that decides
         # whether a qualifying round has batterie or a start order
-        if ev.teams_per_start != 2:
+        if ev.teams_per_start != known.get("teams_per_start", 2):
             lines.append(f"{INDENT * 2}teams_per_start: {ev.teams_per_start}")
-        if ev.entry_columns:
+        if ev.entry_columns and list(ev.entry_columns) != list(
+                known.get("entry_columns") or []):
             lines.append(f"{INDENT * 2}entry_columns: "
                          f"{flow_list(ev.entry_columns)}")
         for name, value in _kept(ev, "startlist_note", "startlist_note_f",
@@ -209,8 +225,12 @@ def _round(r: Round) -> str:
         pairs.append(("label", r.label))
     if r.kind:
         pairs.append(("kind", r.kind))
-    pairs += _kept(r, "distance", "laps", "sprints", "heat_size", "qualify",
-                   "eliminate", "start", "note")
+    # the giornata comes right after what the fase is: it is read far more often
+    # than the numbers, and it is only there when the fase is ridden somewhere
+    # else than the rest of its race
+    pairs += _kept(r, "day", "seq", "distance", "laps", "sprints", "heat_size",
+                   "qualify", "eliminate", "start", "sheet_note",
+                   "results_note", "note")
     # A round that is ridden always says which sheets it files: the default is
     # two of them, and a round that files three (a finals round with the
     # classifica of the specialità on it) has to be explicit. A setup round
@@ -238,13 +258,19 @@ def _programme(comp: Competition) -> list[str]:
             day = item.day
             date = (comp.dates[day - 1]
                     if 0 < day <= len(comp.dates) else "")
+            # 0 is a race waiting for a giornata - and the fasi of one that is
+            # split say their own day, so the rule above them names neither
+            head = msg("yaml_day", n=day) if day else msg("yaml_no_day")
             lines.append("")
-            lines.append(f"{INDENT}# ── {msg('yaml_day', n=day)}"
+            lines.append(f"{INDENT}# ── {head}"
                          + (f" · {date}" if date else "") + " "
-                         + "─" * max(0, 46 - len(str(day)) - len(date)))
+                         + "─" * max(0, 46 - len(head) - len(date)))
         lines.append(f"{INDENT}- cat: {scalar(item.cat)}")
         lines.append(f"{INDENT * 2}event: {scalar(item.event)}")
-        lines.append(f"{INDENT * 2}day: {item.day}")
+        # a race whose fasi are not all on a giornata has no day of its own:
+        # every fase that has one says so itself (see `ui.pages.programme`)
+        if item.day:
+            lines.append(f"{INDENT * 2}day: {item.day}")
         for name, value in _kept(item, "time", "scheme", "teams_per_start",
                                  "note"):
             lines.append(f"{INDENT * 2}{name}: {scalar(value)}")
@@ -259,20 +285,6 @@ def _programme(comp: Competition) -> list[str]:
             lines.append(f"{INDENT * 2}rounds:")
             lines += [f"{INDENT * 3}- {_round(r)}" for r in item.rounds]
     return _block("programme", lines)
-
-
-def _order(comp: Competition, item: ProgrammeItem) -> tuple:
-    """Where a (category, event) sits inside its day.
-
-    The register decides it: the first comunicato of a race is when it runs.
-    Failing that - a race with no comunicato planned yet - it keeps the order
-    the events are declared in, which is the only other thing that says
-    anything.
-    """
-    numbers = [c.n for c in comp.communiques
-               if c.cat == item.cat and c.event == item.event]
-    return (min(numbers) if numbers else 10 ** 6,
-            comp.event(item.event).order, item.cat)
 
 
 def _communiques(comp: Competition) -> list[str]:
@@ -381,7 +393,7 @@ def days_of(comp: Competition) -> list[int]:
     anything is scheduled on the fourth. A programme item on a day the dates do
     not cover still gets one, so nothing is editable only by hand.
     """
-    scheduled = {i.day for i in comp.programme if i.day}
+    scheduled = set(comp.days())
     scheduled |= {c.day for c in comp.communiques if c.day}
     return sorted(set(range(1, len(comp.dates) + 1)) | scheduled) or [1]
 
@@ -438,28 +450,190 @@ def moved(items: list, index: int, delta: int) -> list:
     return out
 
 
-def plan_day(comp: Competition, day: int, start: int) -> list[CommuniqueSpec]:
+def numbered(rows: list[dict], sheet: dict, n: int) -> list[dict]:
+    """Put one document on comunicato `n` - and that is also how two merge.
+
+    The register is a list of documents, and two of them **on the same number**
+    are one sheet with two documents on it (`specs_from_rows`): so moving a
+    document onto a number another one already has is not a clash to resolve,
+    it is the jury saying *these two print together*. Which is what a velocità
+    does every time - the risultati of the batterie and the ordine di partenza
+    of the recuperi go out as one comunicato.
+
+    `n` of 0 takes the document out of the register altogether. The rows come
+    back ordered by number, with the moved one last among its own, because
+    `specs_from_rows` reads *adjacent* equal numbers as one sheet.
+    """
+    key = ("cat", "event", "round", "doc")
+    kept = [r for r in rows
+            if any(_cell_text(r.get(k)) != _cell_text(sheet.get(k))
+                   for k in key)]
+    if n:
+        kept.append({**sheet, "n": n})
+    order = sorted(range(len(kept)), key=lambda i: (_cell_int(kept[i]["n"]), i))
+    return [kept[i] for i in order]
+
+
+def reordered(want: list[int], was: list[int]) -> list[int]:
+    """The places of a scaletta, in the order the numbers typed into it ask for.
+
+    `want` is what each row now says, `was` what it said when it was drawn;
+    both are the running order 1..N. The answer is the rows in their new order,
+    by index, and the caller deals 1..N over it - a scaletta is renumbered
+    whole, because a running order with a hole in it means nothing.
+
+    A number the jury has written is a statement about where that fase goes, so
+    the retyped rows are seated *first*, each at the place it asks for; the rest
+    close up around them, in the order they were already in. Which is the point
+    of asking this way rather than one nudge per rerun: two fasi typed to 1 and
+    2 before applying land first and second, and not first and third, as they
+    would if the untouched row that already said 1 were still in the way.
+
+    A place already taken goes to the next free one, and a number past the end
+    of the giornata is the end of it - a scaletta is renumbered 1..N whatever
+    was typed into it, and nothing is ever dropped.
+    """
+    places: list[int | None] = [None] * len(want)
+    for _n, i in sorted((want[i], i) for i in range(len(want))
+                        if want[i] != was[i]):
+        p = min(max(want[i], 1), len(want)) - 1
+        while p < len(want) and places[p] is not None:
+            p += 1
+        places[p if p < len(want) else places.index(None)] = i
+    for i in [i for i in range(len(want)) if want[i] == was[i]]:
+        places[places.index(None)] = i
+    return [p for p in places if p is not None]
+
+
+def plan_day(comp: Competition, day: int, start: int, *,
+             entry_lists: bool = True, ahead: int = 5,
+             classification: bool = True) -> list[CommuniqueSpec]:
     """A register for one day, proposed from what is scheduled on it.
 
-    A proposal and nothing more: the real order interleaves the specialità -
-    the risultati of a batteria go out while another event is still on the
-    track - and only the jury knows that. What this gets right is that nothing
-    is *missing*, which is the tedious half.
+    Not in the order things are ridden and not grouped by kind either: in the
+    order sheets actually **go out**, which is what the numbering of a real
+    giornata follows.
+
+    * the **elenchi iscritti** open the day - they are published before
+      anything else happens, one per categoria (`entry_lists`);
+    * then a block of **ordini di partenza**, for the fasi that open the day:
+      nothing has been ridden yet, so nothing composes them (`ahead`);
+    * then, fase by fase, the **risultati** - and right after them the ordine
+      di partenza of what those risultati compose, which is the next fase of
+      the same race. That is why a register reads *risultati batterie,
+      partenti finale*: the second could not be written before the first;
+    * the **classifica** of a specialità goes out with the fase that closes it
+      (`classification`);
+    * and the block of start orders is kept topped up as the day goes on, so a
+      race that starts later still has its ordine di partenza out in time.
+
+    Two formats file less than they look like they do (`_docs_planned`): an
+    omnium prova after the first is started from the classifica provvisoria of
+    the one before, and a madison finale publishes its classifica with no
+    risultati under it.
+
+    A proposal and nothing more: what it gets right is that nothing is
+    *missing*, which is the tedious half.
     """
-    out: list[CommuniqueSpec] = []
-    n = start
-    for item in sorted([i for i in comp.programme if i.day == day],
-                       key=lambda i: _order(comp, i)):
-        ev = comp.event(item.event)
-        for rnd in item.rounds:
-            for doc in rnd.docs or []:
-                out.append(CommuniqueSpec(
-                    n=n, day=day, cat=item.cat, event=item.event,
-                    round_key="" if doc == DOC_CLASSIFICATION else rnd.key,
-                    doc=doc,
-                    title=title_for(item.cat, ev.short, rnd.label, doc)))
-                n += 1
-    return out
+    fasi = comp.rounds_on(day)
+    out: list[tuple] = []
+    if entry_lists:
+        out += _entry_list_sheets(comp, day)
+
+    started: set[int] = set()
+    # a fase whose ordine di partenza is *composed* by an earlier fase of its
+    # own race cannot be published before it: the finale of a madison is made
+    # by its batterie. Only the others can go out ahead.
+    opens = [i for i, (item, _r) in enumerate(fasi)
+             if not any(fasi[j][0].cat == item.cat
+                        and fasi[j][0].event == item.event for j in range(i))]
+
+    def start_order(i: int) -> None:
+        if i in started or i >= len(fasi):
+            return
+        started.add(i)
+        item, rnd = fasi[i]
+        if DOC_STARTLIST in _docs_planned(comp, item, rnd):
+            out.append((item, rnd, DOC_STARTLIST))
+
+    for i in opens[:max(ahead, 0)]:
+        start_order(i)
+    for i, (item, rnd) in enumerate(fasi):
+        docs = _docs_planned(comp, item, rnd)
+        for doc in docs:
+            if doc == DOC_STARTLIST:
+                continue
+            if doc == DOC_CLASSIFICATION and not classification:
+                continue
+            out.append((item, rnd, doc))
+        # what those risultati compose: the next fase of the same race
+        nxt = next((j for j in range(i + 1, len(fasi))
+                    if (fasi[j][0].cat, fasi[j][0].event)
+                    == (item.cat, item.event)), None)
+        if nxt is not None:
+            start_order(nxt)
+        # and the head of the day stays as far ahead as it was asked to be -
+        # again only with what nothing composes
+        while len(started) < i + 1 + max(ahead, 0):
+            free = next((j for j in opens if j not in started), None)
+            if free is None:
+                break
+            start_order(free)
+
+    specs: list[CommuniqueSpec] = []
+    for n, (item, rnd, doc) in enumerate(out, start=start):
+        specs.append(CommuniqueSpec(
+            n=n, day=day, cat=item.cat, event=item.event,
+            round_key="" if doc == DOC_CLASSIFICATION else rnd.key, doc=doc,
+            title=title_for(item.cat, comp.event(item.event).short,
+                            rnd.label, doc)))
+    return specs
+
+
+def _entry_list_sheets(comp: Competition, day: int) -> list[tuple]:
+    """The elenchi iscritti that open a giornata, one per categoria racing on it.
+
+    They are not a fase and nobody rides them: the entry list is the sheet the
+    day is published with, and the register has always opened on it.
+    """
+    if EVENT_ENTRY_LIST not in comp.events:
+        return []
+    racing = [c for c in comp.cat_order()
+              if any(i.cat == c for i, _r in comp.rounds_on(day))]
+    blank = Round(key="")
+    return [(ProgrammeItem(cat=cat, event=EVENT_ENTRY_LIST), blank,
+             DOC_STARTLIST) for cat in racing]
+
+
+def _docs_planned(comp: Competition, item: ProgrammeItem,
+                  rnd: Round) -> list[str]:
+    """The sheets a fase files, as the register proposes them.
+
+    What the fase says it files (`Round.docs`), less what the format publishes
+    another way: the prove of an omnium after the first are started from the
+    classifica of the one before, and the risultati of a madison finale are its
+    classifica.
+    """
+    docs = list(rnd.docs or [])
+    fmt = comp.event(item.event).fmt
+    if fmt == "omnium" and _prova_after_the_first(item, rnd):
+        docs = [d for d in docs if d != DOC_STARTLIST]
+    # and only the fase that closes it: the batterie of a madison decide who
+    # rides the finale, so their risultati are the sheet that says it
+    if fmt == "madison" and DOC_CLASSIFICATION in docs:
+        docs = [d for d in docs if d != DOC_RESULTS]
+    return docs
+
+
+def _prova_after_the_first(item: ProgrammeItem, rnd: Round) -> bool:
+    """Whether an omnium prova has one before it that starts it.
+
+    The batterie di qualificazione are not prove: they compose the omnium, and
+    the first prova after them opens on a start order like any other race.
+    """
+    prove = [r for r in item.rounds
+             if r.kind != ROUND_SETUP and "batteria" not in r.key.lower()]
+    return bool(prove) and rnd.key != prove[0].key and rnd in prove
 
 
 def rows_from_specs(specs: list[CommuniqueSpec]) -> list[dict]:
@@ -584,12 +758,37 @@ def issues(comp: Competition, issued: list | None = None) -> list[Issue]:
         if not item.rounds:
             out.append(Issue(ERROR, "round", msg(
                 "cfg_no_rounds", cat=item.cat, event=item.event)))
+        # a fase nobody has put on a giornata is the thing this page is for
+        # forgetting: it is in the programme, it files comunicati, and it is
+        # ridden on no day. The composizione is none of that - it is a job of
+        # the jury, ridden by nobody (`ROUND_SETUP`), and it goes on no day
+        for rnd in item.rounds:
+            if rnd.kind == ROUND_SETUP:
+                continue
+            if not comp.day_of(item, rnd):
+                out.append(Issue(WARN, "round_no_day", msg(
+                    "round_without_day", cat=item.cat,
+                    event=comp.event(item.event).short, round=rnd.label)))
         planned = [c for c in comp.communiques
                    if c.cat == item.cat and c.event == item.event]
         if not planned:
             out.append(Issue(INFO, "communique_missing", msg(
                 "no_communique_planned", cat=item.cat,
                 event=comp.event(item.event).short)))
+
+    # a categoria with nothing to ride, and a giornata with nothing on it: both
+    # are half-finished programmes, and both are silent until they are said
+    for code in comp.cat_order():
+        if not [i for i in comp.programme
+                if i.cat == code and i.event != EVENT_ENTRY_LIST]:
+            out.append(Issue(WARN, "cat_no_event", msg(
+                "category_without_event", cat=code)))
+    for day in range(1, len(comp.dates) + 1):
+        if not comp.rounds_on(day):
+            date = date_of(comp, day)
+            out.append(Issue(INFO, "day_empty", msg(
+                "day_without_race", day=day,
+                date=f" · {date}" if date else "")))
     return out
 
 

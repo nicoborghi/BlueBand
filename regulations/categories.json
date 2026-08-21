@@ -1,0 +1,35 @@
+{
+ "_last_updated_": "12 August 2026",
+ "ES": {
+  "sex": "M",
+  "name": {"it": "ESORDIENTI MASCHI", "en": "U15 MEN"}
+ },
+ "ED": {
+  "sex": "F",
+  "name": {"it": "ESORDIENTI FEMMINE", "en": "U15 WOMEN"}
+ },
+ "AL": {
+  "sex": "M",
+  "name": {"it": "ALLIEVI MASCHI", "en": "U17 MEN"}
+ },
+ "DA": {
+  "sex": "F",
+  "name": {"it": "ALLIEVE FEMMINE", "en": "U17 WOMEN"}
+ },
+ "JU": {
+  "sex": "M",
+  "name": {"it": "JUNIORES MASCHI", "en": "JUNIOR MEN"}
+ },
+ "DJ": {
+  "sex": "F",
+  "name": {"it": "JUNIORES FEMMINE", "en": "JUNIOR WOMEN"}
+ },
+ "UN": {
+  "sex": "M",
+  "name": {"it": "UNDER 23 MASCHI", "en": "UNDER 23 MEN"}
+ },
+ "DU": {
+  "sex": "F",
+  "name": {"it": "UNDER 23 FEMMINE", "en": "UNDER 23 WOMEN"}
+ }
+}

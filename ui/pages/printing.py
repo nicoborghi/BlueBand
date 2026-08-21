@@ -57,8 +57,7 @@ EVENT_HEADED = (BY_TEAM, SPECIALITY_TABLE)
 def render(competition: str, comp: Competition, store: Store) -> None:
     el, _stale = E.effective_entries(store, comp)
     if el is None:
-        notify.info("import_entries_first")
-        return
+        return          # the menu does not offer this page without one (`app`)
     R.apply_pair_numbers(store, comp, el)   # madison: le coppie hanno un numero
 
     mode = st.sidebar.radio(ui("print_mode"), MODES, key="stp_mode",
@@ -116,8 +115,15 @@ def _build(mode: str, comp: Competition, el, store: Store,
                                    short_headers=short_headers)]
     day = st.sidebar.selectbox(ui("day"), comp.days(), key="stp_day")
     out = []
-    for r in [r for r in comp.programme if r.day == day]:
-        out += _speciality(comp, el, store, r.cat, r.event, docs_wanted, font)
+    # by fase, so a specialità split over two giornate is printed on both - and
+    # each race once, however many of its fasi are ridden that day
+    seen: list[tuple[str, str]] = []
+    for item, _rnd in comp.rounds_on(day):
+        if (item.cat, item.event) in seen:
+            continue
+        seen.append((item.cat, item.event))
+        out += _speciality(comp, el, store, item.cat, item.event,
+                           docs_wanted, font)
     return out
 
 

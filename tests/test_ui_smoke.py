@@ -54,15 +54,22 @@ def _page(app, name):
     return _pick(app.sidebar.radio[0], name).run()
 
 
-def test_app_starts_without_an_entry_list(app):
-    """With nothing imported the race page must explain what to do, not crash."""
+def test_without_an_entry_list_the_menu_offers_what_can_be_done(app):
+    """The five pages about the riders are not on the menu until there are some.
+
+    They used to be, and every one of them opened on the same line of apology.
+    What is left is what can actually be worked on with an empty folder: the
+    programme - which is where the elenco iscritti is built - and Impostazioni.
+    """
     assert not app.exception
     # the competition is set in Impostazioni, not picked again on every page
     assert not app.sidebar.selectbox
     assert any("CAMPIONATI ITALIANI GIOVANILI SU PISTA 2026" in m.value
                and "Velodromo delle Cascine" in m.value
                for m in app.sidebar.markdown)
-    assert any("Importa l'elenco iscritti" in i.value for i in app.info)
+    pages = [o for o in app.sidebar.radio[0].options]
+    assert [p.split(" ", 1)[-1] for p in pages] == ["Programma", "Impostazioni"]
+    assert any("elenco iscritti" in c.value for c in app.sidebar.caption)
 
 
 def test_the_app_carries_the_document_stylesheet(app):
@@ -76,14 +83,6 @@ def test_the_app_carries_the_document_stylesheet(app):
     assert len(css) == 1 and "group-start" in css[0]
 
 
-def test_verifica_page(app):
-    """Nothing imported: the page says where the import lives, and stops."""
-    _page(app, "Verifica")
-    assert not app.exception
-    assert any("Impostazioni" in i.value for i in app.info)
-    # the file is chosen there, not here
-    assert not any("File iscritti" in t.label for t in app.text_input)
-
 
 def test_decisioni_page_is_the_register_of_what_was_decided(app):
     """The secretary's log, read back: it works before anything is imported.
@@ -91,6 +90,7 @@ def test_decisioni_page_is_the_register_of_what_was_decided(app):
     Nothing is composed here any more - a decision is written in the race it
     was taken in (see `_decision_panel` in Gare).
     """
+    _seed_entries(app)
     _page(app, "Decisioni")
     assert not app.exception
     assert any("Nessuna decisione" in i.value for i in app.info)
@@ -103,6 +103,7 @@ def _file(store, **kw):
 
 
 def test_the_register_lists_and_filters_what_was_filed(app):
+    _seed_entries(app)
     from core.store import open_competition
 
     store = open_competition("CITA26")
@@ -135,6 +136,7 @@ def test_the_register_lists_and_filters_what_was_filed(app):
 
 def test_a_filed_decision_can_be_corrected_or_deleted(app):
     """Every column of the row is correctable where the decision is shown."""
+    _seed_entries(app)
     from core import decisions as D
     from core.store import open_competition
 
@@ -163,6 +165,7 @@ def test_the_register_recaps_a_specialita_fase_by_fase(app):
     Across the whole competition the recap would be the register in a worse
     order, so it only appears once the page is about one specialità.
     """
+    _seed_entries(app)
     from core.store import open_competition
 
     store = open_competition("CITA26")
@@ -189,6 +192,7 @@ def test_changing_the_category_clears_an_event_it_does_not_contest(app):
     not a specialità of the new categoria: the picker comes back empty rather
     than naming a race that does not exist (`state.sticky_select`).
     """
+    _seed_entries(app)
     from core.config import load_competition
     from core.store import competitions_root
 
@@ -208,6 +212,7 @@ def test_changing_the_category_clears_an_event_it_does_not_contest(app):
 
 
 def test_the_puis_panel_opens_on_the_categories_in_gara(app):
+    _seed_entries(app)
     _page(app, "Decisioni")
     assert app.selectbox(key="dec_puis_col").value == "DA, AL, ED, ES"
     app.text_input(key="dec_puis_q").set_value("casco").run()
@@ -225,14 +230,45 @@ def test_impostazioni_shows_the_competition_and_the_programme(app):
     # the register table is not here any more: Documenti → Registro says the
     # same and more, and prints it
     assert not any("Registro" in e.label for e in app.expander)
-    assert app.selectbox(key="team_group").value == "region"
+    # and what a squadra is has gone with the elenco iscritti: both are the
+    # programme's, and both are edited in Programma → Gara
+    assert not [s for s in app.selectbox if s.key == "team_group"]
+
+
+def _seed_entries(app):
+    """Give the competition an elenco iscritti - empty, but there.
+
+    Five pages are off the menu until one exists (`app.NEEDS_ENTRIES`), and the
+    ones about the register and the decisions need it to *exist* and nothing
+    more: they are read off the programme and the journal. This is that, and it
+    does not need the federation's workbook to be reachable.
+    """
+    from core import entries as E
+    from core.store import open_competition
+
+    E.save_import(open_competition("CITA26"), E.EntryList())
+    app.run()
+    return app
 
 
 def _import(app, iscritti_path):
-    """Import the entry list - a setting, so it is done in Impostazioni."""
-    _page(app, "Impostazioni")
-    app.text_input(key="entries_src").set_value(str(iscritti_path)).run()
-    app.button(key="entries_import").click().run()
+    """Put an entry list in the competition, the way the app stores one.
+
+    Not through the page any more: the elenco is *built* in Programma → Gara
+    from a file the jury uploads, and AppTest cannot drive a file uploader.
+    What every test below actually needs is a competition that has one - so it
+    is written where the app keeps it (`core.entries`), and the run that
+    follows finds it exactly as it would after an import.
+    """
+    from core import entries as E
+    from core.config import load_competition
+    from core.store import competitions_root, open_competition
+
+    store = open_competition("CITA26")
+    comp = load_competition(competitions_root() / "CITA26" / "programme.yaml")
+    E.set_source_path(store, str(iscritti_path))
+    E.save_import(store, E.import_entries(iscritti_path, comp))
+    app.run()
     return app
 
 
@@ -583,10 +619,16 @@ def test_quick_print_writes_one_entry_list_per_category(app, iscritti_path):
 
 
 def test_import_then_edit_entry_list(app, iscritti_path):
-    # the entry file is a setting: it is chosen and reloaded in Impostazioni
+    # with an entry list the pages about the riders are on the menu, and say
+    # how many there are
     _import(app, iscritti_path)
     assert not app.exception
-    assert any("238" in s.value for s in app.success)
+
+    _page(app, "Impostazioni")
+    # the file in force and what the last import found in it - the *building*
+    # of the elenco is in Programma → Gara, this is what is left as a setting
+    assert any("Ultimo import" in c.value and "atleti" in c.value
+               for c in app.caption)
 
     _page(app, "Verifica")
     # the counters, the tabella specialità and the validation panel
@@ -772,12 +814,14 @@ def test_documenti_prints_the_tabella_specialita(app, iscritti_path):
     assert app.sidebar.multiselect(key="stp_docs").disabled
 
 
-def test_the_register_does_not_need_an_entry_list(app):
-    """It reads the programme and the comunicati: nothing has to be imported.
+def test_the_register_is_read_off_the_programme_and_not_off_the_riders(app):
+    """It reads the programme and the comunicati: an empty elenco is enough.
 
-    On the old Stampa page it sat behind the same "importa gli iscritti" guard
-    as the batches, which it never needed.
+    Documenti is on the menu once there is an elenco at all (`app`), and this
+    half of it never looks at a rider: it says what has been filed and what is
+    still to file.
     """
+    _seed_entries(app)
     _documents(app, "Registro comunicati")
     assert not app.exception
     assert [m.value for m in app.metric][:1] == ["140"]
@@ -838,14 +882,17 @@ def test_settings_page_changes_the_letterhead(app, tmp_path):
     _page(app, "Impostazioni")
     assert not app.exception
     # The page runs from what the app is working on down to what destroys work:
-    # the entry list it is all read off, what a squadra is, the folder a
-    # comunicato lands in, then how it looks, then the backups - and only last
-    # the one control here that deletes a race. The programme is not on it at
-    # all: it is read, written and printed on the Programma page, and a
-    # read-only copy here was a second place to look for the same answer.
+    # the folder a comunicato lands in, how a sheet looks, what a specialità is
+    # and the lines its sheets open on, the backups - and only last the one
+    # control here that deletes a race.
+    #
+    # Nothing about *this* competition is on it any more: the elenco iscritti
+    # and what a squadra is belong to the programme and are edited there
+    # (Programma → Gara). What is left holds for the installation.
     subs = [s.value for s in app.subheader]
-    assert subs == ["Elenco iscritti", "Squadra", "Cartella dei comunicati",
-                    "Aspetto dei comunicati", "Backup", "Azzera una gara"]
+    assert subs == ["Cartella dei comunicati", "Aspetto dei comunicati",
+                    "Specialità", "Righe dei comunicati", "Backup",
+                    "Azzera una gara"]
     # the three things that decide how a sheet looks are one section, not two:
     # the letterhead was on the page while the signature was hidden behind an
     # expander called «avanzate», which is not a different kind of choice
@@ -2000,12 +2047,6 @@ def test_a_womens_keirin_is_written_about_women(app, iscritti_path, comp):
 # here in the three states it is met in: nothing imported, nothing ridden, and
 # a specialità decided.
 
-def test_statistiche_page_says_what_is_missing(app):
-    """Nothing imported: the page points at the import and stops."""
-    _page(app, "Statistiche")
-    assert not app.exception
-    assert any("Impostazioni" in i.value for i in app.info)
-
 
 def test_statistiche_page_is_empty_until_something_is_decided(app,
                                                               iscritti_path):
@@ -2064,22 +2105,268 @@ def _programme_page(app):
     return app
 
 
-def test_programma_page_opens_on_a_tab_per_day(app):
-    """Gara, Specialità, one tab per date - and the sheet it all prints as.
+def _day(app, day: int):
+    """Open a giornata of the Programma page - one is drawn at a time."""
+    return app.button_group(key="prog_day").set_value([day]).run()
 
-    The days in the middle and the two things that are not a day at either
-    end: what the competition *is* first, and the foglio programma last.
+
+def test_programma_page_opens_on_the_giornate_and_one_day_at_a_time(app):
+    """Four tabs, and Programmazione shows one giornata at a time.
+
+    `st.tabs` builds the body of every tab on every rerun, so a tab per day was
+    four scalette drawn to move one fase. The picker carries the four dates.
+
+    Specialità is not a tab of its own: what a specialità *is* holds for every
+    championship and is in Impostazioni, and the lines it used to carry to
+    every sheet are the regulation's (Impostazioni → Righe dei comunicati).
     """
     _programme_page(app)
-    labels = [t.label for t in app.tabs]
-    assert labels[:2] == ["Gara", "Specialità"]
-    # four dates in the programme, four tabs - and each says which day it is
-    assert labels[2:-1] == [f"Giornata {n} · 08-0{n + 3}" for n in (1, 2, 3, 4)]
-    assert labels[-1] == "Foglio programma"
-    # every day tab holds the two panels that make a day
-    assert [s.value for s in app.subheader].count("Gare della giornata") == 4
-    assert [s.value for s in app.subheader].count(
-        "Comunicati della giornata") == 4
+    assert [t.label for t in app.tabs] == [
+        "Gara", "Categorie, specialità e giornate", "Programmazione",
+        "Foglio programma"]
+    days = app.button_group(key="prog_day")
+    assert [o.content for o in days.options] == [
+        f"Giornata {n} · 08-0{n + 3}" for n in (1, 2, 3, 4)]
+    # one day is drawn, and it is a day: the scaletta and the register of it
+    # one table for the giornata: the register is three columns of it now, and
+    # the second table under it is gone
+    heads = [s.value for s in app.subheader]
+    assert heads.count("Fasi della giornata") == 1
+    assert "Comunicati della giornata" not in heads
+    # and the one summary: rows the categorie, columns the specialità
+    assert "Categorie × specialità" in heads
+
+
+def test_a_categoria_is_added_and_given_a_specialita(app):
+    """The workflow the page is built around, end to end.
+
+    A sigla the catalogue has not got, ticked into a specialità: the race is in
+    the programme with the fasi the regulation proposes and on no giornata,
+    which is what the checks then say. Unticking takes it away again.
+    """
+    _programme_page(app)
+    app.text_input(key="prog_cat_code").set_value("MA").run()
+    app.button(key="prog_cats_add_go").click().run()
+    assert not app.exception
+    draft = app.session_state["prog_draft"]
+    assert "MA" in draft.categories
+
+    app.multiselect(key="prog_evs_MA").set_value(["keirin"]).run()
+    assert not app.exception
+    item = app.session_state["prog_draft"].scheduled("MA", "keirin")
+    assert item is not None and item.rounds, "the race came with no fasi"
+    assert item.day == 0 and all(r.day == 0 for r in item.rounds)
+    assert any("nessuna giornata" in w.value for w in app.warning)
+
+    app.multiselect(key="prog_evs_MA").set_value([]).run()
+    assert app.session_state["prog_draft"].scheduled("MA", "keirin") is None
+
+
+def test_a_specialita_is_split_over_two_days_from_the_day_it_moves_to(app):
+    """Two of the velocità's fasi put on the fourth day, and they say so.
+
+    The race stays one - `scheduled` still finds all five fasi - and the ones
+    that moved carry their own giornata.
+    """
+    _programme_page(app)
+    _day(app, 4)
+    app.selectbox(key="prog_addcat_4").set_value("AL").run()
+    app.selectbox(key="prog_addev_4").set_value("velocita").run()
+    picker = app.multiselect(key="prog_addrnd_4_AL_velocita")
+    moved = list(picker.value)[-2:]
+    picker.set_value(moved).run()
+    app.button(key="prog_add_4").click().run()
+    assert not app.exception
+
+    draft = app.session_state["prog_draft"]
+    item = draft.scheduled("AL", "velocita")
+    assert len(item.rounds) == 5, "the split made a second race"
+    assert [r.key for r in item.rounds if draft.day_of(item, r) == 4] == moved
+    assert {draft.day_of(item, r) for r in item.rounds} == {item.day, 4}
+
+
+# The scaletta of a giornata is a `st.data_editor`, and AppTest cannot type
+# into one (see the note in `conftest`): what the grid hands back is a frame,
+# so the three tests below hand one over themselves and check what the page
+# then writes onto the programme. It is the whole of the write-back - the
+# order, the orario, and the fase taken off the day.
+
+def _scaletta(comp, day):
+    from ui.pages import programme as PP
+    on = comp.rounds_on(day)
+    return on, PP._day_rows(comp, on, numbers=False, race=False)
+
+
+def _apply(comp, day, edits: dict):
+    """Edit the scaletta of a day the way the grid does, and apply it."""
+    import pandas as pd
+    from ui.pages import programme as PP
+
+    on, rows = _scaletta(comp, day)
+    frame = pd.DataFrame(rows)
+    for (row, col), value in edits.items():
+        frame.at[row, col] = value
+    return PP._apply_scaletta(comp, on, rows, frame)
+
+
+def _fresh():
+    """The real championship programme, off disk and untouched."""
+    from core.config import load_competition
+    return load_competition(programme_path())
+
+
+def test_a_fase_typed_to_the_front_takes_the_giornata_with_it():
+    """The gesture the scaletta exists for, and the file it leaves behind."""
+    comp = _fresh()
+    was = [(i.cat, r.key) for i, r in comp.rounds_on(2)]
+
+    assert _apply(comp, 2, {(4, "n"): 1}), "the page did not see the edit"
+    now = [(i.cat, r.key) for i, r in comp.rounds_on(2)]
+    assert now[0] == was[4], "the fase did not go to the front"
+    assert now[1:] == was[:4] + was[5:], "the rest did not keep its order"
+    # renumbered whole, from 1: a running order with a hole in it says nothing
+    assert [r.seq for _i, r in comp.rounds_on(2)] == list(range(1, len(now) + 1))
+
+
+def test_two_numbers_typed_before_applying_both_land():
+    """One commit, not one rerun per fase - which is what the grid is for."""
+    comp = _fresh()
+    was = [(i.cat, r.key) for i, r in comp.rounds_on(2)]
+
+    _apply(comp, 2, {(5, "n"): 1, (6, "n"): 2})
+    now = [(i.cat, r.key) for i, r in comp.rounds_on(2)]
+    assert now[:2] == [was[5], was[6]]
+
+
+def test_a_scaletta_nobody_touched_writes_nothing():
+    """Opening a giornata must not put a `seq:` on every fase of it.
+
+    The scaletta is shown numbered 1..N whether or not the file says so
+    (`config.rounds_on` falls back to the order the programme is in), so a
+    write-back that dealt the numbers out unasked would turn every giornata
+    merely opened into a diff.
+    """
+    comp = _fresh()
+    was = [r.seq for i in comp.programme for r in i.rounds]
+    assert not _apply(comp, 2, {})
+    assert [r.seq for i in comp.programme for r in i.rounds] == was
+
+
+def test_the_box_takes_a_fase_off_the_day_and_leaves_it_in_the_programme():
+    """`Togli` is about the giornata, never about the programme."""
+    comp = _fresh()
+    on, _rows = _scaletta(comp, 2)
+    item, rnd = on[3]
+
+    assert _apply(comp, 2, {(3, "off"): True})
+    assert comp.day_of(item, rnd) == 0, "still on the day"
+    assert rnd in comp.scheduled(item.cat, item.event).rounds, "left the race"
+    assert (item.cat, rnd.key) not in [(i.cat, r.key)
+                                       for i, r in comp.rounds_on(2)]
+
+
+def test_the_orario_is_typed_into_the_scaletta():
+    """The one field of a fase that is read off the running order itself."""
+    comp = _fresh()
+    on, _rows = _scaletta(comp, 2)
+
+    assert _apply(comp, 2, {(0, "start"): "09:30"})
+    assert on[0][1].start == "09:30"
+
+
+def test_the_scaletta_carries_the_numbers_of_the_comunicati():
+    """One table: the fase, and beside it the comunicato each sheet goes out on.
+
+    The register used to be a second table under the first, in the same order,
+    with the same fasi in it - and keeping the two in step by reading down one
+    and up the other was the work the jury was left with.
+    """
+    from ui.pages import programme as PP
+
+    comp = _fresh()
+    rows = PP._day_rows(comp, comp.rounds_on(2), numbers=True, race=True)
+    first = rows[0]
+    assert (first["cat"], first["round"]) == ("ES", "Qualificazioni")
+    assert first["com_start"] and first["com_res"]
+    # and what the fase actually rides, where it is read
+    assert "km" in first["event"] and "giri" in first["event"]
+
+
+def test_the_race_line_is_off_when_the_switch_is():
+    """Two switches in the sidebar, and off is the shortest table there is."""
+    from ui.pages import programme as PP
+
+    comp = _fresh()
+    rows = PP._day_rows(comp, comp.rounds_on(2), numbers=False, race=False)
+    assert "com_start" not in rows[0]
+    assert rows[0]["event"] == "Velocità"
+
+
+def test_two_sheets_given_one_number_become_one_comunicato():
+    """Typing the number of another sheet is how a comunicato is merged.
+
+    Which is what a velocità does every turno, and what the register has always
+    meant by two rows with one number on them.
+    """
+    from ui.pages import programme as PP
+
+    comp = _fresh()
+    item, rnd = comp.rounds_on(2)[0]
+    start = PP._spec_of(comp, item, rnd, "partenti").n
+    assert PP._renumber_sheets(comp, [(item, rnd, "risultati", start)])
+
+    one = [c for c in comp.communiques if c.n == start]
+    assert len(one) == 1, "the number is on two comunicati"
+    assert [s.doc for s in one[0].sheets] == ["partenti", "risultati"]
+    # and the table says so on the row of that fase
+    row = PP._day_rows(comp, comp.rounds_on(2), numbers=True, race=False)[0]
+    assert row["com_start"] == row["com_res"] == start
+
+
+def test_a_fase_files_the_two_usual_sheets_without_being_told():
+    """`Round.docs = None` is *the usual two*, and reading it raw lost them.
+
+    Opening a fase seeded the picker from the raw field, showed nothing ticked
+    and wrote that back: a fase that files no comunicato because somebody
+    looked at it.
+    """
+    from core.config import Round
+    from ui.pages import programme as PP
+
+    assert PP._docs_of(Round(key="Finale")) == ["partenti", "risultati"]
+    assert PP._docs_of(Round(key="Finale", docs=["risultati"])) == ["risultati"]
+    assert PP._docs_of(Round(key="Composizione coppie", kind="setup")) == []
+
+
+def test_assigning_the_documents_gives_back_the_file_that_was_written_by_hand():
+    """The strongest check there is: on CITA26 it changes nothing.
+
+    Which sheets a fase files was decided by hand, fase by fase, for a hundred
+    and forty comunicati. Proposing them from the regulation has to come out at
+    exactly that file, or the button is a way of losing a championship's worth
+    of decisions.
+    """
+    from ui.pages import programme as PP
+
+    comp = _fresh()
+    assert PP._assign_docs(comp, classification=True, repechages=True,
+                           keep=False) == 0
+
+
+def test_assigning_the_documents_fills_in_a_programme_that_states_none():
+    """And on a programme that says nothing, every fase comes out stated."""
+    from core.config import load_competition
+    from ui.pages import programme as PP
+
+    comp = load_competition("competitions/TR26_test/programme.yaml")
+    assert PP._assign_docs(comp, classification=True, repechages=True,
+                           keep=False) > 0
+    for item in comp.programme:
+        ridden = [r for r in item.rounds if r.kind != "setup"]
+        assert all(r.docs for r in ridden), item.event
+        # the classifica closes the specialità, and closes it once
+        closing = [r for r in ridden if "classifica" in (r.docs or [])]
+        assert len(closing) == 1 and closing[0] is ridden[-1]
 
 
 def test_saving_the_programme_changes_nothing(app, tmp_path):
@@ -2266,8 +2553,6 @@ def test_a_competition_with_no_programme_builds_one(empty):
     [b for b in empty.button if "Crea" in b.label][-1].click().run()
     assert not empty.exception
 
-    path = (empty.session_state["setup_draft"] if "setup_draft"
-            in empty.session_state else None)
     written = load_competition(
         __import__("core.store", fromlist=["open_competition"])
         .open_competition("TR2026").path("programme.yaml"))
@@ -2281,11 +2566,11 @@ def test_a_competition_with_no_programme_builds_one(empty):
 def test_a_specialita_is_picked_and_its_shape_asked_per_categoria(empty):
     """Seven fields typed by hand is how an inseguimento becomes a corsa.
 
-    The specialità are *picked* - the catalogue knows the code, the sigla, the
-    format and the atleti per squadra. What differs from categoria to categoria
-    is asked when the race is put on a giornata, and not once for everybody:
-    the same chilometro is ridden two at a time by one categoria and one at a
-    time by the next.
+    The specialità are *ticked*, on the categoria that rides them - the
+    catalogue knows the code, the sigla, the format and the atleti per squadra,
+    and the race comes out whole. What differs from categoria to categoria is
+    asked under that categoria and nowhere else: the same chilometro is ridden
+    two at a time by one and one at a time by the next.
     """
     from core.config import Category
 
@@ -2305,23 +2590,28 @@ def test_a_specialita_is_picked_and_its_shape_asked_per_categoria(empty):
     _page(app, "Programma")
     empty = app
 
-    empty.multiselect(key="prog_events_pick").set_value(["chilometro"]).run()
+    empty.multiselect(key="prog_evs_DA").set_value(["chilometro"]).run()
     assert not empty.exception
 
     ev = empty.session_state["prog_draft"].events["chilometro"]
     assert (ev.fmt, ev.abbr) == ("time_trial", "TT")
 
-    # scheduling it gives the whole race, distance and giri included, and asks
-    # the one thing the specialità cannot answer for every categoria
+    # ticking it gave the whole race, distance and giri included; the one thing
+    # the specialità cannot answer for every categoria is asked under this one
+    starts = empty.radio(key="prog_opt_per_start_DA_chilometro")
+    starts.set_value(starts.options[1]).run()          # uno alla volta
+    assert not empty.exception
+
+    # and it is put on the giornata one fase at a time
     empty.selectbox(key="prog_addcat_1").set_value("DA").run()
     empty.selectbox(key="prog_addev_1").set_value("chilometro").run()
-    starts = empty.radio(key="prog_opt_per_start_add_1")
-    starts.set_value(starts.options[1]).run()          # uno alla volta
+    empty.multiselect(key="prog_addrnd_1_DA_chilometro").set_value(["Finale"]).run()
     empty.button(key="prog_add_1").click().run()
     assert not empty.exception
 
     item = empty.session_state["prog_draft"].scheduled("DA", "chilometro")
     assert [r.key for r in item.rounds] == ["Finale"]
+    assert item.day == 1
     # a kilometre is a kilometre, and on a 250 it is four giri
     assert (item.rounds[0].distance, item.rounds[0].laps) == (1.0, 4.0)
     assert item.rounds[0].docs[-1] == "classifica"
@@ -2370,3 +2660,40 @@ def test_the_last_races_are_one_tap_away(app, iscritti_path):
     assert app.selectbox(key="ga_cat").value == "AL"
     assert app.selectbox(key="ga_event").value == "velocita"
     assert app.selectbox(key="ga_round").value == "Qualificazioni"
+
+
+def test_an_inseguimento_can_be_ridden_as_a_direct_final(app, iscritti_path):
+    """«Finale diretta»: one race against the clock, and the classifica.
+
+    A categoria that has not got four squadre does not ride finals: it rides
+    once, the times are taken and the classification comes straight out of
+    them. The programme says so by scheduling one fase, and the race page has
+    to run it like the qualification it replaces - not like a finals round
+    waiting for somebody to load four teams into it.
+    """
+    from core import rounds as RD
+    from core.config import load_competition
+    from core.programme import dump
+    from core.store import competitions_root, open_competition
+
+    path = competitions_root() / "CITA26" / "programme.yaml"
+    comp = load_competition(path)
+    item = comp.scheduled("AL", "ins_squadre")
+    item.rounds = RD.propose(comp, "AL", "ins_squadre",
+                             RD.Options(direct_final=True))
+    assert [r.key for r in item.rounds] == ["Finale"]
+    path.write_text(dump(comp), encoding="utf-8")
+
+    rid = _open_race(app, iscritti_path, "AL", "ins_squadre", "Finale")
+    assert not app.exception
+    assert any("Tempi" in s.value for s in app.subheader)
+    # the whole field rides it: there is nothing to qualify into a direct final
+    from core import race as R
+    from core.entries import import_master
+
+    [b for b in app.sidebar.button if "Salva" in b.label][0].click().run()
+    state = open_competition("CITA26").load_race(rid)
+    comp = load_competition(path)
+    riding = R.entrants(import_master(iscritti_path, comp), comp,
+                        "AL", "ins_squadre", "Finale")
+    assert riding and list(state.entrants) == list(riding)

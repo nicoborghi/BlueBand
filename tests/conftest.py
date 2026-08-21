@@ -66,9 +66,23 @@ def store(tmp_path):
     return Store(tmp_path / "evt")
 
 
+def _available(path: Path) -> bool:
+    """Whether a fixture file can be read at all.
+
+    Not just "does it exist": these live on a mounted Drive folder, and a mount
+    that has gone away makes `exists()` *raise* (`OSError: No such device`)
+    rather than answer False - which turned every test that wants the workbook
+    into an error instead of a skip.
+    """
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
 @pytest.fixture(scope="session")
 def iscritti_path():
-    if not ISCRITTI.exists():
+    if not _available(ISCRITTI):
         pytest.skip(f"entry workbook not available: {ISCRITTI}")
     return ISCRITTI
 
@@ -76,6 +90,6 @@ def iscritti_path():
 @pytest.fixture(scope="session")
 def ksport_path():
     """The flat federal export: one sheet, one row per rider, no specialità."""
-    if not KSPORT.exists():
+    if not _available(KSPORT):
         pytest.skip(f"ksport export not available: {KSPORT}")
     return KSPORT

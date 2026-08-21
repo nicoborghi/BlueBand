@@ -1,0 +1,194 @@
+{
+  "_last_updated_": "13 August 2026",
+  "_about_": "Which line opens which sheet, and the wordings this installation says its own way. Read by core/notes.py, edited in Impostazioni. 'rules' is the regulation and ships filled in; 'texts' holds only what somebody rewrote - what is not in it is what the catalogues (core/i18n) say, in every language.",
+  "_about_wordings_": "Lines that reach a sheet but are composed rather than picked by a rule - the keirin describes its own tournament, batteria by batteria, from what the entries make of it (ui/pages/races.py). Listed here so they are editable in Impostazioni like the rest.",
+  "rules": [
+    {
+      "key": "note_madison_startlist",
+      "fmt": "madison",
+      "round": "heats",
+      "doc": "partenti",
+      "args": {
+        "n": "setup:eliminate"
+      }
+    },
+    {
+      "key": "note_madison_results",
+      "fmt": "madison",
+      "round": "heats",
+      "doc": "risultati",
+      "args": {
+        "n": "qualify"
+      }
+    },
+    {
+      "key": "note_omnium_startlist",
+      "fmt": "omnium",
+      "round": "heats",
+      "doc": "partenti",
+      "args": {
+        "n": "setup:eliminate"
+      }
+    },
+    {
+      "key": "note_omnium_results",
+      "fmt": "omnium",
+      "round": "heats",
+      "doc": "risultati",
+      "args": {
+        "n": "qualify"
+      }
+    },
+    {
+      "key": "note_scheme_12",
+      "fmt": "sprint",
+      "round": "qualifying",
+      "doc": "partenti",
+      "when": {
+        "scheme": "12"
+      }
+    },
+    {
+      "key": "note_scheme_12",
+      "fmt": "sprint",
+      "round": "qualifying",
+      "doc": "risultati",
+      "when": {
+        "scheme": "12"
+      }
+    },
+    {
+      "key": "note_scheme_8",
+      "fmt": "sprint",
+      "round": "qualifying",
+      "doc": "partenti",
+      "when": {
+        "scheme": "8"
+      }
+    },
+    {
+      "key": "note_scheme_8",
+      "fmt": "sprint",
+      "round": "qualifying",
+      "doc": "risultati",
+      "when": {
+        "scheme": "8"
+      }
+    },
+    {
+      "key": "note_sprint_round1_start",
+      "fmt": "sprint",
+      "round": "round1",
+      "doc": "partenti",
+      "args": {
+        "winner": "word:winner",
+        "others": "word:others"
+      }
+    },
+    {
+      "key": "note_sprint_round1_results",
+      "fmt": "sprint",
+      "round": "round1",
+      "doc": "risultati",
+      "args": {
+        "winner": "word:winner"
+      }
+    },
+    {
+      "key": "note_sprint_repechage",
+      "fmt": "sprint",
+      "round": "repechage",
+      "doc": "partenti",
+      "args": {
+        "winners": "word:winners",
+        "others": "word:others"
+      }
+    },
+    {
+      "key": "note_qualify_teams",
+      "fmt": "timed_team",
+      "round": "qualifying",
+      "doc": "partenti",
+      "args": {
+        "n": "qualify"
+      }
+    },
+    {
+      "key": "note_qualify_teams",
+      "fmt": "timed_team",
+      "round": "qualifying",
+      "doc": "risultati",
+      "args": {
+        "n": "qualify"
+      }
+    },
+    {
+      "key": "note_qualify_times",
+      "fmt": "timed",
+      "round": "qualifying",
+      "doc": "partenti",
+      "args": {
+        "n": "qualify"
+      }
+    },
+    {
+      "key": "note_qualify_times",
+      "fmt": "timed",
+      "round": "qualifying",
+      "doc": "risultati",
+      "args": {
+        "n": "qualify"
+      }
+    },
+    {
+      "key": "note_first_team_finish",
+      "fmt": "timed_team",
+      "doc": "partenti",
+      "when": {
+        "starts_two": true,
+        "half_laps": false
+      }
+    },
+    {
+      "key": "note_first_team_back",
+      "fmt": "timed_team",
+      "doc": "partenti",
+      "when": {
+        "starts_two": true,
+        "half_laps": true
+      }
+    },
+    {
+      "key": "note_first_rider",
+      "fmt": "timed",
+      "doc": "partenti",
+      "when": {
+        "starts_two": true,
+        "half_laps": false
+      }
+    },
+    {
+      "key": "note_first_rider_back",
+      "fmt": "timed",
+      "doc": "partenti",
+      "when": {
+        "starts_two": true,
+        "half_laps": true
+      }
+    },
+    {
+      "key": "note_change_half_lap",
+      "event": "vel_squadre",
+      "doc": "partenti",
+      "when": {
+        "track_m": 333
+      }
+    }
+  ],
+  "wordings": [
+    "note_keirin_stage",
+    "note_keirin_rep_stage",
+    "note_keirin_repechages"
+  ],
+  "texts": {}
+}

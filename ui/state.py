@@ -11,7 +11,8 @@ from dataclasses import fields, replace
 import streamlit as st
 
 from core import entries as E
-from core.i18n import msg, set_language, set_overrides, ui
+from core import notes as NOTES
+from core.i18n import set_language, set_overrides, ui
 from core.config import Competition, load_competition, validate
 from core.store import (Store, competitions_root, current_competition,
                         list_competitions, open_competition,
@@ -27,9 +28,6 @@ BRANDING_SETTINGS = ("signature", "header_img", "footer_img",
                      "name_style", "name_width", "note_colors",
                      "decision_codes")
 
-# What a squadra is here and what it is called: the programme states the rule,
-# this machine can override it (Impostazioni → Squadra).
-ENTRY_SETTINGS = ("team_group", "team_name")
 
 #: Where the language of this competition is stored (Impostazioni → Lingua).
 #: Unset - which is every competition set up before it could be chosen - is the
@@ -92,6 +90,11 @@ def competition(name: str) -> Competition | None:
     # `validate`, the sidebar, the page that follows - looks up its prose in
     # the catalogue of whatever is set here
     set_language(settings.get(LANGUAGE))
+    # and, in that language, the lines this installation words its own way:
+    # what a batteria announces, where a squadra lines up (`core.notes`). They
+    # are read through the same catalogue as everything else, so they have to
+    # be in force before the first `msg` of the run
+    NOTES.apply()
     comp = _stale_free(str(p), p.stat().st_mtime)
     # an empty value is not a choice - a signature never set must not blank the
     # one the programme carries - but False *is* one: a tick taken off in
@@ -100,9 +103,6 @@ def competition(name: str) -> Competition | None:
             if settings.get(k) or isinstance(settings.get(k), bool)}
     if over:
         comp = replace(comp, branding=replace(comp.branding, **over))
-    over = {k: settings[k] for k in ENTRY_SETTINGS if settings.get(k)}
-    if over:
-        comp = replace(comp, entry_sheet=replace(comp.entry_sheet, **over))
     # every sheet calls the squadra by the word chosen for this competition,
     # so it is set once here rather than passed down to each builder
     set_overrides({"team": comp.team_name, "team_en": comp.team_name})
@@ -128,6 +128,17 @@ def choose_competition(name: str) -> None:
 
 def store(name: str) -> Store:
     return open_competition(name)
+
+
+def has_entries(name: str) -> bool:
+    """Whether this competition has an elenco iscritti at all.
+
+    What the menu is built on (`app.NEEDS_ENTRIES`): five of the seven pages
+    are about the riders and have nothing to show without them. The snapshot on
+    disk answers it - reading it is what those pages would do anyway, and it is
+    cached with everything else the run reads.
+    """
+    return E.load_import(store(name)) is not None
 
 
 def entry_list(name: str, comp: Competition):

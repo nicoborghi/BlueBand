@@ -1,0 +1,103 @@
+name: build
+
+# The Windows installer, built from a clean environment on every tag - and on
+# demand, so a build can be checked without cutting a release.
+#
+# The environment is built from `pyproject.toml` and nothing else: that file is
+# the manifest, and PyInstaller bundles what it finds - so a build machine with
+# a working scientific environment on it would quietly ship matplotlib and half
+# of astropy inside a jury's console.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install exactly what the app declares
+        run: pip install -e ".[build]"
+
+      - name: The icon, from the wordmark
+        # Edge is on every Windows runner, and it is what rasterises the SVG
+        run: python packaging/make_icon.py
+
+      - name: Freeze
+        run: pyinstaller packaging/blueband.spec --noconfirm
+
+      - name: The size budget
+        shell: pwsh
+        run: |
+          $mb = [math]::Round((Get-ChildItem dist/BlueBand -Recurse |
+                Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+          Write-Host "bundle: $mb MB"
+          # pandas, numpy and pyarrow are in here on purpose and they are most
+          # of it. The budget is a tripwire for something *new* arriving, not a
+          # target - read docs/BUILD.md before raising it.
+          if ($mb -gt 600) { throw "bundle is $mb MB, budget is 600 MB" }
+
+      - name: The bundle is whole
+        # every module imports and every data file is there. A bundle missing
+        # `core` still starts and still serves a page - it dies on the first
+        # render - so this runs before the check that it answers, not after.
+        run: dist/BlueBand/BlueBand.exe --check
+
+      - name: It starts, and it answers
+        shell: pwsh
+        env:
+          # pinned so the check knows where to knock, instead of guessing at
+          # whatever free port the launcher picked (`launcher.free_port`)
+          BLUEBAND_PORT: "8599"
+        run: |
+          $app = Start-Process dist/BlueBand/BlueBand.exe -PassThru
+          $ok = $false
+          foreach ($try in 1..30) {
+            Start-Sleep -Seconds 2
+            try {
+              $r = Invoke-WebRequest "http://localhost:8599/healthz" `
+                   -TimeoutSec 3 -UseBasicParsing
+              if ($r.Content -eq "ok") { $ok = $true; break }
+            } catch { }
+          }
+          Stop-Process -Id $app.Id -Force
+          if (-not $ok) { throw "the packaged app did not answer on 8599" }
+
+      - name: Installer
+        run: |
+          $v = "${{ github.ref_name }}" -replace '^v', ''
+          if (-not $v) { $v = "0.0.0" }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=$v" packaging\blueband.iss
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BlueBand-setup
+          path: dist/*setup.exe
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*setup.exe
