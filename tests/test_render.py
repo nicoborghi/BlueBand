@@ -330,14 +330,10 @@ def test_letterhead_can_be_switched_off(entries, comp):
 
 # ── PDF output ──────────────────────────────────────────────────────────────
 
-def test_pdf_export(entries, comp, tmp_path):
+def test_pdf_export(entries, comp, tmp_path, chromium):
     """The jury saves a PDF directly; HTML is only the fallback."""
     from core.store import Store
-    from render import pdf as P
     from render.render import archive
-
-    if not P.available():
-        pytest.skip("nessun browser Chromium installato")
 
     # the store must live where the browser can read it: a snap-confined
     # Chromium cannot open /tmp, which is exactly the fallback path below
@@ -369,7 +365,8 @@ def test_the_browser_profile_never_goes_next_to_the_document(tmp_path,
 
 
 def test_a_working_directory_the_browser_cannot_use_is_not_the_answer(tmp_path,
-                                                                      monkeypatch):
+                                                                      monkeypatch,
+                                                                      chromium):
     """The Drive folder is offered first and dropped when it does not work.
 
     The comunicati live on `/mnt/g/...`, which a snap Chromium cannot write to
@@ -378,8 +375,6 @@ def test_a_working_directory_the_browser_cannot_use_is_not_the_answer(tmp_path,
     """
     from render import pdf as P
 
-    if not P.available():
-        pytest.skip("nessun browser Chromium installato")
     dead = tmp_path / "dead"
     dead.mkdir()
     dead.chmod(0o500)                        # created, never written into
@@ -397,7 +392,7 @@ def test_a_working_directory_the_browser_cannot_use_is_not_the_answer(tmp_path,
 
 
 def test_every_profile_candidate_is_tried_before_giving_up(monkeypatch,
-                                                           tmp_path):
+                                                           tmp_path, chromium):
     """One unusable directory is not the answer: the next one is tried.
 
     A profile that cannot be locked kills the run without a word about the
@@ -405,8 +400,6 @@ def test_every_profile_candidate_is_tried_before_giving_up(monkeypatch,
     """
     from render import pdf as P
 
-    if not P.available():
-        pytest.skip("nessun browser Chromium installato")
     dead = tmp_path / "dead"
     dead.mkdir()
     dead.chmod(0o500)                        # created, never written into

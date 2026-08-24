@@ -61,8 +61,17 @@ select = ["E4", "E7", "E9", "F"]
 
 [tool.coverage.run]
 # the app, not the tests and not the packaging scripts: what is measured is
-# what a jury runs
-source = ["core", "render", "ui", "app.py", "launcher.py"]
+# what a jury runs.
+#
+# Module names, not file names. `source` entries that are not directories are
+# resolved with `importlib.util.find_spec`, and "app.py" resolves as the
+# submodule `py` of the package `app` - which *imports* app.py to look inside
+# it, from within coverage's own trace callback. The import of pandas that
+# happens down there is aborted half way and numpy stays broken for the rest
+# of the process ("cannot load module more than once per process"), so every
+# later `import pandas` in the run raises. Two names with an extension cost
+# the whole suite.
+source = ["core", "render", "ui", "app", "launcher"]
 branch = true
 omit = ["*/__pycache__/*", "tests/*"]
 

@@ -102,3 +102,35 @@ def ksport_path():
     if not _available(KSPORT):
         pytest.skip(f"ksport export not available: {KSPORT}")
     return KSPORT
+
+
+@pytest.fixture(scope="session")
+def chromium():
+    """A Chromium that actually prints, not merely one on the PATH.
+
+    `render.pdf.available()` answers whether a binary is *installed*, which is
+    the right question for the app - it decides whether to try at all - and the
+    wrong one for the two tests that drive a real run. A CI runner has Chrome
+    on the PATH and hangs on `--print-to-pdf`: each of those tests then spent
+    the full `pdf.TIMEOUT` on every candidate directory before going red, ten
+    minutes of the job to say nothing about the code.
+
+    So the guard is a run, not a lookup - once per session, on a short leash.
+    The app needs no such thing: a browser that hangs is a document that comes
+    out as HTML, which is what `pdf_failed` is for and what its own test
+    checks.
+    """
+    from render import pdf as P
+
+    if not P.available():
+        pytest.skip("nessun browser Chromium installato")
+    was = P.TIMEOUT
+    P.TIMEOUT = 15
+    try:
+        data = P.html_to_pdf("<html><body><p>prova</p></body></html>")
+    except P.PdfError as exc:
+        pytest.skip(f"Chromium non stampa su questa macchina: {exc}")
+    finally:
+        P.TIMEOUT = was
+    assert data.startswith(b"%PDF")
+    return P.browser()
