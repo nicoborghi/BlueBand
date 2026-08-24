@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from conftest import programme_path
+from conftest import EXAMPLE_PROGRAMME, programme_path
 from core.i18n import catalogue
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -2358,7 +2358,7 @@ def test_assigning_the_documents_fills_in_a_programme_that_states_none():
     from core.config import load_competition
     from ui.pages import programme as PP
 
-    comp = load_competition("competitions/TR26_test/programme.yaml")
+    comp = load_competition(EXAMPLE_PROGRAMME)
     assert PP._assign_docs(comp, classification=True, repechages=True,
                            keep=False) > 0
     for item in comp.programme:

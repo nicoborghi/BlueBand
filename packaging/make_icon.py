@@ -1,4 +1,4 @@
-"""Turn `header/track.svg` into the `.ico` the Windows build wants.
+"""Turn `ui/track.svg` into the `.ico` the Windows build wants.
 
     python packaging/make_icon.py
 
@@ -28,7 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-SOURCE = ROOT / "header" / "track.svg"
+SOURCE = ROOT / "ui" / "track.svg"
 TARGET = ROOT / "packaging" / "blueband.ico"
 
 #: What Windows asks for, largest first. 256 is the desktop and the installer,

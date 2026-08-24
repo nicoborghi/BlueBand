@@ -50,7 +50,10 @@ datas = [
     (str(ROOT / "regulations"), "regulations"),
     (str(ROOT / "render" / "templates"), "render/templates"),
     (str(ROOT / "render" / "print.css"), "render"),
-    (str(ROOT / "header"), "header"),
+    # the wordmark and the icon: data inside a *code* package, so
+    # `collect_submodules("ui")` below does not reach them
+    (str(ROOT / "ui" / "track.svg"), "ui"),
+    (str(ROOT / "ui" / "track_text_ink.svg"), "ui"),
 ]
 
 # Streamlit's frontend and the metadata it reads its own version from. The

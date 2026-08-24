@@ -6,17 +6,14 @@ of that categoria. These are about that translation - and about the two things
 it must never get wrong: the dorsali, and the work already done in the file.
 """
 
-from pathlib import Path
-
 import pytest
 
+from conftest import EXAMPLE_ENTRIES, EXAMPLE_PROGRAMME
 from core import entries as E
 from core import entry_book as B
 from core import entry_formats as F
 from core import programme as P
 from core.config import load_competition
-
-KSPORT = Path("competitions/TR26_test/Iscritti_182447.xls")
 
 
 @pytest.fixture
@@ -27,8 +24,7 @@ def comp():
     written into `entries:` by hand before anything could be imported at all,
     and now it comes from the format (`core.entry_formats`).
     """
-    return F.applied(load_competition("competitions/TR26_test/programme.yaml"),
-                     "ksport")
+    return F.applied(load_competition(EXAMPLE_PROGRAMME), "ksport")
 
 
 @pytest.fixture
@@ -39,39 +35,49 @@ def master():
     header five rows down, and what is built from it is ours - a sheet per
     categoria, the header on the first row.
     """
-    return F.applied(load_competition("competitions/TR26_test/programme.yaml"),
-                     "master")
+    return F.applied(load_competition(EXAMPLE_PROGRAMME), "master")
 
 
 @pytest.fixture
 def entries(comp):
-    if not KSPORT.exists():
-        pytest.skip("the sample ksport export is not in the checkout")
-    return E.import_ksport_export(KSPORT, comp)
+    """The fictional field that ships with the repo (`example`).
+
+    Which is the point of it being fictional: a real elenco is a few hundred
+    minors' personal data and cannot be in the repo, so these used to run on
+    the one laptop that has the Drive folder mounted and skip everywhere else.
+    """
+    return E.import_ksport_export(EXAMPLE_ENTRIES, comp)
 
 
 # ── the format, which is what makes the file readable at all ────────────────
 
 def test_a_competition_that_states_no_layout_is_read_by_the_format(comp):
     """Nothing had to be typed into `programme.yaml` for this to be readable."""
-    bare = load_competition("competitions/TR26_test/programme.yaml")
+    bare = load_competition(EXAMPLE_PROGRAMME)
     assert not bare.entry_sheet.ksport, "the fixture is not testing anything"
     assert comp.entry_sheet.ksport["CodiceUci"] == "uci_id"
     assert comp.entry_sheet.check_in == {"Verificato": "checked_in",
                                          "NP": "not_starting"}
 
 
-def test_what_a_programme_states_itself_wins_over_the_format():
+def test_what_a_programme_states_itself_wins_over_the_format(tmp_path):
     """A federation that renames a column is a line in the table; a meeting
     that reads a file of its own is a line in its programme."""
-    comp = load_competition("competitions/CITA26/programme.yaml")
+    written = tmp_path / "programme.yaml"
+    written.write_text("name: Una riunione che legge un file suo\n"
+                       "entries:\n"
+                       "  ksport:\n"
+                       '    "Tessera UCI": uci_id\n', encoding="utf-8")
+    comp = load_competition(written)
     mine = dict(comp.entry_sheet.ksport)
+    assert mine == {"Tessera UCI": "uci_id"}
     assert F.applied(comp, "ksport").entry_sheet.ksport == {
         **F.layout("ksport")["ksport"], **mine}
 
 
 def test_the_sample_export_is_read_whole(entries):
     assert len(entries.riders) == 140
+    assert not entries.warnings, "the example file must read without a complaint"
     assert {r.cat for r in entries.riders.values()} == {"ES", "ED", "AL", "DA",
                                                         "JU", "DJ"}
 

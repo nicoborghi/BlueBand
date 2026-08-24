@@ -5,7 +5,7 @@ no command line, an icon on the desktop. This is how it is made, and - more
 usefully - which parts of it are load-bearing.
 
 ```bash
-python packaging/make_icon.py                 # header/track.svg -> .ico
+python packaging/make_icon.py                 # ui/track.svg -> .ico
 pyinstaller packaging/blueband.spec --noconfirm
 iscc packaging/blueband.iss                   # Windows only, Inno Setup 6
 ```

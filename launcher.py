@@ -111,7 +111,7 @@ def options(port: int) -> dict:
 REQUIRED = ("app.py", "regulations/events.json", "regulations/distances.json",
             "regulations/penalties.json", "render/print.css",
             "render/templates/document.html.j2", "render/templates/page.html.j2",
-            "header/track.svg", "header/track_text_ink.svg")
+            "ui/track.svg", "ui/track_text_ink.svg")
 
 #: Imported by `--check`. `app.py` itself is not: it calls `set_page_config`
 #: on import, which needs a running Streamlit. These reach everything it would.

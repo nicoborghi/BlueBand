@@ -1,0 +1,278 @@
+# Trofeo di Esempio 2026 - manifestazione fittizia
+#
+# Il programma di una riunione inventata, con l'elenco iscritti fittizio che
+# le sta accanto (`Iscritti_999999.xlsx`). Nessun dato qui viene da una gara
+# vera: e' quello che si apre per vedere come lavora l'app, ed e' quello su
+# cui girano i test che hanno bisogno di un elenco (tests/test_entry_book.py).
+#
+# La struttura - categorie, specialita', orari, registro comunicati - e' quella
+# di una finale del Trofeo delle Regioni, perche' un esempio che non somiglia a
+# una riunione vera non insegna niente e non prova niente.
+
+
+# ── manifestazione ──────────────────────────────────────────────
+name: Trofeo di Esempio 2026
+short: example
+id: "999999"
+location: Velodromo di Esempio
+dates: ["2026-09-02"]
+track_len: 0.3333
+
+# ── testata, piè di pagina, firma ───────────────────────────────
+branding:
+  color: "#0a5688"
+  signature_mode: image
+  signature_scope: always
+  name_style: split
+  name_width: 0.62
+
+# ── categorie ───────────────────────────────────────────────────
+categories:
+  ES: {name: ESORDIENTI MASCHI, sex: M, order: 1}
+  ED: {name: ESORDIENTI FEMMINE, sex: F, order: 2}
+  AL: {name: ALLIEVI MASCHI, sex: M, order: 3}
+  DA: {name: ALLIEVE FEMMINE, sex: F, order: 4}
+  JU: {name: JUNIORES MASCHI, sex: M, order: 5}
+  DJ: {name: JUNIORES FEMMINE, sex: F, order: 6}
+
+# ── specialità ──────────────────────────────────────────────────
+events:
+  omnium:
+    name: OMNIUM
+    short: Omnium
+    order: 0
+  madison:
+    name: MADISON
+    short: Madison
+    order: 1
+  ins_squadre:
+    name: INSEGUIMENTO A SQUADRE
+    short: Ins. Squadre
+    order: 2
+  vel_squadre:
+    name: VELOCITÀ A SQUADRE
+    short: Vel. Squadre
+    order: 3
+  eliminazione:
+    name: ELIMINAZIONE
+    short: Eliminazione
+    order: 4
+  chilometro:
+    name: CHILOMETRO DA FERMO
+    short: Chilometro
+    order: 5
+
+# ── quote di iscrizione (comunicato STP) ────────────────────────
+quotas:
+  max_events_level: warn
+  max_events_count_reserves: false
+
+# ── programma gare ──────────────────────────────────────────────
+programme:
+
+  # ── giorno 1 · 2026-09-02 ────────────────────────────
+  - cat: ES
+    event: omnium
+    day: 1
+    rounds:
+      - {key: Tempo Race, seq: 2, distance: 2.7, laps: 8, sprints: 4, start: "9:15", docs: []}
+      - {key: Eliminazione, seq: 8, start: "11:20", docs: []}
+      - {key: Corsa a Punti, seq: 13, distance: 6.7, laps: 20, sprints: 4, start: "12:45", docs: []}
+  - cat: ES
+    event: madison
+    day: 1
+    rounds:
+      - {key: Composizione coppie, kind: setup}
+      - {key: Finale, seq: 17, distance: 6.7, laps: 20, sprints: 4, start: "13:55", docs: []}
+  - cat: ED
+    event: omnium
+    day: 1
+    rounds:
+      - {key: Tempo Race, seq: 1, distance: 2.7, laps: 8, sprints: 4, start: "9:00", docs: [partenti, gara, risultati, classifica_parziale, classifica]}
+      - {key: Eliminazione, seq: 7, start: "11:00", docs: []}
+      - {key: Corsa a Punti, seq: 12, distance: 6.7, laps: 20, sprints: 4, start: "12:25", docs: []}
+  - cat: ED
+    event: madison
+    day: 1
+    rounds:
+      - {key: Composizione coppie, kind: setup}
+      - {key: Finale, seq: 16, distance: 6.7, laps: 20, sprints: 4, start: "13:35", docs: []}
+  - cat: AL
+    event: ins_squadre
+    day: 1
+    rounds:
+      - {key: Finale, seq: 3, distance: 3, laps: 9, start: "9:30", docs: []}
+  - cat: AL
+    event: madison
+    day: 1
+    rounds:
+      - {key: Composizione coppie, kind: setup}
+      - {key: Finale, seq: 19, distance: 10, laps: 30, sprints: 6, start: "15:00", docs: []}
+  - cat: AL
+    event: vel_squadre
+    day: 1
+    rounds:
+      - {key: Finale, seq: 9, distance: 0.5, laps: 1.5, start: "11:40", docs: []}
+  - cat: DA
+    event: madison
+    day: 1
+    rounds:
+      - {key: Composizione coppie, kind: setup}
+      - {key: Finale, seq: 18, distance: 10, laps: 30, sprints: 6, start: "14:20", docs: []}
+  - cat: DA
+    event: vel_squadre
+    day: 1
+    rounds:
+      - {key: Finale, seq: 11, distance: 0.5, laps: 1.5, start: "12:10", docs: []}
+  - cat: JU
+    event: eliminazione
+    day: 1
+    rounds:
+      - {key: Finale, seq: 5, start: "10:20", docs: []}
+  - cat: JU
+    event: madison
+    day: 1
+    rounds:
+      - {key: Composizione coppie, kind: setup}
+      - {key: Finale, seq: 21, distance: 13, laps: 40, sprints: 8, start: "15:30", docs: []}
+  - cat: JU
+    event: vel_squadre
+    day: 1
+    rounds:
+      - {key: Finale, seq: 10, start: "11:55", docs: []}
+  - cat: JU
+    event: chilometro
+    day: 1
+    teams_per_start: 1
+    rounds:
+      - {key: Finale, seq: 15, distance: 1, laps: 3, start: "13:20", docs: []}
+  - cat: DJ
+    event: eliminazione
+    day: 1
+    rounds:
+      - {key: Finale, seq: 4, start: "10:00", docs: []}
+  - cat: DJ
+    event: chilometro
+    day: 1
+    rounds:
+      - {key: Finale, seq: 14, distance: 1, laps: 3, start: "13:05", docs: []}
+  - cat: DA
+    event: eliminazione
+    day: 1
+    rounds:
+      - {key: Finale, seq: 6, start: "10:40", docs: []}
+
+# ── registro comunicati ─────────────────────────────────────────
+communiques:
+
+  # ── giorno 0 ──────────────────────────────────────────────
+  - {n: 1, day: 0, cat: ES, event: omnium, round: Scratch, doc: partenti, title: ES Omnium Scratch - Partenti}
+  - {n: 2, day: 0, cat: AL, event: ins_squadre, round: Qualificazioni, doc: partenti, title: AL Ins. Squadre Qualificazioni - Partenti}
+  - {n: 3, day: 0, cat: AL, event: vel_squadre, round: Qualificazioni, doc: partenti, title: AL Vel. Squadre Qualificazioni - Partenti}
+  - {n: 4, day: 0, cat: DA, event: ins_squadre, round: Qualificazioni, doc: partenti, title: DA Ins. Squadre Qualificazioni - Partenti}
+  - {n: 5, day: 0, cat: DA, event: vel_squadre, round: Qualificazioni, doc: partenti, title: DA Vel. Squadre Qualificazioni - Partenti}
+  - {n: 6, day: 0, cat: JU, event: eliminazione, round: Finale, doc: partenti, title: JU Eliminazione Finale - Partenti}
+  - {n: 7, day: 0, cat: JU, event: vel_squadre, round: Qualificazioni, doc: partenti, title: JU Vel. Squadre Qualificazioni - Partenti}
+  - {n: 8, day: 0, cat: JU, event: chilometro, round: Finale, doc: partenti, title: JU Chilometro Finale - Partenti}
+  - {n: 9, day: 0, cat: DJ, event: eliminazione, round: Finale, doc: partenti, title: DJ Eliminazione Finale - Partenti}
+  - {n: 10, day: 0, cat: DJ, event: vel_squadre, round: Qualificazioni, doc: partenti, title: DJ Vel. Squadre Qualificazioni - Partenti}
+  - {n: 11, day: 0, cat: DJ, event: chilometro, round: Finale, doc: partenti, title: DJ Chilometro Finale - Partenti}
+  - {n: 12, day: 0, cat: ES, event: omnium, round: Scratch, doc: risultati, title: ES Omnium Scratch - Risultati}
+  - {n: 13, day: 0, cat: AL, event: ins_squadre, round: Qualificazioni, doc: risultati, title: AL Ins. Squadre Qualificazioni - Risultati}
+  - {n: 14, day: 0, cat: AL, event: vel_squadre, round: Qualificazioni, doc: risultati, title: AL Vel. Squadre Qualificazioni - Risultati}
+  - {n: 15, day: 0, cat: DA, event: ins_squadre, round: Qualificazioni, doc: risultati, title: DA Ins. Squadre Qualificazioni - Risultati}
+  - {n: 16, day: 0, cat: DA, event: vel_squadre, round: Qualificazioni, doc: risultati, title: DA Vel. Squadre Qualificazioni - Risultati}
+  - {n: 17, day: 0, cat: JU, event: eliminazione, round: Finale, doc: risultati, title: JU Eliminazione Finale - Risultati}
+  - {n: 18, day: 0, cat: JU, event: eliminazione, round: "", doc: classifica, title: JU Eliminazione - Classifica}
+  - {n: 19, day: 0, cat: JU, event: vel_squadre, round: Qualificazioni, doc: risultati, title: JU Vel. Squadre Qualificazioni - Risultati}
+  - {n: 20, day: 0, cat: JU, event: chilometro, round: Finale, doc: risultati, title: JU Chilometro Finale - Risultati}
+  - {n: 21, day: 0, cat: JU, event: chilometro, round: "", doc: classifica, title: JU Chilometro - Classifica}
+  - {n: 22, day: 0, cat: DJ, event: eliminazione, round: Finale, doc: risultati, title: DJ Eliminazione Finale - Risultati}
+  - {n: 23, day: 0, cat: DJ, event: eliminazione, round: "", doc: classifica, title: DJ Eliminazione - Classifica}
+  - {n: 24, day: 0, cat: DJ, event: vel_squadre, round: Qualificazioni, doc: risultati, title: DJ Vel. Squadre Qualificazioni - Risultati}
+  - {n: 25, day: 0, cat: DJ, event: chilometro, round: Finale, doc: risultati, title: DJ Chilometro Finale - Risultati}
+  - {n: 26, day: 0, cat: DJ, event: chilometro, round: "", doc: classifica, title: DJ Chilometro - Classifica}
+  - {n: 27, day: 0, cat: AL, event: ins_squadre, round: Finali, doc: partenti, title: AL Ins. Squadre Finali - Partenti}
+  - {n: 28, day: 0, cat: AL, event: madison, round: Finale, doc: partenti, title: AL Madison Finale - Partenti}
+  - {n: 29, day: 0, cat: AL, event: vel_squadre, round: Finali, doc: partenti, title: AL Vel. Squadre Finali - Partenti}
+  - {n: 30, day: 0, cat: DA, event: ins_squadre, round: Finali, doc: partenti, title: DA Ins. Squadre Finali - Partenti}
+  - {n: 31, day: 0, cat: DA, event: madison, round: Finale, doc: partenti, title: DA Madison Finale - Partenti}
+  - {n: 32, day: 0, cat: DA, event: vel_squadre, round: Finali, doc: partenti, title: DA Vel. Squadre Finali - Partenti}
+  - {n: 33, day: 0, cat: JU, event: madison, round: Finale, doc: partenti, title: JU Madison Finale - Partenti}
+  - {n: 34, day: 0, cat: JU, event: vel_squadre, round: Finali, doc: partenti, title: JU Vel. Squadre Finali - Partenti}
+  - {n: 35, day: 0, cat: DJ, event: madison, round: Finale, doc: partenti, title: DJ Madison Finale - Partenti}
+  - {n: 36, day: 0, cat: DJ, event: vel_squadre, round: Finali, doc: partenti, title: DJ Vel. Squadre Finali - Partenti}
+  - {n: 37, day: 0, cat: AL, event: ins_squadre, round: Finali, doc: risultati, title: AL Ins. Squadre Finali - Risultati}
+  - {n: 38, day: 0, cat: AL, event: ins_squadre, round: "", doc: classifica, title: AL Ins. Squadre - Classifica}
+  - {n: 39, day: 0, cat: AL, event: madison, round: Finale, doc: risultati, title: AL Madison Finale - Risultati}
+  - {n: 40, day: 0, cat: AL, event: madison, round: "", doc: classifica, title: AL Madison - Classifica}
+  - {n: 41, day: 0, cat: AL, event: vel_squadre, round: Finali, doc: risultati, title: AL Vel. Squadre Finali - Risultati}
+  - {n: 42, day: 0, cat: AL, event: vel_squadre, round: "", doc: classifica, title: AL Vel. Squadre - Classifica}
+  - {n: 43, day: 0, cat: DA, event: ins_squadre, round: Finali, doc: risultati, title: DA Ins. Squadre Finali - Risultati}
+  - {n: 44, day: 0, cat: DA, event: ins_squadre, round: "", doc: classifica, title: DA Ins. Squadre - Classifica}
+  - {n: 45, day: 0, cat: DA, event: madison, round: Finale, doc: risultati, title: DA Madison Finale - Risultati}
+  - {n: 46, day: 0, cat: DA, event: madison, round: "", doc: classifica, title: DA Madison - Classifica}
+  - {n: 47, day: 0, cat: DA, event: vel_squadre, round: Finali, doc: risultati, title: DA Vel. Squadre Finali - Risultati}
+  - {n: 48, day: 0, cat: DA, event: vel_squadre, round: "", doc: classifica, title: DA Vel. Squadre - Classifica}
+  - {n: 49, day: 0, cat: JU, event: madison, round: Finale, doc: risultati, title: JU Madison Finale - Risultati}
+  - {n: 50, day: 0, cat: JU, event: madison, round: "", doc: classifica, title: JU Madison - Classifica}
+  - {n: 51, day: 0, cat: JU, event: vel_squadre, round: Finali, doc: risultati, title: JU Vel. Squadre Finali - Risultati}
+  - {n: 52, day: 0, cat: JU, event: vel_squadre, round: "", doc: classifica, title: JU Vel. Squadre - Classifica}
+  - {n: 53, day: 0, cat: DJ, event: madison, round: Finale, doc: risultati, title: DJ Madison Finale - Risultati}
+  - {n: 54, day: 0, cat: DJ, event: madison, round: "", doc: classifica, title: DJ Madison - Classifica}
+  - {n: 55, day: 0, cat: DJ, event: vel_squadre, round: Finali, doc: risultati, title: DJ Vel. Squadre Finali - Risultati}
+  - {n: 56, day: 0, cat: DJ, event: vel_squadre, round: "", doc: classifica, title: DJ Vel. Squadre - Classifica}
+  - {n: 57, day: 0, cat: ES, event: entry_list, round: "", doc: partenti, title: ES entry_list - Partenti}
+  - {n: 58, day: 0, cat: ED, event: entry_list, round: "", doc: partenti, title: ED entry_list - Partenti}
+  - {n: 59, day: 0, cat: AL, event: entry_list, round: "", doc: partenti, title: AL entry_list - Partenti}
+  - {n: 60, day: 0, cat: DA, event: entry_list, round: "", doc: partenti, title: DA entry_list - Partenti}
+  - {n: 61, day: 0, cat: JU, event: entry_list, round: "", doc: partenti, title: JU entry_list - Partenti}
+  - {n: 62, day: 0, cat: DJ, event: entry_list, round: "", doc: partenti, title: DJ entry_list - Partenti}
+
+  # ── giorno 1 ──────────────────────────────────────────────
+  - {n: 63, day: 1, cat: ED, event: omnium, round: Scratch, doc: partenti, title: ED Omnium Scratch - Partenti}
+  - {n: 64, day: 1, cat: ED, event: omnium, round: Scratch, doc: risultati, title: ED Omnium Scratch - Risultati}
+
+  # ── giorno 0 ──────────────────────────────────────────────
+  - {n: 65, day: 0, cat: ES, event: omnium, round: Tempo Race, doc: partenti, title: ES Omnium Tempo Race - Partenti}
+
+  # ── giorno 1 ──────────────────────────────────────────────
+  - {n: 66, day: 1, cat: ES, event: madison, round: Finale, doc: partenti, title: ES Madison Finale - Partenti}
+  - {n: 67, day: 1, cat: ED, event: omnium, round: Tempo Race, doc: partenti, title: ED Omnium Tempo Race - Partenti}
+  - {n: 68, day: 1, cat: ED, event: madison, round: Finale, doc: partenti, title: ED Madison Finale - Partenti}
+
+  # ── giorno 0 ──────────────────────────────────────────────
+  - {n: 69, day: 0, cat: ES, event: omnium, round: Tempo Race, doc: risultati, title: ES Omnium Tempo Race - Risultati}
+
+  # ── giorno 1 ──────────────────────────────────────────────
+  - {n: 70, day: 1, cat: ES, event: madison, round: Finale, doc: risultati, title: ES Madison Finale - Risultati}
+  - {n: 71, day: 1, cat: ES, event: madison, round: "", doc: classifica, title: ES Madison - Classifica}
+  - {n: 72, day: 1, cat: ED, event: omnium, round: Tempo Race, doc: risultati, title: ED Omnium Tempo Race - Risultati}
+  - {n: 73, day: 1, cat: ED, event: madison, round: Finale, doc: risultati, title: ED Madison Finale - Risultati}
+  - {n: 74, day: 1, cat: ED, event: madison, round: "", doc: classifica, title: ED Madison - Classifica}
+
+  # ── giorno 0 ──────────────────────────────────────────────
+  - {n: 75, day: 0, cat: ES, event: omnium, round: Eliminazione, doc: partenti, title: ES Omnium Eliminazione - Partenti}
+
+  # ── giorno 1 ──────────────────────────────────────────────
+  - {n: 76, day: 1, cat: ED, event: omnium, round: Eliminazione, doc: partenti, title: ED Omnium Eliminazione - Partenti}
+
+  # ── giorno 0 ──────────────────────────────────────────────
+  - {n: 77, day: 0, cat: ES, event: omnium, round: Eliminazione, doc: risultati, title: ES Omnium Eliminazione - Risultati}
+
+  # ── giorno 1 ──────────────────────────────────────────────
+  - {n: 78, day: 1, cat: ED, event: omnium, round: Eliminazione, doc: risultati, title: ED Omnium Eliminazione - Risultati}
+
+  # ── giorno 0 ──────────────────────────────────────────────
+  - {n: 79, day: 0, cat: ES, event: omnium, round: Corsa a Punti, doc: partenti, title: ES Omnium Corsa a Punti - Partenti}
+
+  # ── giorno 1 ──────────────────────────────────────────────
+  - {n: 80, day: 1, cat: ED, event: omnium, round: Corsa a Punti, doc: partenti, title: ED Omnium Corsa a Punti - Partenti}
+
+  # ── giorno 0 ──────────────────────────────────────────────
+  - {n: 81, day: 0, cat: ES, event: omnium, round: Corsa a Punti, doc: risultati, title: ES Omnium Corsa a Punti - Risultati}
+  - {n: 82, day: 0, cat: ES, event: omnium, round: "", doc: classifica, title: ES Omnium - Classifica}
+
+  # ── giorno 1 ──────────────────────────────────────────────
+  - {n: 83, day: 1, cat: ED, event: omnium, round: Corsa a Punti, doc: risultati, title: ED Omnium Corsa a Punti - Risultati}
+  - {n: 84, day: 1, cat: ED, event: omnium, round: "", doc: classifica, title: ED Omnium - Classifica}

@@ -6,8 +6,20 @@ __pycache__/
 .ruff_cache/
 HANDOFF.md
 
-# competition data: entry lists and results
-competitions/
+# competition data: entry lists and results. A live competition is riders'
+# personal data and a jury's work in progress - neither belongs in here.
+#
+# The exception is the fictional one, and only the four files it is *made* of:
+# open it in the app and everything it then writes - races, comunicati, PDFs,
+# the journal - is ignored like anybody else's, so the example can be run
+# without ever dirtying the checkout. See competitions/example/README.md.
+competitions/*
+!competitions/example/
+competitions/example/*
+!competitions/example/README.md
+!competitions/example/programme.yaml
+!competitions/example/make_entries.py
+!competitions/example/Iscritti_999999.xlsx
 
 # copies of the last saved PDFs, served to the browser
 static/

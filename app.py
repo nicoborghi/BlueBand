@@ -39,8 +39,9 @@ NEEDS_ENTRIES = ("page_races", "page_check_in", "page_decisions",
 #: What the app is called - the browser tab, and what the jury asks for.
 APP_NAME = "Blue Band"
 
-LOGO = Path(__file__).resolve().parent / "header" / "track.svg"
-LOGO_TEXT = Path(__file__).resolve().parent / "header" / "track_text_ink.svg"
+UI = Path(__file__).resolve().parent / "ui"
+LOGO = UI / "track.svg"
+LOGO_TEXT = UI / "track_text_ink.svg"
 
 
 def main() -> None:

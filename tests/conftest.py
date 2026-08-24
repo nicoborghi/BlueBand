@@ -34,6 +34,15 @@ def _patch_apptest_button_group() -> None:
 
 _patch_apptest_button_group()
 
+# The fictional meeting that ships with the repo: a programme and the flat
+# federal export beside it, both invented (`make_entries.py`, in that folder).
+# It sits among the real competitions because that is what it is - one the app
+# opens like any other - and it is what the tests that need an elenco run on:
+# a real one is a few hundred minors' personal data and cannot be in here.
+EXAMPLE = ROOT / "competitions" / "example"
+EXAMPLE_PROGRAMME = EXAMPLE / "programme.yaml"
+EXAMPLE_ENTRIES = EXAMPLE / "Iscritti_999999.xlsx"
+
 GIURIA = Path("/mnt/g/My Drive/Public/Campionati Italiani Pista Giovanili 2026/Giuria")
 ISCRITTI = GIURIA / "Iscritti_26_generale.xlsx"
 KSPORT = GIURIA / "Iscritti_182447.xls"
