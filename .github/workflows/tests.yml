@@ -44,12 +44,18 @@ jobs:
         run: pytest -q --cov --cov-report=xml --cov-report=term-missing
 
       - name: Codecov
-        # one upload is enough; the second interpreter runs the same lines
-        if: matrix.python-version == '3.12'
+        # One upload is enough; the second interpreter runs the same lines.
+        #
+        # And only when there is a token to do it with: Codecov stopped taking
+        # tokenless uploads on a repository's default branch ("Token required
+        # because branch is protected"), so without the secret this step cannot
+        # succeed and would fail the branch over a report nobody can send. With
+        # the secret set it runs, and a genuine upload error is still loud.
+        if: matrix.python-version == '3.12' && env.CODECOV_TOKEN != ''
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
           fail_ci_if_error: true
-          # public repo: the tokenless upload works, and the token is used
-          # when the repo secret is set (it makes uploads less rate-limited)
           token: ${{ secrets.CODECOV_TOKEN }}
