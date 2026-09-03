@@ -16,7 +16,6 @@ management, classifications, jury decisions, numbered communiqués. Built on
 Streamlit.
 
 > [!NOTE]
-> [!NOTE]
 > **Beta version** - used at the Italian Youth Track Championships (2025, 2026) and at the Trofeo delle Regioni 2026. Much of the codebase is AI-generated.
 
 The competition is described in a single YAML file, which is read by BlueBand at startup. The app is a single-page web app, which can be run on a laptop or a tablet. The app is designed to be used by the commissaires at the trackside to manage the competition, including checking licences, managing events, and generating results and communiqués. The app is designed to be easy to use, with a simple interface that allows the commissaires to quickly access the information they need.
