@@ -291,73 +291,19 @@ The abbreviations a printed sheet uses are the **UCI** ones — see the
 
 .. _build:
 
-Windows build
--------------
+Packaging
+---------
 
-The console ships as an ``.exe`` a jury installs by double-clicking.
+**Not implemented yet.** There is no installer, no release to download, and no
+published build: the app runs from a checkout (:ref:`install`).
 
-.. code-block:: bash
+``packaging/`` holds the work in progress — a PyInstaller spec, an Inno Setup
+script and an icon builder — and ``.github/workflows/build.yml`` the CI that
+would drive them. None of it ships anything today, and the notes on freezing
+Streamlit, on what the bundle weighs and on the per-user install layout have
+been taken out of this page rather than left standing as if they described
+something you could install. They come back with the first release.
 
-   python packaging/make_icon.py                 # ui/track.svg -> .ico
-   pyinstaller packaging/blueband.spec --noconfirm
-   iscc packaging/blueband.iss                   # Windows only, Inno Setup 6
-
-Out comes ``dist/BlueBand-<version>-setup.exe``. CI does the same on every
-``v*`` tag and attaches it to the release.
-
-What it weighs, and why
-~~~~~~~~~~~~~~~~~~~~~~~
-
-The app installs at **about 435 MB**, and most of that is three packages the
-console never imports by name: pandas, numpy and pyarrow (~334 MB), Streamlit
-and its dependencies (~87 MB), CPython and the bootloader (~20 MB). The app
-itself, with its regulations and templates, is about 1 MB.
-
-They are there because ``st.dataframe`` and ``st.data_editor`` are made of them.
-**This was measured, and the alternative was built and rejected**: hand-written
-HTML tables brought the installation down to 108 MB and were worse to use — rows
-twice as tall, a select too narrow to read, and none of the sorting, resizing,
-full screen, search and copy that come free. Keep that in mind before
-"optimising" the dependency list: the size is a decision that has already been
-taken, once, with numbers.
-
-The three awkward things about freezing Streamlit
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-All three are solved in ``packaging/blueband.spec``, and each was a build that
-succeeded and then failed at runtime:
-
-#. **Streamlit reads its own version from its installed metadata.** Without the
-   ``.dist-info`` in the bundle it raises at import — ``copy_metadata``.
-#. **Its frontend is data.** ``streamlit/static/`` is the compiled React app —
-   ``collect_data_files``.
-#. **The app is never imported.** The analysis starts at ``launcher.py``, which
-   hands Streamlit ``app.py`` as a *path*, so ``core``, ``ui`` and ``render``
-   are in no import graph: the bundle starts, serves a page, and dies on ``No
-   module named 'core'`` at the first render. ``collect_submodules``, with the
-   repository put on ``sys.path`` first — without that it finds nothing and
-   returns an empty list **with only a warning**.
-
-``BlueBand.exe --check`` is the guard against all three: it imports every module
-and looks for every data file, and it fails at the door instead of on the jury's
-first click.
-
-The install is **per-user on purpose**, twice over: no administrator prompt on a
-laptop nobody has the password for, and the program's folder stays writable —
-Streamlit serves the last saved PDFs out of ``static/`` inside it.
-
-Building on Linux
-~~~~~~~~~~~~~~~~~
-
-The whole recipe except the ``.ico`` and the installer works on Linux, and that
-is worth doing before pushing a tag:
-
-.. code-block:: bash
-
-   python -m venv /tmp/bb && /tmp/bb/bin/pip install -e ".[build]"
-   /tmp/bb/bin/pyinstaller packaging/blueband.spec --noconfirm
-   dist/BlueBand/BlueBand --check
-
-Build it in a **clean virtual environment**, never in a working scientific one:
-PyInstaller bundles what it finds, and the ``excludes`` in the spec are a safety
-net rather than a guarantee.
+What is already true, and is not a packaging concern, is that ``core.paths``
+keeps *what the program is* apart from *what the jury made* — see
+:ref:`storage`. That separation is what a packaged build would rely on.

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Blue Band 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-03 18:07+0200\n"
+"POT-Creation-Date: 2026-09-03 20:13+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: it <LL@li.org>\n"
@@ -19,39 +19,39 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: ../../index.rst:100
+#: ../../index.rst:102
 msgid "User Guide"
 msgstr "Guida"
 
-#: ../../index.rst:108
+#: ../../index.rst:110
 msgid "Reference"
 msgstr "Riferimento tecnico"
 
-#: ../../index.rst:7 dd750ef4903f4929b35a3d7e421387bd
+#: ../../index.rst:7 0840e5d88989406b89b5491530fc7984
 msgid "Blue Band"
 msgstr "Blue Band"
 
-#: ../../index.rst:9 0b721aaeb8624addb0e79b0236d8a91b
+#: ../../index.rst:9 b9aeb981b7624505b4ab2fba7ac843ea
 msgid "**Commissaires' console for track cycling competitions.**"
 msgstr "**La console di giuria per le manifestazioni su pista.**"
 
-#: ../../index.rst:11 2a9af2af9cde47c8849d72b869d874d3
+#: ../../index.rst:11 a72eef15bde8426a87744474f6c114d0
 msgid "GitHub"
 msgstr "GitHub"
 
-#: ../../index.rst:14 37f8bc2ea7ce4050b2f8dfff9f743871
+#: ../../index.rst:14 9b2d87ca2b434c7a86c7944fedafbafa
 msgid "Tests"
 msgstr "Test"
 
-#: ../../index.rst:17 4abe3b4c6bb74756bb16c30524491483
+#: ../../index.rst:17 071824577ad644efab9808289f7cc082
 msgid "Coverage"
 msgstr "Copertura"
 
-#: ../../index.rst:20 8ab7b7abd769469d8490fa88172b4f7a
+#: ../../index.rst:20 1b6cbbd0da4e48dc93086e523e6d3ea3
 msgid "License"
 msgstr "Licenza"
 
-#: ../../index.rst:26 5cfa3861135f4c008edd6a4a9a9e66d8
+#: ../../index.rst:26 aa3c922146af404dbe5b92c8dc0ee7c3
 msgid ""
 "Experimental. Used at the Italian Youth Track Championships (2025, 2026) and"
 " nowhere else. Much of the codebase is AI-generated. Feedback and "
@@ -63,7 +63,7 @@ msgstr ""
 "Segnalazioni e contributi sono benvenuti — apri una `issue "
 "<https://github.com/nicoborghi/BlueBand/issues>`_ o una pull request."
 
-#: ../../index.rst:31 90375966e41e4045acfaf2f4b24d6919
+#: ../../index.rst:31 1de0efea626e48d8a40644c7a8d47932
 msgid ""
 "Blue Band is what a commissaires' panel runs a track meeting from: licence "
 "check, entry lists, results, classifications, jury decisions, and the "
@@ -78,7 +78,7 @@ msgstr ""
 "portatile al velodromo — spesso senza rete — e scrive tutto quello che fa in"
 " file semplici, una cartella per manifestazione."
 
-#: ../../index.rst:37 2353e8b6f3834a8bb070d022fe599200
+#: ../../index.rst:37 950f4c14071b4a0fb0faf64638cea333
 msgid ""
 "One YAML file per competition (``programme.yaml``) says what is being run: "
 "the track, the categories, which events each contests, the rounds of every "
@@ -91,37 +91,38 @@ msgstr ""
 "comunicati. Organizzare l'edizione dell'anno prossimo vuol dire modificare "
 "quel file."
 
-#: ../../index.rst:44 f4083ec069504cdbb9d3d2a040d451f3
+#: ../../index.rst:44 5fe71e6bb0954ea1a9057914eefdeea6
 msgid "Quick start"
 msgstr "Per cominciare"
 
-#: ../../index.rst:46 de4ac78ad7504772a24a4e05d51b821f
-msgid ""
-"On a jury laptop, install `the latest BlueBand-setup.exe "
-"<https://github.com/nicoborghi/BlueBand/releases>`_ and start it from the "
-"desktop icon — no Python, no command line. From a checkout:"
-msgstr ""
-"Sul portatile della giuria, installa `l'ultimo BlueBand-setup.exe "
-"<https://github.com/nicoborghi/BlueBand/releases>`_ e avvialo dall'icona sul"
-" desktop — niente Python, niente riga di comando. Da un checkout:"
+#: ../../index.rst:46 9089af1754514dd496cc33de13053e25
+msgid "Python ≥ 3.11, from a checkout:"
+msgstr "Python ≥ 3.11, da un checkout:"
 
-#: ../../index.rst:57 1ff448facbea42ada3a4c6c20ad83a6d
+#: ../../index.rst:55 a0163d09cc59495b83d17d11749b2e48
 msgid ""
-"See :doc:`install` for both paths, the example competition, and where the "
-"data lands."
+"See :doc:`install` for the example competition and where the data lands."
 msgstr ""
-"Vedi :doc:`install` per entrambe le strade, la manifestazione di esempio e "
-"dove finiscono i dati."
+"Vedi :doc:`install` per la manifestazione di esempio e per dove finiscono i "
+"dati."
 
-#: ../../index.rst:62 f137fd26c8444ed48af99fb8fd1661cf
+#: ../../index.rst:59 40e4aa8843cc4b8ba79dd57f0bc43ed6
+msgid ""
+"**Packaging is not implemented yet.** There is no installer and no release "
+"to download — the app runs from a checkout."
+msgstr ""
+"**La pacchettizzazione non è ancora implementata.** Non esiste un installer "
+"né una release da scaricare: il programma si esegue da un checkout."
+
+#: ../../index.rst:64 cc0f180bdb6241f1aa8c388307d9a906
 msgid "What it does"
 msgstr "Che cosa fa"
 
-#: ../../index.rst:64 545e55e3bab847508a5c29cba0dbf3a9
+#: ../../index.rst:66 5be2bf61157344ae865036edbc9e88d2
 msgid "Licence check"
 msgstr "Verifica delle licenze"
 
-#: ../../index.rst:65 abc61679ab69497eb5ce648ed272917d
+#: ../../index.rst:67 73c924d07eef4d24850069ebfbed7045
 msgid ""
 "Counters, the event-entry table, quota checks against the regulation. Jury "
 "edits are recorded as patches keyed by UCI ID; the entry workbook is never "
@@ -132,11 +133,11 @@ msgstr ""
 " indicizzate sull'UCI ID; l'elenco iscritti non viene mai scritto se non lo "
 "chiedi."
 
-#: ../../index.rst:69 640d00728ff3447f8dad047b1adc42c1
+#: ../../index.rst:71 8590f9e214f445269fa6651b8b9788ad
 msgid "Races"
 msgstr "Gare"
 
-#: ../../index.rst:70 8e9cd2dc78cc45df864d0aa83827e80f
+#: ../../index.rst:72 200b4ad3c8ba4233ae6c32e02f495465
 msgid ""
 "Every format track cycling runs: bunch races, pursuits, sprint and keirin "
 "brackets, omnium, madison, derny — with results typed in the jury's own "
@@ -146,11 +147,11 @@ msgstr ""
 "inseguimenti, tabelloni di velocità e keirin, omnium, madison, derny — con i"
 " risultati scritti nella grafia della giuria."
 
-#: ../../index.rst:74 fdd9c839407046728d4c9e52ad2bccf6
+#: ../../index.rst:76 ba9532cb132a41f68765e31c34163263
 msgid "Decisions"
 msgstr "Decisioni"
 
-#: ../../index.rst:75 577a9ac2da674071a885b82b1a7c10af
+#: ../../index.rst:77 ac31fa8179a74763b78c3e65ba283bc8
 msgid ""
 "One row per decision of the panel, with the UCI code and the sentence "
 "published under it. A warning follows the rider through the event."
@@ -158,11 +159,11 @@ msgstr ""
 "Una riga per decisione del collegio, con il codice UCI e la frase pubblicata"
 " sotto di esso. Un'ammonizione segue l'atleta per tutta la specialità."
 
-#: ../../index.rst:78 d037dab7626e4329aca3b9b75a518375
+#: ../../index.rst:80 762687b1d0fb4a689e03adfa5f10e7ad
 msgid "Communiqués"
 msgstr "Comunicati"
 
-#: ../../index.rst:79 b282826f51954c6abbe2244e2c99e334
+#: ../../index.rst:81 2096ea8f738b4b4a93c63f13a7166dc5
 msgid ""
 "A numbered register planned from the running order, with the merge rules of "
 "the regulation applied: which sheets share a number, in what order they can "
@@ -172,11 +173,11 @@ msgstr ""
 "accorpamento del regolamento applicate: quali fogli condividono un numero e "
 "in che ordine possono essere pubblicati."
 
-#: ../../index.rst:83 44a685c7b4f949a8aedca54ed6bcb3f7
+#: ../../index.rst:85 ffc49f6be7ea4503bb37646e33f470ff
 msgid "Printing"
 msgstr "Stampa"
 
-#: ../../index.rst:84 9aa5dcc0643645c6956b5bb22f382aee
+#: ../../index.rst:86 0454917cbc2949fa89dc3510e096ed97
 msgid ""
 "Headless Chromium to PDF, with the meeting's letterhead, footer and "
 "signature on every page. With no browser available, a self-contained HTML "
@@ -186,11 +187,11 @@ msgstr ""
 " su ogni pagina. Senza browser disponibile, un file HTML autoconsistente — "
 "niente si perde mai per mancanza di un motore di stampa."
 
-#: ../../index.rst:88 c850ebb5cf9b454ca3aebd52dfcd3489
+#: ../../index.rst:90 35c0fd745f7141c881f4788db4134cfe
 msgid "Statistics"
 msgstr "Statistiche"
 
-#: ../../index.rst:89 d2973a38047645f39f06038d22995f14
+#: ../../index.rst:91 33ffe38e30e84035be922162fc925b96
 msgid ""
 "The medal table and the podiums it is counted from, plus the team points "
 "classification where the meeting has one."
@@ -198,7 +199,7 @@ msgstr ""
 "Il medagliere e i podi da cui è contato, più la classifica a punti per "
 "squadre dove la manifestazione ne ha una."
 
-#: ../../index.rst:92 3eccadc4b83548b3ba6684dd250ab196
+#: ../../index.rst:94 ce4822d908da41bcb65bf7edf11b2abb
 msgid ""
 "Everything under ``core/`` is plain Python — no Streamlit, no I/O beyond "
 "``core.store`` — so the scoring, the composition tables and the register are"
@@ -208,18 +209,27 @@ msgstr ""
 "nessun I/O oltre ``core.store`` — perciò i punteggi, le tabelle di "
 "composizione e il registro sono testabili senza interfaccia, e lo sono."
 
-#: ../../index.rst:98 9d8d9e289d7a4c5897fc054233b9aa5c
+#: ../../index.rst:100 62e6ccc13ca64734bb7ef568b5708a8a
 msgid "Documentation"
 msgstr "Documentazione"
 
-#: ../../index.rst:120 f864becc92b94c078d36bed5c022166a
+#: ../../index.rst:122 01b67dfcbe834ae7ab5ac7ca9c6ab87f
 msgid "Licence"
 msgstr "Licenza"
 
-#: ../../index.rst:122 481aa00c30ad477a8d1b7c973f4388c2
+#: ../../index.rst:124 c4327a9e94a14b39a846093ca962a506
 msgid ""
 "GPLv3 — see `LICENSE "
 "<https://github.com/nicoborghi/BlueBand/blob/main/LICENSE>`_."
 msgstr ""
 "GPLv3 — vedi `LICENSE "
 "<https://github.com/nicoborghi/BlueBand/blob/main/LICENSE>`_."
+
+#~ msgid ""
+#~ "On a jury laptop, install `the latest BlueBand-setup.exe "
+#~ "<https://github.com/nicoborghi/BlueBand/releases>`_ and start it from the "
+#~ "desktop icon — no Python, no command line. From a checkout:"
+#~ msgstr ""
+#~ "Sul portatile della giuria, installa `l'ultimo BlueBand-setup.exe "
+#~ "<https://github.com/nicoborghi/BlueBand/releases>`_ e avvialo dall'icona sul"
+#~ " desktop — niente Python, niente riga di comando. Da un checkout:"

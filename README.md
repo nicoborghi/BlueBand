@@ -16,30 +16,27 @@ management, classifications, jury decisions, numbered communiqués. Built on
 Streamlit.
 
 > [!NOTE]
-> **Experimental** — used at the Italian Youth Track Championships (2025, 2026)
-> and nowhere else. Much of the codebase is AI-generated.
+> [!NOTE]
+> **Beta version** - used at the Italian Youth Track Championships (2025, 2026) and at the Trofeo delle Regioni 2026. Much of the codebase is AI-generated.
 
-One YAML file per competition says what is being run — the track, the categories,
-which events each contests, the rounds of every event, the running order of each
-day, the communiqué register. Everything the jury does is written to plain files
-in one folder, atomically, with the previous version kept.
+The competition is described in a single YAML file, which is read by BlueBand at startup. The app is a single-page web app, which can be run on a laptop or a tablet. The app is designed to be used by the commissaires at the trackside to manage the competition, including checking licences, managing events, and generating results and communiqués. The app is designed to be easy to use, with a simple interface that allows the commissaires to quickly access the information they need.
 
 ## Install
 
-On a jury laptop, install
-[the latest `BlueBand-setup.exe`](https://github.com/nicoborghi/BlueBand/releases)
-and start it from the desktop. No Python, no command line; the competitions it
-writes live in `Documenti\BlueBand` and an uninstall does not touch them.
-
-From a checkout:
+Python ≥ 3.11, from this repository:
 
 ```bash
+git clone https://github.com/nicoborghi/BlueBand.git
+cd BlueBand
 pip install -e .
-streamlit run app.py          # or: python launcher.py, as the .exe runs it
+streamlit run app.py          # or: python launcher.py
 ```
 
-`competitions/example/` is a fictional meeting that ships with the repo — open
-it to see the console working without holding a real entry list. It is also what
+> **Packaging is not implemented yet.** There is no installer and no release to
+> download: the app runs from a checkout. `packaging/` holds a work-in-progress
+> PyInstaller spec and Inno Setup script, neither of which ships a build today.
+
+`competitions/example/` is a fictional meeting that ships with the repo. It is also what
 the tests run on.
 
 ```bash
@@ -48,14 +45,14 @@ python -m pytest tests -q
 
 ## Documentation
 
-**[blueband.readthedocs.io](https://blueband.readthedocs.io/)** — built with
-Sphinx in two languages from one English source.
+**[blueband.readthedocs.io](https://blueband.readthedocs.io/)** - built with
+Sphinx in English and Italian.
 
 | | |
 |---|---|
 | [Running a competition](https://blueband.readthedocs.io/en/latest/guide.html) | What to click, at the trackside |
 | [Glossary](https://blueband.readthedocs.io/en/latest/glossary.html) | The vocabulary, and every result code |
-| [Install and run](https://blueband.readthedocs.io/en/latest/install.html) | Both install paths, the tests, the example |
+| [Install and run](https://blueband.readthedocs.io/en/latest/install.html) | Install paths, the tests, the example |
 | [Reference](https://blueband.readthedocs.io/en/latest/reference/index.html) | Architecture, `programme.yaml`, formats, storage, the build |
 
 To build the docs locally:
@@ -76,4 +73,4 @@ make update
 
 ## Licence
 
-GPLv3 — see [LICENSE](LICENSE).
+GPLv3 - see [LICENSE](LICENSE).

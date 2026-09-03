@@ -3,33 +3,13 @@
 Install and run
 ===============
 
-On a jury laptop
-----------------
+.. note::
 
-Install `the latest BlueBand-setup.exe
-<https://github.com/nicoborghi/BlueBand/releases>`_ and start it from the
-desktop icon. No Python, no command line, no administrator prompt — the
-install is per-user.
-
-.. list-table::
-   :header-rows: 1
-   :widths: 30 45 25
-
-   * - What
-     - Where
-     - Survives an uninstall
-   * - the program
-     - ``%LOCALAPPDATA%\Programs\Blue Band``
-     - no
-   * - the competitions
-     - ``Documents\BlueBand``
-     - **yes**
-   * - the communiqués
-     - wherever Settings points, usually a shared drive
-     - **yes**
-
-Closing the console window stops the server. Closing the browser tab does not —
-which is what lets the jury reopen the app from browser history mid-competition.
+   **Packaging is not implemented yet.** There is no installer and no release
+   to download, so there is one way in: a checkout. ``packaging/`` holds a
+   work-in-progress PyInstaller spec and Inno Setup script, and neither ships
+   a build today. Where this page says what the packaged program *would* do,
+   it is describing intent, not something you can install.
 
 
 From a checkout
@@ -44,14 +24,13 @@ Python ≥ 3.11.
    pip install -e .
    streamlit run app.py
 
-``python launcher.py`` is the other way in, and the one the installer runs: it
-picks a free port, starts Streamlit in-process and opens the browser. Use it to
-test the packaged behaviour without building an installer.
+``python launcher.py`` is the other way in: it picks a free port, starts
+Streamlit in-process and opens the browser. It is what a packaged build would
+run, so it is also how that behaviour gets tested.
 
-Dependencies are **pinned, not ranged** (see ``pyproject.toml``): the same list
-is the Windows installer's manifest, and a version that drifts between the
-laptop a release was tested on and the one it was built on is a version nobody
-tested.
+Dependencies are **pinned, not ranged** (see ``pyproject.toml``): a version
+that drifts between the laptop something was tested on and the one it is run on
+is a version nobody tested.
 
 
 Where the data goes
@@ -116,7 +95,7 @@ them where the file is missing, so CI coverage is a floor rather than the whole
 picture — read a drop, not the absolute number.
 
 
-Building the installer
-----------------------
+Packaging
+---------
 
-See :ref:`build`.
+Not implemented yet — see the note at the top of this page.

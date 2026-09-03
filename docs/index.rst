@@ -43,9 +43,7 @@ year's edition means editing that file.
 Quick start
 ===========
 
-On a jury laptop, install `the latest BlueBand-setup.exe
-<https://github.com/nicoborghi/BlueBand/releases>`_ and start it from the
-desktop icon — no Python, no command line. From a checkout:
+Python ≥ 3.11, from a checkout:
 
 .. code-block:: bash
 
@@ -54,8 +52,12 @@ desktop icon — no Python, no command line. From a checkout:
    pip install -e .
    streamlit run app.py
 
-See :doc:`install` for both paths, the example competition, and where the data
-lands.
+See :doc:`install` for the example competition and where the data lands.
+
+.. note::
+
+   **Packaging is not implemented yet.** There is no installer and no release
+   to download — the app runs from a checkout.
 
 
 What it does
