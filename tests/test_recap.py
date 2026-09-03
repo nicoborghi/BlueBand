@@ -116,7 +116,7 @@ def test_the_recap_names_the_squadra_and_keeps_it_on_one_table(el, comp):
 
 
 def test_the_events_are_columns_marked_X_or_by_pairing(el, comp):
-    doc = D.team_recap(el, comp, "Emilia-Romagna")
+    doc = D.team_recap(el, comp, "Emilia-Romagna", all_events=False)
     keys = [c.key for c in doc.tables[0].columns]
     assert keys[-2:] == ["ev_velocita", "ev_madison"]
     marks = {r["last_name"]: (r["ev_velocita"], r["ev_madison"])
@@ -126,12 +126,27 @@ def test_the_events_are_columns_marked_X_or_by_pairing(el, comp):
 
 
 def test_a_specialita_nobody_here_rides_gets_no_column(el, comp):
-    doc = D.team_recap(el, comp, "Veneto")
+    doc = D.team_recap(el, comp, "Veneto", all_events=False)
     assert [c.key for c in doc.tables[0].columns][-1] == "ev_velocita"
 
 
+def test_by_default_every_specialita_of_the_categorie_is_a_column(el, comp):
+    """The blank grid: the sheet is what the specialità are collected on.
+
+    It goes out before the verifica as often as after it, and a colleague with
+    a pen needs the column of a specialità nobody has entered yet.
+    """
+    doc = D.team_recap(el, comp, "Veneto")
+    keys = [c.key for c in doc.tables[0].columns if c.key.startswith("ev_")]
+    assert set(keys) == {f"ev_{s}" for s in comp.events_for("ES")}
+    assert len(keys) > 1                    # not just the velocita they ride
+    # and in the order of the programme, like every other sheet
+    assert keys == [f"ev_{s}" for s in comp.event_order() if f"ev_{s}" in keys]
+    assert doc.tables[0].rows[0]["ev_velocita"] == "X"
+
+
 def test_the_column_heads_are_abbreviated_and_keyed_under_the_table(el, comp):
-    doc = D.team_recap(el, comp, "Emilia-Romagna")
+    doc = D.team_recap(el, comp, "Emilia-Romagna", all_events=False)
     heads = [c.label for c in doc.tables[0].columns][-2:]
     assert all(len(h) <= 6 for h in heads)
     for head in heads:
@@ -145,14 +160,15 @@ def test_the_short_names_can_head_the_columns_instead_of_the_sigle(el, comp):
     The sigla is right where a dozen specialità have to fit; a manager reading
     their own squadra would rather not look anything up.
     """
-    doc = D.team_recap(el, comp, "Emilia-Romagna", short_headers=True)
+    doc = D.team_recap(el, comp, "Emilia-Romagna", short_headers=True,
+                       all_events=False)
     heads = [c.label for c in doc.tables[0].columns][-2:]
     assert heads == [comp.event("velocita").short, comp.event("madison").short]
     # nothing to key any more, but what the caselle say is still explained
     assert comp.event("madison").abbr not in doc.legend
     assert "X iscritto" in doc.legend
     # and the head is what has to fit: the columns are wider than the marks
-    abbr = D.team_recap(el, comp, "Emilia-Romagna")
+    abbr = D.team_recap(el, comp, "Emilia-Romagna", all_events=False)
     assert (next(c.pct for c in doc.tables[0].columns if c.key == "ev_madison")
             > next(c.pct for c in abbr.tables[0].columns
                    if c.key == "ev_madison"))
@@ -166,8 +182,9 @@ def test_a_composed_batteria_follows_the_mark(el, comp):
 
 def test_grouping_by_club_prints_the_regione_instead(el, comp):
     """The squadra is the title: the column that names it would repeat it."""
-    by_region = D.team_recap(el, comp, "Emilia-Romagna")
-    by_club = D.team_recap(el, comp, "GS Pippo", group=RC.BY_CLUB)
+    by_region = D.team_recap(el, comp, "Emilia-Romagna", show_tail=True)
+    by_club = D.team_recap(el, comp, "GS Pippo", group=RC.BY_CLUB,
+                           show_tail=True)
     tail = [c.key for c in by_region.tables[0].columns
             if not c.key.startswith("ev_")][-1]
     tail_club = [c.key for c in by_club.tables[0].columns
@@ -180,8 +197,35 @@ def test_a_squadra_with_nobody_in_it_prints_no_table(el, comp):
     assert doc.tables == [] and "0 atleti" in doc.info
 
 
+def test_the_societa_is_off_by_default_and_the_uci_id_on(el, comp):
+    """The squadra is the title; what a manager checks is the UCI ID."""
+    doc = D.team_recap(el, comp, "Emilia-Romagna")
+    keys = [c.key for c in doc.tables[0].columns]
+    assert "club" not in keys and "uci_id" in keys
+    keys = [c.key for c in D.team_recap(el, comp, "Emilia-Romagna",
+                                        show_tail=True,
+                                        uci_id=False).tables[0].columns]
+    assert "club" in keys and "uci_id" not in keys
+
+
+def test_a_rule_is_drawn_where_the_categoria_changes(el, comp):
+    """Four categorie on one grid read as four blocks, not as one list."""
+    el.riders["b"].cat = "ES"
+    doc = D.team_recap(el, comp, "Emilia-Romagna")
+    rows = doc.tables[0].rows
+    ruled = [r["last_name"] for r in rows
+             if "section-start" in r.get("_class", "")]
+    # the rule opens the second categoria, and nothing is ruled off above the
+    # first rider on the sheet
+    assert ruled == [rows[1]["last_name"]]
+    assert rows[0]["cat"] != rows[1]["cat"]
+    plain = D.team_recap(el, comp, "Emilia-Romagna", rule_categories=False)
+    assert not any("section-start" in r.get("_class", "")
+                   for r in plain.tables[0].rows)
+
+
 def test_the_recap_renders(el, comp):
-    doc = D.team_recap(el, comp, "Emilia-Romagna",
+    doc = D.team_recap(el, comp, "Emilia-Romagna", show_tail=True,
                        heats={("AL", "velocita", "a"): ("Qualificazioni", 2)})
     html = to_html(doc, comp)
     assert "Emilia-Romagna" in html and "X 2" in html
@@ -195,7 +239,8 @@ def test_the_speciality_table_counts_a_category_across_the_programme(el, comp):
 
     assert [r.cat for r in rows] == comp.cat_order()
     al = next(r for r in rows if r.cat == "AL")
-    assert (al.entries, al.checked_in, al.missing) == (2, 0, 2)
+    # verified is "has a specialità": both AL riders are entered in one
+    assert (al.entries, al.checked_in, al.missing) == (2, 2, 0)
     assert al.per_event["velocita"] == 1
     # starters, as every other count of an event is: the second AL rider is the
     # riserva of that coppia, and a riserva does not line up

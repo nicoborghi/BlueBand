@@ -1,0 +1,323 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:07+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: it <LL@li.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../guide.rst:4 2c8922c3bd904c33a5c6ee09f0d41b00
+msgid "Running a competition"
+msgstr "Dirigere una manifestazione"
+
+#: ../../guide.rst:6 fa8389ffc5a1466bba1a032b82328369
+msgid ""
+"What to click, and what happens when you do. It does not explain the "
+"regulations — it explains the console."
+msgstr ""
+"Dove si clicca e che cosa succede quando lo si fa. Non spiega i regolamenti "
+"— spiega il programma."
+
+#: ../../guide.rst:9 c1468e34f294420cade218f073c7d911
+msgid "**The rule that always holds**"
+msgstr "**La regola che vale sempre**"
+
+#: ../../guide.rst:11 b02a6035f30343abbe0fcea885bc6332
+msgid ""
+"Nothing is lost. Every save keeps the previous version, reloading the "
+"browser erases nothing, and the federation's entry workbook is **never "
+"written by the app** unless you explicitly ask it to be."
+msgstr ""
+"Niente si perde. Ogni salvataggio conserva la versione precedente, "
+"ricaricare il browser non cancella nulla, e il file Excel degli iscritti "
+"della federazione **non viene mai scritto dal programma**, a meno che tu non"
+" glielo chieda esplicitamente."
+
+#: ../../guide.rst:17 92a259ed5d5a4b50aaf0a4d653584efa
+msgid "The seven pages"
+msgstr "Le sette pagine"
+
+#: ../../guide.rst:19 975ba7afb9c94f61983cea16e3651bb1
+msgid "Chosen from the left-hand column."
+msgstr "Si scelgono nella colonna di sinistra."
+
+#: ../../guide.rst:25 b4c09cd1c6404179a3661e007ed0ea91
+msgid "Page"
+msgstr "Pagina"
+
+#: ../../guide.rst:26 acc4dc7786ce48ec930897aff14b2f60
+msgid "What it is for"
+msgstr "A che serve"
+
+#: ../../guide.rst:27 903c5f82ce434a54986be898bce4c089
+msgid "When"
+msgstr "Quando"
+
+#: ../../guide.rst:28 0b30019deb824bedb6501d07464594a7
+msgid "**Programme**"
+msgstr "**Programma**"
+
+#: ../../guide.rst:29 e15f8fadc02e4c1ba4b83c3ef6de4a2d
+msgid "Defines what is ridden, when, and when each communiqué goes out"
+msgstr "Definisce che cosa si corre, quando, e quando esce ogni comunicato"
+
+#: ../../guide.rst:30 8f5033e90afb464db77c423e5f129458
+msgid "Before the competition"
+msgstr "Prima della manifestazione"
+
+#: ../../guide.rst:31 8291b7ee8f1848a383b85811097b7965
+msgid "**Settings**"
+msgstr "**Impostazioni**"
+
+#: ../../guide.rst:32 1e71f9a362c44a2e919ef74e2c3338f8
+msgid "Output folder, letterhead, signature, team grouping, backup"
+msgstr "Cartella di uscita, testata, firma, squadra, backup"
+
+#: ../../guide.rst:33 24aef6aad9364b3e882aeb4c3ddc9967
+msgid "Once, at the start"
+msgstr "Una volta, all'inizio"
+
+#: ../../guide.rst:34 60d672951cf54330941f2b4216a89fc5
+msgid "**Check-in**"
+msgstr "**Verifica**"
+
+#: ../../guide.rst:35 445ff53f0d544c89afca9ea46a2fd133
+msgid "Licence check, corrections to rider data, entry to events"
+msgstr ""
+"Verifica delle licenze, correzione dei dati degli atleti, iscrizione alle "
+"specialità"
+
+#: ../../guide.rst:36 521de444b31d44439a68e3705d4d14a7
+msgid "The day before, and each morning"
+msgstr "Il giorno prima e ogni mattina"
+
+#: ../../guide.rst:37 e6a01f020e2349469a2f12091a1431a4
+msgid "**Documents**"
+msgstr "**Documenti**"
+
+#: ../../guide.rst:38 4ee91b58a6d4472a886135e82151e2b2
+msgid ""
+"Entry lists, batch printing, per-team recaps, letterhead sheet, register"
+msgstr ""
+"Elenchi iscritti, stampa in blocco, riepiloghi per squadra, foglio "
+"intestato, registro"
+
+#: ../../guide.rst:39 29682466f786436db37acd049cdbf4cb
+msgid "Before each event, and at the end of each day"
+msgstr "Prima di ogni specialità e a fine giornata"
+
+#: ../../guide.rst:40 8bac49444c11438993fcca6c4df19186
+msgid "**Races**"
+msgstr "**Gare**"
+
+#: ../../guide.rst:41 5bef5bda245d43a8bdd700dc4520af58
+msgid "Runs a race: results, classification, communiqué"
+msgstr "Fa correre una gara: risultati, classifica, comunicato"
+
+#: ../../guide.rst:42 85658efb2e434e84a9eac46c6aa89a2f
+msgid "During the racing"
+msgstr "Durante le gare"
+
+#: ../../guide.rst:43 5fb3cd55f33145939940e729feed60b9
+msgid "**Decisions**"
+msgstr "**Decisioni**"
+
+#: ../../guide.rst:44 fe85fa10a0ef4dd4b6416b1eeff08eb4
+msgid "The jury's decision register"
+msgstr "Il registro delle decisioni della giuria"
+
+#: ../../guide.rst:45 d7783c9e2a5a413fa4decea2b8843800
+msgid "Whenever the panel rules on something"
+msgstr "Quando il collegio decide qualcosa"
+
+#: ../../guide.rst:46 7de769d930ce44cb92a70e862ed5c3fa
+msgid "**Statistics**"
+msgstr "**Statistiche**"
+
+#: ../../guide.rst:47 5e9d7d45e54f411f9ffb3a5758610790
+msgid "Medal table, podiums, and the team classification where there is one"
+msgstr "Medagliere, podi e la classifica per squadre dove c'è"
+
+#: ../../guide.rst:48 06aa3f31ed5f4b1db09d4a123181bd94
+msgid "End of day, and at the prize-giving"
+msgstr "A fine giornata e alla premiazione"
+
+#: ../../guide.rst:50 e026391c80d047b7baff1768469a59da
+msgid ""
+"The five pages about riders — check-in, races, decisions, documents, "
+"statistics — **do not appear until an entry list exists**: they have nothing"
+" to show. The entry list is built in *Programme → Entries*."
+msgstr ""
+"Le cinque pagine che riguardano gli atleti — Verifica, Gare, Decisioni, "
+"Documenti, Statistiche — **non compaiono finché non esiste l'elenco "
+"iscritti**: non hanno niente da mostrare. L'elenco si costruisce in "
+"*Programma → Iscritti*."
+
+#: ../../guide.rst:56 d5bb30c5b739427d8ddcfb8e1d562012
+msgid "The order to use them in"
+msgstr "L'ordine in cui si usano"
+
+#: ../../guide.rst:58 6d95b82bfa9e439bade4cc4dfc9bcb6b
+msgid ""
+":ref:`Programme <programme-yaml>` — categories, events, rounds, days, the "
+"communiqué register. It is the file everything else comes out of."
+msgstr ""
+":ref:`Programma <programme-yaml>` — categorie, specialità, fasi, giornate, "
+"registro dei comunicati. È il file da cui esce tutto il resto."
+
+#: ../../guide.rst:60 270fc943dc294d8eb1272ddbf8975d5b
+msgid "**Settings** — where the PDFs go, what they look like, what a team is."
+msgstr ""
+"**Impostazioni** — dove finiscono i PDF, che aspetto hanno, che cos'è una "
+"squadra."
+
+#: ../../guide.rst:61 ec905e14712d45769d252ad1490fb12f
+msgid "**Check-in** — the desk: licences, bibs, who rides what."
+msgstr "**Verifica** — il banco: licenze, dorsali, chi corre che cosa."
+
+#: ../../guide.rst:62 b09932a0ac3946df8d7baafe717e4b07
+msgid "**Races** — the working page, for the whole competition."
+msgstr "**Gare** — la pagina di lavoro, per tutta la manifestazione."
+
+#: ../../guide.rst:66 a18390d2ee5743089a8c53af20ea36a5
+msgid "One folder per competition"
+msgstr "Una cartella per manifestazione"
+
+#: ../../guide.rst:68 d325c0be5bfb48ca87f4ae0d463420c4
+msgid ""
+"Everything the jury writes lives in a single folder, copied to a memory "
+"stick at the end of each day:"
+msgstr ""
+"Tutto quello che la giuria scrive sta in una cartella sola, che si copia su "
+"una chiavetta a fine giornata:"
+
+#: ../../guide.rst:86 5eb3f7936b3b46b7a4cf89440f5cf248
+msgid "See :ref:`storage` for what each of them holds."
+msgstr "Vedi :ref:`storage` per che cosa contiene ciascuno."
+
+#: ../../guide.rst:90 2644c1f2e6124ac0bb066481810e9411
+msgid "When something goes wrong"
+msgstr "Se qualcosa va storto"
+
+#: ../../guide.rst:96 8787d7bccd1040c59d2560154a9c1c82
+msgid "Symptom"
+msgstr "Sintomo"
+
+#: ../../guide.rst:97 9e012fa2d77a4de39f801853f82ca2f6
+msgid "What to do"
+msgstr "Che cosa fare"
+
+#: ../../guide.rst:98 377935f867914524ba77a268c5af4973
+msgid "No PDF, an ``.html`` instead"
+msgstr "Il PDF non esce, esce un ``.html``"
+
+#: ../../guide.rst:99 7a55c084cee74476ad006f0cd7b36fec
+msgid ""
+"Chromium is not installed, or cannot read the folder. Print the HTML with "
+":kbd:`Ctrl+P`. The reason is in ``journal.jsonl``."
+msgstr ""
+"Chromium non è installato, o non può leggere la cartella. L'HTML si stampa "
+"con :kbd:`Ctrl+P`. Il motivo è in ``journal.jsonl``."
+
+#: ../../guide.rst:101 d21bcefbe9cd4b9db0fd227fec84d0ef
+msgid "Saved a wrong result"
+msgstr "Ho salvato un risultato sbagliato"
+
+#: ../../guide.rst:102 3978f75f58284cfcb9e1e3cfb6878b44
+msgid "*↩ Restore previous version*, in the Races sidebar."
+msgstr "*↩ Ripristina versione precedente*, nella barra laterale di Gare."
+
+#: ../../guide.rst:103 c73f924a320246ad9d73a9ed281ca1c9
+msgid "Got a whole event wrong"
+msgstr "Ho sbagliato tutta una specialità"
+
+#: ../../guide.rst:104 f46e6f3391a44b03afb01bbea90620be
+msgid ""
+"*Settings → Reset an event*. Clears every round of it; the previous versions"
+" stay in ``.snapshots/``."
+msgstr ""
+"*Impostazioni → Azzera una gara*. Cancella tutte le sue fasi; le versioni "
+"precedenti restano in ``.snapshots/``."
+
+#: ../../guide.rst:106 d4c119280ff74ccca7b4c757eb3716b0
+msgid "Corrected an edit badly at check-in"
+msgstr "Ho corretto male una modifica in Verifica"
+
+#: ../../guide.rst:107 90725ed821a2446d828726d8d54648a0
+msgid "*Undo the last edit*, at the foot of the page."
+msgstr "*Annulla l'ultima modifica*, in fondo alla pagina."
+
+#: ../../guide.rst:108 d432f1e37a8245f8b6d59817b333941e
+msgid "The browser closed"
+msgstr "Il browser si è chiuso"
+
+#: ../../guide.rst:109 812191d1edac4ce593e9e6f29c997fb6
+msgid ""
+"Reopen it. Everything saved is still there: the server is the console "
+"window, not the tab."
+msgstr ""
+"Riaprilo. Tutto quello che era stato salvato è ancora lì: il server è la "
+"finestra nera, non la scheda."
+
+#: ../../guide.rst:111 6ea0ebe6feb246d2868a6b9f1cf0c557
+msgid "No letterhead on the communiqué"
+msgstr "Manca la testata sul comunicato"
+
+#: ../../guide.rst:112 90075d2809e54fcf9d06bb08979dd087
+msgid "*Settings → Communiqué appearance → Letterhead*: the image is missing."
+msgstr "*Impostazioni → Aspetto dei comunicati → Testata*: manca l'immagine."
+
+#: ../../guide.rst:113 ac82c02f02014c2fb379fba46bda4c0b
+msgid "The communiqué register is out of date"
+msgstr "Il registro dei comunicati è rimasto indietro"
+
+#: ../../guide.rst:114 0aa83a6d552b4f08b0680c6977358d4c
+msgid ""
+"*Programme → Planning → Recompute the numbers*. It shows what changes before"
+" writing anything."
+msgstr ""
+"*Programma → Programmazione → Ricalcola i numeri*. Mostra che cosa cambia "
+"prima di scrivere qualsiasi cosa."
+
+#: ../../guide.rst:116 a502608a85344fa7b1ce367ce288f056
+msgid "The five rider pages are not there"
+msgstr "Le cinque pagine degli atleti non ci sono"
+
+#: ../../guide.rst:117 e39a32732ade414fb9ad3ab426972497
+msgid "There is no entry list yet: *Programme → Categories*, at the bottom."
+msgstr "Non c'è ancora l'elenco iscritti: *Programma → Categorie*, in fondo."
+
+#: ../../guide.rst:119 fdf2f400590b4df183d2bc2a777cc318
+msgid "**Before leaving**"
+msgstr "**Prima di andare via**"
+
+#: ../../guide.rst:121 7c29983c37bd45ffac09e487bf276985
+msgid ""
+"*Settings → Data and backup → Create a backup*, and copy the folder to a "
+"shared drive."
+msgstr ""
+"*Impostazioni → Dati e backup → Crea copia di backup*, e copia la cartella "
+"su un disco condiviso."
+
+#: ../../guide.rst:124 847c0b15b94e477ea196caf406f87c60
+msgid ""
+"The codes typed into results — ``DNS``, ``DNF``, ``ABD``, ``DSQ``, ``REL``, "
+"``NS``, ``W`` — and what each does to a classification are in the "
+":ref:`glossary`."
+msgstr ""
+"Le sigle che si scrivono nei risultati — ``DNS``, ``DNF``, ``ABD``, ``DSQ``,"
+" ``REL``, ``NS``, ``W`` — e che cosa fa ciascuna a una classifica sono nel "
+":ref:`glossario <glossary>`."

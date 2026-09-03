@@ -47,6 +47,11 @@ GIURIA = Path("/mnt/g/My Drive/Public/Campionati Italiani Pista Giovanili 2026/G
 ISCRITTI = GIURIA / "Iscritti_26_generale.xlsx"
 KSPORT = GIURIA / "Iscritti_182447.xls"
 
+# The other flat export the app reads: what the federal system Fattore K sends
+# for an ordinary meeting (`Iscritti_NNNNNN.xls`). Real entries again, so it
+# lives outside the repo and the test that wants it skips where it is not.
+FATTOREK = ROOT.parent / "commissaire" / "data" / "Iscritti_178983.xls"
+
 # The data folder is named after the championship being run and is not the same
 # on every machine: the repo ships `CITA26_test`, a live console has `CITA26`.
 # The tests read whichever programme is there - they only care that it is the
@@ -102,6 +107,14 @@ def ksport_path():
     if not _available(KSPORT):
         pytest.skip(f"ksport export not available: {KSPORT}")
     return KSPORT
+
+
+@pytest.fixture(scope="session")
+def fattorek_path():
+    """The Fattore K export: the same flat shape, without the Regione column."""
+    if not _available(FATTOREK):
+        pytest.skip(f"Fattore K export not available: {FATTOREK}")
+    return FATTOREK
 
 
 @pytest.fixture(scope="session")

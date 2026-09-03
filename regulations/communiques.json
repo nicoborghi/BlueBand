@@ -1,0 +1,57 @@
+{
+  "_last_updated_": "29 August 2026",
+  "_about_": "Which documents ride on the same comunicato. A fase says which sheets it files (core/rounds.docs_for); this says which of those sheets share a number. Four rules, each generic and each on or off per format - a competition can override any of them in the `communiques:` block of its programme.yaml. Read by core/communiques.py.",
+  "rules": {
+    "results_are_classification": {
+      "name": {
+        "it": "Risultati e classifica insieme, quando la gara è una corsa sola",
+        "en": "Results and classification together, when one race decides it"
+      },
+      "_about_": "A madison, uno scratch, una corsa a punti: la classifica della specialità *è* l'ordine d'arrivo di quell'unica corsa, e sono un foglio solo. Una velocità a squadre che si decide su due finali no: lì la classifica è un'altra tabella."
+    },
+    "results_with_next_startlist": {
+      "name": {
+        "it": "Risultati di una fase con l'ordine di partenza della successiva",
+        "en": "A round's results with the next round's start order"
+      },
+      "_about_": "«Quarti - Risultati e Ordine di Partenza Semifinali»: la fase successiva si compone da quei risultati, esce subito dopo e va sullo stesso foglio. Non nelle gare a cronometro, dove fra le qualificazioni e le finali passa mezza giornata."
+    },
+    "partial_is_next_startlist": {
+      "name": {
+        "it": "Accorpa comunicati omnium",
+        "en": "Merge omnium communiqués"
+      },
+      "_about_": "La classifica parziale dopo una prova è anche l'ordine di partenza della prova dopo: un numero, due titoli. Non vale per la prima prova, che non ha niente di parziale prima di sé."
+    },
+    "partial_is_results_of_first": {
+      "name": {
+        "it": "Prima prova: risultati e classifica parziale sono un foglio",
+        "en": "First round: results and partial standings are one sheet"
+      },
+      "_about_": "Nella prima prova di un omnium l'ordine d'arrivo *è* la classifica parziale - non c'è ancora niente da sommarci."
+    },
+    "last_results_with_classification": {
+      "name": {
+        "it": "Risultati dell'ultima fase con la classifica finale",
+        "en": "The closing round's results with the final classification"
+      },
+      "_about_": "Diverso da «risultati e classifica insieme»: là sono la stessa tabella, qui sono due tabelle che escono sullo stesso foglio perché la seconda arriva dalla prima e non c'è niente in mezzo. È quello che fa l'omnium con la corsa a punti."
+    }
+  },
+  "formats": {
+    "*": [
+      "results_are_classification"
+    ],
+    "sprint": [
+      "results_with_next_startlist"
+    ],
+    "keirin": [
+      "results_with_next_startlist"
+    ],
+    "omnium": [
+      "partial_is_next_startlist",
+      "partial_is_results_of_first",
+      "last_results_with_classification"
+    ]
+  }
+}

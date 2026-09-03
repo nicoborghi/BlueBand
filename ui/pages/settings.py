@@ -1,25 +1,26 @@
 """SETTINGS ("Impostazioni") - what holds beyond this competition.
 
 The page is ordered by what it is: from what the app is working on, down to what
-can destroy work. Seven sections, in this order and no other:
+can destroy work. Six sections, in this order and no other:
 
-1. **Manifestazione** - which one is loaded, whether its programme reads, and
+1. **competition** - which one is loaded, whether its programme reads, and
    the language it is all read in.
 2. **Cartella dei comunicati** - where a saved sheet lands. The one setting
    that has to be right before the first comunicato goes out.
 3. **Aspetto dei comunicati** - the letterhead, the signature, how a name is
-   set. All of it is "how a sheet looks", so it is one section: before, the two
-   images were on the page and the signature was hidden behind an expander
-   called *avanzate*, which is not a different kind of choice.
-4. **Specialità** - what each one *is*: sigla UCI, formato, atleti per squadra,
+   set, the colours of a decision, the **caratteri** each element is set in,
+   and the **note di default** a sheet opens on (`core.notes`). All of it is
+   "how a sheet looks", so it is one section - and it ends on the one control
+   that puts the whole of it back to what the app ships: the
+   two images were on the page, the signature was hidden behind an expander
+   called *avanzate* and the wordings were a section of their own halfway down,
+   which is three places for one question.
+4. **event** - what each one *is*: sigla UCI, formato, atleti per squadra,
    the column it is called in the entry file. The same at every championship,
    so it is a table of the installation (`regulations/events.json`) and not
    seven fields typed into every new programme.
-5. **Righe dei comunicati** - the sentences a sheet opens on, worded once
-   (`core.notes`). Which line goes on which sheet is the regulation's; how it
-   is worded is decided here.
-6. **Dati e backup** - the folder, the copy, the journal.
-7. **Azzera una gara** - last, alone, and the only thing here that deletes.
+5. **Dati e backup** - the folder, the copy, the journal.
+6. **Azzera una gara** - last, alone, and the only thing here that deletes.
 
 **Nothing about one competition is here.** The elenco iscritti is built in
 Programma → Gara, and so is what a squadra is at this meeting: both are
@@ -48,7 +49,7 @@ from core.config import EVENT_ENTRY_LIST, Competition, validate
 from core.i18n import (LANGUAGES, help_text, label, language,
                        language_name, msg, note_kind_name, ui)
 from core.store import Store, list_competitions, open_competition
-from render.render import darken, data_uri
+from render.render import darken, data_uri, image_style
 from ui import notify, state
 
 
@@ -79,7 +80,6 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     _output_folder(store)
     _appearance(comp, store)
     _events()
-    _sheet_lines(store)
     _data_and_backup(store)
     _reset_event(comp, store)
     _credit()
@@ -237,8 +237,10 @@ def _appearance(comp: Competition, store: Store) -> None:
     """What every sheet of this competition looks like.
 
     The letterhead carries the venue and the dates, the signature changes with
-    the jury president, the name style is a matter of taste: three choices, one
-    section, set once and left alone. They are not part of the programme - a
+    the jury president, the name style and the characters are a matter of
+    taste: a handful of choices, one section, set once and left alone. The last
+    control of the section puts every one of them back (`_restore_appearance`),
+    which is what a laptop handed on from last year's championship needs. They are not part of the programme - a
     different jury signs a different year - so they live in `settings.json`
     (`ui.state.BRANDING_SETTINGS`).
     """
@@ -251,12 +253,160 @@ def _appearance(comp: Competition, store: Store) -> None:
                                      ("footer_img", ui("footer_img"),
                                       "footer_img")):
             _image_setting(comp, store, key, title, help_text(help_key))
+    with st.expander(ui("sheet_slots"), expanded=False):
+        _sheet_slots(comp, store)
     with st.expander(ui("signature"), expanded=False):
         _signature(comp, store)
     with st.expander(ui("name_style"), expanded=False):
         _name_style(comp, store)
     with st.expander(ui("note_colors"), expanded=False):
         _note_colors(comp, store)
+    # the wording of the lines is the same kind of choice as the letterhead and
+    # the signature - how a sheet reads - and it used to be a section of its
+    # own halfway down the page, which put two answers to "what does a
+    # comunicato look like" in two different places
+    with st.expander(ui("sheet_lines"), expanded=False):
+        _sheet_lines(store)
+    with st.expander(ui("fonts"), expanded=False):
+        _fonts(comp, store)
+    _restore_appearance(store)
+
+
+#: What a font setting is called in the picker: the key of `config.FONTS`, said
+#: in words. The value is looked up when the widget is drawn, so the list
+#: follows a change of language on the next rerun.
+FONT_LABELS = {key: f"font_{key}" for key in C.FONTS}
+
+
+def _fonts(comp: Competition, store: Store) -> None:
+    """The character and the colour every element of a sheet is set in.
+
+    A picker of what is being set - il titolo, il sottotitolo, il riquadro
+    della decisione - and beside it how it is set, because that is the shape of
+    the question: a jury changes the titolo of a championship once and never
+    looks at the other thirteen. `Imposta` writes both, `Ripristina
+    predefinito` takes that one element back to what the app ships, and the
+    table under them is the whole set as it stands, so what has been changed is
+    readable without opening the picker fourteen times.
+
+    Everything typed here goes into the style of the page
+    (`render.font_css_vars`, `render.color_css_vars`), so what does not read as
+    a font or as a colour is refused here and never written
+    (`config.font_value`, `config.text_color`).
+
+    The colour is stored only where it *differs*: il titolo and the riquadro
+    «Comunicato n.» are printed in the colour of the competition, and one saved
+    as today's hex would stop following the letterhead the day it changes.
+    """
+    b = comp.branding
+    st.caption(msg("fonts_caption"))
+    keys = list(C.FONTS)
+    key = st.selectbox(ui("font_element"), keys, key="font_element",
+                       format_func=_named(FONT_LABELS),
+                       help=help_text("font_element"))
+    default = C.FONTS[key]
+    current = b.fonts.get(key, default)
+    default_color = C.default_text_color(key, b.color)
+    current_color = b.text_colors.get(key, default_color)
+
+    c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+    value = c1.text_input(ui("font_value"), value=current,
+                          key=f"font_value_{key}",
+                          help=msg("font_default", value=default))
+    color = c2.color_picker(ui("font_color"), current_color,
+                            key=f"font_color_{key}",
+                            help=help_text("font_color"))
+    typed = value.strip()
+    ok = bool(C.font_value(key, typed))
+    if typed and not ok:
+        notify.error("font_not_readable", value=typed)
+
+    changed = ok and (typed != current or color != current_color)
+    c1, c2 = st.columns([1, 1])
+    if c1.button(ui("set"), key="save_font", disabled=not changed):
+        store.set_setting("fonts", {**b.fonts, key: typed})
+        store.set_setting("text_colors", _with_color(b, key, color) or None)
+        state.refresh()
+    if c2.button(ui("restore_default"), key="reset_font",
+                 disabled=(current, current_color) == (default, default_color)):
+        store.set_setting("fonts", {**b.fonts, key: default})
+        store.set_setting("text_colors",
+                          _with_color(b, key, default_color) or None)
+        st.session_state.pop(f"font_value_{key}", None)
+        st.session_state.pop(f"font_color_{key}", None)
+        state.refresh()
+
+    # the element as the sheet sets it: the one preview that answers "is 17pt
+    # too big for this title", which is not a question a number answers
+    st.html(_font_sample(b.fonts, key, typed if ok else current, color))
+    st.dataframe(pd.DataFrame([{
+        ui("font_element"): ui(FONT_LABELS[k]),
+        ui("font_value"): b.fonts.get(k, C.FONTS[k]),
+        ui("font_color"): b.text_colors.get(
+            k, C.default_text_color(k, b.color)),
+        ui("font_default"): C.FONTS[k],
+    } for k in keys]), hide_index=True, use_container_width=True)
+
+
+def _with_color(b: C.Branding, key: str, color: str) -> dict[str, str]:
+    """The colours as they will be stored, with `key` set to `color`.
+
+    A colour that *is* the default is not written down: two of them are «the
+    colour of the letterhead», and a titolo filed as the hex it is today is a
+    titolo that stops following the letterhead tomorrow. `Branding` drops it
+    again on the way back in - this is the same rule, applied where the file is
+    written rather than where it is read.
+    """
+    colors = {k: v for k, v in b.text_colors.items() if k != key}
+    if color and color != C.default_text_color(key, b.color):
+        colors[key] = color
+    return colors
+
+
+def _font_sample(fonts: dict[str, str], key: str, value: str,
+                 color: str) -> str:
+    """One line set the way the sheet would set it - typeface, size, colour."""
+    family = fonts.get(C.FONT_FAMILY, C.FONTS[C.FONT_FAMILY])
+    size = "" if key == C.FONT_FAMILY else f"font-size:{value};"
+    used = value if key == C.FONT_FAMILY else family
+    return (f'<div style="font-family:{used};{size}color:{color};'
+            'padding:4px 0">'
+            f'{ui(FONT_LABELS[key])} - {ui("font_sample")}</div>')
+
+
+def _restore_appearance(store: Store) -> None:
+    """Everything on this section back to what the app ships, in one write.
+
+    The letterhead, the slots, the signature, the colours, the characters: a
+    laptop that has been set up for last year's championship and is handed on
+    is one place where every one of them is wrong, and putting them right one
+    expander at a time is how half of them get left. Only what is in
+    `settings.json` goes - the programme keeps what it says (`state.BRANDING_SETTINGS`).
+    """
+    st.caption(msg("restore_appearance_caption"))
+    if st.button(ui("restore_all_defaults"), key="restore_appearance",
+                 help=help_text("restore_all_defaults")):
+        gone = store.clear_settings(state.BRANDING_SETTINGS)
+        _forget_appearance_widgets()
+        notify.ok("appearance_restored", n=len(gone))
+        state.refresh()
+
+
+#: The fields of this section that own their value once they exist: restoring
+#: the defaults has to drop them, or the boxes go on showing what was typed
+#: into them after the file underneath has been put back.
+#: The picker of which element is being set is not among them: it is where the
+#: jury is looking, not something the reset is about.
+APPEARANCE_WIDGETS = ("brand_", "fit_", "width_", "align_", "off_", "sig_",
+                      "name_style", "name_width", "note_color_",
+                      "decision_codes", "slot_", "gap_", "font_value_",
+                      "font_color_")
+
+
+def _forget_appearance_widgets() -> None:
+    for k in list(st.session_state):
+        if k.startswith(APPEARANCE_WIDGETS):
+            del st.session_state[k]
 
 
 def _note_colors(comp: Competition, store: Store) -> None:
@@ -308,6 +458,10 @@ def _swatch(kind: str, color: str) -> str:
             'font-size:0.85rem;color:#222">'
             f'{note_kind_name(kind)}</div>')
 
+
+FIT_LABELS = {C.FIT_PAGE: "fit_page", C.FIT_SIZE: "fit_size"}
+ALIGN_LABELS = {C.ALIGN_LEFT: "align_left", C.ALIGN_CENTER: "align_center",
+                C.ALIGN_RIGHT: "align_right"}
 
 SIG_MODE_LABELS = {C.SIG_IMAGE: "sig_mode_image", C.SIG_TEXT: "sig_mode_text"}
 SIG_SCOPE_LABELS = {C.SIG_ALWAYS: "sig_scope_always",
@@ -368,6 +522,80 @@ def _signature(comp: Competition, store: Store) -> None:
 NAME_STYLE_LABELS = {C.NAME_SPLIT: "name_split", C.NAME_FULL: "name_full"}
 
 
+#: The items a slot can hold, and what each is called on screen.
+SLOT_LABELS = {C.SLOT_NONE: "slot_none",
+               C.SLOT_COMMUNIQUE: "slot_communique",
+               C.SLOT_PRINTED_AT: "slot_printed_at"}
+
+#: The three positions of a line, and the word for each.
+SIDE_LABELS = {C.ALIGN_LEFT: "slot_left", C.ALIGN_CENTER: "slot_center",
+               C.ALIGN_RIGHT: "slot_right"}
+
+#: The two lines, and the label of the air asked for under / over each.
+SLOT_LINES = (("head", "slot_head", "head_gap"),
+              ("foot", "slot_foot", "foot_gap"))
+
+
+def _sheet_slots(comp: Competition, store: Store) -> None:
+    """What prints on the two lines that frame the table, and how far in.
+
+    «Comunicato n.» top right and «Emesso il …» bottom right is where the jury
+    workbooks put them and what every sheet printed until now; a testata that
+    already carries something in one of those corners had nowhere to move them
+    to. Six pickers - three positions per line - and two millimetre boxes for
+    the air between each line and its edge of the paper.
+
+    An item can only be in one place, so choosing it in a second slot takes it
+    out of the first (`config.Branding._settle_slots` does the same to a
+    settings.json written by hand).
+    """
+    b = comp.branding
+    st.caption(msg("sheet_slots_caption"))
+    items = list(C.SLOT_ITEMS)
+    for line, title, gap_key in SLOT_LINES:
+        st.markdown(f"**{ui(title)}**")
+        cols = st.columns(3)
+        picked = []
+        for col, side in zip(cols, C.SLOT_SIDES):
+            current = getattr(b, f"{line}_{side}")
+            picked.append(col.selectbox(
+                ui(SIDE_LABELS[side]), items,
+                index=items.index(current) if current in items else 0,
+                key=f"slot_{line}_{side}", format_func=_named(SLOT_LABELS),
+                help=help_text("sheet_slots")))
+        mm = st.number_input(ui(gap_key), 0.0, C.SLOT_GAP_MAX,
+                             float(getattr(b, gap_key)), step=1.0,
+                             key=f"gap_{line}", help=help_text(gap_key))
+        # The three slots are read together: an item moved into a new position
+        # leaves the one it was in, in the same rerun, or the sheet would print
+        # it twice until somebody noticed.
+        moved = [side for side, value in zip(C.SLOT_SIDES, picked)
+                 if value != getattr(b, f"{line}_{side}")]
+        if moved:
+            _drop_duplicates(picked, moved)
+            for side, value in zip(C.SLOT_SIDES, picked):
+                store.set_setting(f"{line}_{side}", value)
+            state.refresh()
+        if mm != getattr(b, gap_key):
+            store.set_setting(gap_key, float(mm))
+            state.refresh()
+
+
+def _drop_duplicates(picked: list[str], moved: list[str]) -> None:
+    """Blank, in place, every slot that repeats an item the jury just moved.
+
+    The pick that changed is the one that stands: a jury that puts «Emesso il»
+    on the left has said it wants it there, not that it wants it twice.
+    """
+    for side in moved:
+        item = picked[C.SLOT_SIDES.index(side)]
+        if item == C.SLOT_NONE:
+            continue
+        for i, other in enumerate(picked):
+            if other == item and C.SLOT_SIDES[i] != side:
+                picked[i] = C.SLOT_NONE
+
+
 def _name_style(comp: Competition, store: Store) -> None:
     """Two columns or one, on every printed sheet."""
     b = comp.branding
@@ -396,12 +624,21 @@ def _name_style(comp: Competition, store: Store) -> None:
 
 def _image_setting(comp: Competition, store: Store, key: str, title: str,
                    help_txt: str) -> None:
-    """One of the two images that frame every printed sheet.
+    """One of the two images that frame every printed sheet, and how it sits.
 
     A relative path is read from the `track/` folder, where `header/` lives, so
     a new championship is a new SVG here and not a code change.
+
+    *Adatta alla pagina* is the default and is what a letterhead wants: drawn
+    to the paper width, edge to edge. A logo is not a letterhead - it has its
+    own proportions - so the other fit gives it a width of its own, as a
+    percentage of the sheet, and a side to sit on. Both are saved in
+    `settings.json` (`ui.state.BRANDING_SETTINGS`), so the choice outlives the
+    competition the way the image itself does.
     """
-    current = getattr(comp.branding, key)
+    which = key.split("_")[0]                   # header_img -> header
+    b = comp.branding
+    current = getattr(b, key)
     value = st.text_input(title, value=current, key=f"brand_{key}",
                           help=help_txt)
     c1, _ = st.columns([1, 3])
@@ -409,24 +646,66 @@ def _image_setting(comp: Competition, store: Store, key: str, title: str,
                  disabled=value == current):
         store.set_setting(key, value.strip())
         state.refresh()
+
+    fits = list(C.IMAGE_FITS)
+    fit = st.radio(ui("image_fit"), fits, key=f"fit_{which}", horizontal=True,
+                   index=fits.index(getattr(b, f"{which}_fit")),
+                   format_func=_named(FIT_LABELS), help=help_text("image_fit"))
+    if fit != getattr(b, f"{which}_fit"):
+        store.set_setting(f"{which}_fit", fit)
+        state.refresh()
+    if fit == C.FIT_SIZE:
+        c1, c2 = st.columns([1, 1])
+        width = c1.slider(ui("image_width"), int(C.IMAGE_WIDTH_MIN),
+                          int(C.IMAGE_WIDTH_MAX),
+                          value=int(getattr(b, f"{which}_width")), step=5,
+                          key=f"width_{which}", help=help_text("image_width"))
+        aligns = list(C.ALIGNS)
+        align = c2.selectbox(ui("image_align"), aligns, key=f"align_{which}",
+                             index=aligns.index(getattr(b, f"{which}_align")),
+                             format_func=_named(ALIGN_LABELS),
+                             help=help_text("image_align"))
+        if (width, align) != (getattr(b, f"{which}_width"),
+                              getattr(b, f"{which}_align")):
+            store.set_setting(f"{which}_width", float(width))
+            store.set_setting(f"{which}_align", align)
+            state.refresh()
+
+    # How far it is held off its own edge of the paper - the testata from the
+    # top, the piè from the bottom - which is a question either fit can be
+    # asked: a full-width banner may want air above it just as a logo does.
+    edge = "header_top" if which == "header" else "footer_bottom"
+    off = st.number_input(ui(edge), min_value=0.0,
+                          max_value=C.IMAGE_OFFSET_MAX,
+                          value=float(getattr(b, edge)), step=1.0,
+                          key=f"off_{which}", help=help_text(edge))
+    if off != getattr(b, edge):
+        store.set_setting(edge, float(off))
+        state.refresh()
+
     path = _asset_path(value)
     if path is not None:
-        # a banner is as wide as the sheet: it goes under the field, full width,
-        # rather than squeezed into a column next to it
-        _preview(st, path, width=700)
+        # the preview is the sheet in miniature: same width, same side, so the
+        # setting is judged where it is made rather than on the first PDF
+        _preview(st, path, width=700, style=image_style(b, which))
     elif value:
         notify.error("image_missing")
 
 
-def _preview(container, path: Path, width: int) -> None:
+def _preview(container, path: Path, width: int, style: str = "") -> None:
     """Show the image the way the comunicato will.
 
     Through the renderer's own `data_uri`, not `st.image`: the banners are
     Inkscape SVGs, which `st.image` cannot draw at all and which lose their
     namespaces if injected as raw markup.
+
+    `style` is what the renderer puts on the same tag (`render.image_style`):
+    the paper is the box, so the sheet's width and side are shown inside a
+    frame of the preview's own width.
     """
-    container.html(f'<img src="{data_uri(path)}" '
-                   f'style="width:100%;max-width:{width}px;display:block">')
+    container.html(f'<div style="max-width:{width}px">'
+                   f'<img src="{data_uri(path)}" '
+                   f'style="width:100%;display:block;{style}"></div>')
 
 
 def _asset_path(value: str) -> Path | None:
@@ -440,20 +719,20 @@ def _asset_path(value: str) -> Path | None:
     return p if p.exists() else None
 
 
-# ── 4. what a specialità is, once for every championship ────────────────────
+# ── 4. what an event is, once for every championship ────────────────────
 
-#: The formats a specialità can be run under - what `race.round_format` knows.
+#: The formats an event can be run under - what `race.round_format` knows.
 FORMATS = ("group", "elimination", "timed", "timed_team", "sprint", "keirin",
            "omnium", "madison", "time_trial", "entrylist")
 
 
 def _events() -> None:
-    """The specialità this installation knows, and what each one *is*.
+    """The event this installation knows, and what each one *is*.
 
-    Sigla UCI, formato, atleti per squadra, quante partono insieme, e come si
-    chiama la colonna nel file iscritti: facts that are the same at every
-    championship. They used to be typed into the Programma page of every new
-    meeting - seven fields per specialità, per year, and getting one wrong is a
+    Sigla UCI, formato, atleti per squadra, quante partono insieme, quanto dura
+    una sua fase, e come si chiama la colonna nel file iscritti: facts that are
+    the same at every championship. They used to be typed into the Programma page of every new
+    meeting - seven fields per event, per year, and getting one wrong is a
     programme that runs the wrong machinery.
 
     So they live in `regulations/events.json` and are edited here. A programme
@@ -472,13 +751,14 @@ def _events() -> None:
                  "fmt": str(entry.get("fmt") or "group"),
                  "team_size": int(entry.get("team_size") or 0),
                  "teams_per_start": int(entry.get("teams_per_start") or 2),
+                 "minutes": int(entry.get("minutes") or 0),
                  "entry_columns": ", ".join(entry.get("entry_columns") or [])}
                 for code, entry in table.items()]
         edited = st.data_editor(
             pd.DataFrame(rows), key="set_events_grid", hide_index=True,
             use_container_width=True, num_rows="fixed",
             column_order=["code", "short", "abbr", "fmt", "team_size",
-                          "teams_per_start", "entry_columns"],
+                          "teams_per_start", "minutes", "entry_columns"],
             column_config={
                 "code": st.column_config.TextColumn(ui("code"), disabled=True,
                                                     width="small"),
@@ -495,6 +775,9 @@ def _events() -> None:
                 "teams_per_start": st.column_config.NumberColumn(
                     ui("per_start"), min_value=1, max_value=2, step=1,
                     width="small", help=help_text("starts_per_race")),
+                "minutes": st.column_config.NumberColumn(
+                    ui("event_minutes"), min_value=0, max_value=240, step=5,
+                    width="small", help=help_text("event_minutes")),
                 "entry_columns": st.column_config.TextColumn(
                     ui("entry_columns"), help=help_text("entry_columns")),
             })
@@ -507,7 +790,7 @@ def _events() -> None:
 def _save_events(table: dict, edited) -> None:
     """Write the grid back into the catalogue, and only what it is about.
 
-    The name of a specialità is per language and is not in the grid, so it is
+    The name of an event is per language and is not in the grid, so it is
     carried over untouched: reading a table in Italian and writing it back must
     not be what drops the English one.
     """
@@ -520,12 +803,13 @@ def _save_events(table: dict, edited) -> None:
         size = int(row["team_size"] or 0)
         entry["team_size"] = size
         entry["teams_per_start"] = int(row["teams_per_start"] or 2)
+        entry["minutes"] = int(row["minutes"] or 0)
         columns = [c.strip() for c in str(row["entry_columns"] or "").split(",")
                    if c.strip()]
         entry["entry_columns"] = columns
         # what says nothing is not written down: an empty value in this table
-        # would be a statement that a specialità has no sigla
-        for name in ("abbr", "team_size", "entry_columns"):
+        # would be a statement that an event has no sigla
+        for name in ("abbr", "team_size", "minutes", "entry_columns"):
             if not entry.get(name):
                 entry.pop(name, None)
         if entry.get("teams_per_start") == 2:
@@ -533,7 +817,7 @@ def _save_events(table: dict, edited) -> None:
     CAT.save(table)
 
 
-# ── 5. what a specialità announces on its sheets ────────────────────────────
+# ── 5. what an event announces on its sheets ────────────────────────────
 
 def _sheet_lines(store: Store) -> None:
     """The lines a comunicato opens on, worded once for the installation.
@@ -550,31 +834,29 @@ def _sheet_lines(store: Store) -> None:
     of that race in them - so what the jury reads in Programmazione is what
     will print - and re-proposed when one of those numbers moves.
     """
-    st.subheader(ui("sheet_lines"))
     st.caption(msg("sheet_lines_caption"))
-    with st.expander(ui("sheet_lines_edit"), expanded=False):
-        lang = language()
-        st.caption(ui("sheet_lines_language", language=language_name(lang)))
-        mine = NOTES.texts()
-        edited = dict(mine.get(lang) or {})
-        for key in NOTES.keys():
-            shipped = NOTES.shipped(key, lang)
-            value = st.text_area(
-                _line_title(key), edited.get(key, shipped),
-                key=f"set_note_{lang}_{key}", height=68,
-                help=msg("sheet_line_default", text=shipped))
-            edited[key] = value
-        c1, c2 = st.columns([1, 3], vertical_alignment="center")
-        if c1.button(ui("save_sheet_lines"), key="set_notes_save"):
-            NOTES.save_texts({**mine, lang: edited})
-            notify.ok("sheet_lines_saved", path=str(NOTES.FILE))
-            state.refresh()
-        if c2.button(ui("restore_sheet_lines"), key="set_notes_reset",
-                     help=help_text("restore_sheet_lines")):
-            NOTES.save_texts({**mine, lang: {}})
-            _forget_note_widgets(lang)
-            notify.ok("sheet_lines_restored")
-            state.refresh()
+    lang = language()
+    st.caption(ui("sheet_lines_language", language=language_name(lang)))
+    mine = NOTES.texts()
+    edited = dict(mine.get(lang) or {})
+    for key in NOTES.keys():
+        shipped = NOTES.shipped(key, lang)
+        value = st.text_area(
+            _line_title(key), edited.get(key, shipped),
+            key=f"set_note_{lang}_{key}", height=68,
+            help=msg("sheet_line_default", text=shipped))
+        edited[key] = value
+    c1, c2 = st.columns([1, 3], vertical_alignment="center")
+    if c1.button(ui("save_sheet_lines"), key="set_notes_save"):
+        NOTES.save_texts({**mine, lang: edited})
+        notify.ok("sheet_lines_saved", path=str(NOTES.FILE))
+        state.refresh()
+    if c2.button(ui("restore_sheet_lines"), key="set_notes_reset",
+                 help=help_text("restore_sheet_lines")):
+        NOTES.save_texts({**mine, lang: {}})
+        _forget_note_widgets(lang)
+        notify.ok("sheet_lines_restored")
+        state.refresh()
 
 
 def _line_title(key: str) -> str:

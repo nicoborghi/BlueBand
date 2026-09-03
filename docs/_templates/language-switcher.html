@@ -1,0 +1,43 @@
+{#- EN | IT switcher.
+
+    The theme ships no language component, and Read the Docs' own flyout only
+    exists on Read the Docs - so this one computes its targets from the URL and
+    works in both places:
+
+      Read the Docs   /en/latest/guide.html  <->  /it/latest/guide.html
+      local build     .../html/guide.html    <->  .../html-it/guide.html
+
+    It stays on the same page across the swap. Where neither layout matches
+    (an unexpected path), it hides itself rather than offering a dead link.
+-#}
+<div class="language-switcher" role="group" aria-label="Language" hidden>
+  <a class="lang-btn{% if language == 'en' %} active{% endif %}"
+     data-lang="en" hreflang="en" href="#">EN</a>
+  <a class="lang-btn{% if language == 'it' %} active{% endif %}"
+     data-lang="it" hreflang="it" href="#">IT</a>
+</div>
+<script>
+(function () {
+  var box = document.currentScript.previousElementSibling;
+
+  function target(lang) {
+    var p = window.location.pathname;
+    var rtd = p.match(/^\/(en|it)(\/.*)?$/);        // Read the Docs
+    if (rtd) { return "/" + lang + (rtd[2] || "/"); }
+    if (p.indexOf("/html-it/") !== -1) {            // local build
+      return lang === "it" ? p : p.replace("/html-it/", "/html/");
+    }
+    if (p.indexOf("/html/") !== -1) {
+      return lang === "en" ? p : p.replace("/html/", "/html-it/");
+    }
+    return null;
+  }
+
+  var ok = true;
+  box.querySelectorAll(".lang-btn").forEach(function (a) {
+    var href = target(a.dataset.lang);
+    if (href === null) { ok = false; } else { a.href = href + window.location.hash; }
+  });
+  if (ok) { box.hidden = false; }
+})();
+</script>

@@ -1,0 +1,378 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:07+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: it <LL@li.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../reference/entries.rst:4 0e7f53affa5c4d599792e44e9057f42b
+msgid "Entry lists and communiqués"
+msgstr "Elenchi iscritti e comunicati"
+
+#: ../../reference/entries.rst:9 6e46b49ca3684ee487f654c12d1daa5e
+msgid "Entry lists"
+msgstr "Elenchi iscritti"
+
+#: ../../reference/entries.rst:11 8f66ce242194401cbb3448ce53a53593
+msgid "Three files, three jobs."
+msgstr ""
+
+#: ../../reference/entries.rst:13 13170421ba0a4662a92a2723f0f6ca8a
+msgid "the federation's export"
+msgstr ""
+
+#: ../../reference/entries.rst:14 c5dd26705d574a9a9c3eca714694d53a
+msgid ""
+"What arrived. **Never written to**, unless the competition explicitly asks. "
+"Copied into the competition folder as proof of what was received."
+msgstr ""
+
+#: ../../reference/entries.rst:17 3d4ef14a6846407eb9f32b73efc82461
+msgid "``entry_list.xlsx``"
+msgstr ""
+
+#: ../../reference/entries.rst:18 9e79adaa7a0c4352bb0c686e81bca9d5
+msgid ""
+"The workbook the competition is actually run from: an archive sheet plus one"
+" sheet per category, with a column per event. Written by the app."
+msgstr ""
+
+#: ../../reference/entries.rst:21 a70b0113146a4751b392b4510d49466f
+msgid "``entries_import.json`` / ``entries_overlay.json``"
+msgstr ""
+
+#: ../../reference/entries.rst:22 e139da83ddab47af9f2c14ea9fb5c266
+msgid ""
+"The read-only import snapshot, and the jury's edits as explicit patches."
+msgstr ""
+
+#: ../../reference/entries.rst:26 4c018a711037460aa31ebaac476a3d21
+msgid "The shapes an entry file arrives in"
+msgstr "Le forme in cui arriva un file iscritti"
+
+#: ../../reference/entries.rst:28 8a05ac2902a940b1833e8dd1f88de2ee
+msgid ""
+"``regulations/entry_formats.json`` is the table of them; "
+"``core.entry_formats`` reads it. A third shape is a block in that JSON file,"
+" not a branch in the code."
+msgstr ""
+
+#: ../../reference/entries.rst:31 2edc28117ca44f71a0d771aca0d4b4cd
+msgid "``ksport`` (default)"
+msgstr ""
+
+#: ../../reference/entries.rst:32 85fd26d753fa4ccc8cc30a90e6804f06
+msgid ""
+"The flat federal export — one row per rider, no event columns at all. Which "
+"events a rider contests is not in it: the programme says which columns a "
+"category has, and the jury ticks them at the licence check."
+msgstr ""
+
+#: ../../reference/entries.rst:36 7aa89b0ebf4848719159df7f45ce49b9
+msgid "``master``"
+msgstr ""
+
+#: ../../reference/entries.rst:37 c96f55f3431e4c82a5ef5853c76a630a
+msgid ""
+"The workbook this app writes: an archive sheet plus one printable sheet per "
+"category, whose event columns hold ``X`` (starter), ``R`` (reserve) or a "
+"pairing letter."
+msgstr ""
+
+#: ../../reference/entries.rst:41 2ddc211e3b3b4d02b27bade63885bc8d
+msgid ""
+"**Column headings are never hard-coded.** ``entries.columns`` and "
+"``entries.ksport`` in ``programme.yaml`` map the file's headings to the "
+"field names used here, matched **by name rather than by position**, so a "
+"shifted column does not silently import garbage and a differently-worded "
+"export is a config change. What a competition states wins over the format's "
+"own table."
+msgstr ""
+
+#: ../../reference/entries.rst:47 54ca3419ff214ed9b35ff160e4a2619e
+msgid ""
+"``entries.check_in`` is the third mapping and the odd one out: the two "
+"columns of the licence check are not in the federation's layout at all — the"
+" jury adds them to the workbook. Wherever they are, they are read on import "
+"and written back by ``write_back``; where they are not, the check lives in "
+"the overlay."
+msgstr ""
+
+#: ../../reference/entries.rst:52 dccccd74a7f14f6099c7128a3451ee96
+msgid ""
+"Where the automatic match does not cover a file, the Programme page opens a "
+"mapping dialog. It is how a file that puts the **region inside a \"Note\" "
+"column** is read correctly. The mapping is saved into that competition's "
+"``programme.yaml`` (``mapped: true``), and once answered the app stops "
+"reporting missing columns — the question has an answer, including \"none\". "
+"The fields without which nothing can be built are ``uci_id``, ``last_name``,"
+" ``cat`` and ``bib``."
+msgstr ""
+
+#: ../../reference/entries.rst:62 9e2a0e267f8c4b6ebb834bb7ec7cff48
+msgid "The overlay"
+msgstr "L'overlay"
+
+#: ../../reference/entries.rst:64 2256da3ac6a04a0daba0e110285244fd
+msgid ""
+"Every edit made in the app is a ``Patch`` in ``entries_overlay.json``, re-"
+"applied on top of each new import. Patches are keyed by **UCI ID**, the one "
+"code that does not change: a bib or a region corrected in the app survives "
+"any number of reloads. A patch that no longer applies is reported at the "
+"check-in page rather than silently dropped. Every edit but a check-in tick "
+"carries a reason and a date."
+msgstr ""
+
+#: ../../reference/entries.rst:79 c7922456a8604173aa1c8b0a7f663c28
+msgid ""
+"With ``use_overlay: false`` in ``settings.json``, check-in writes **directly"
+" into the entry workbook**: the cell is changed in the real file and the "
+"file is re-imported straight away, with a copy taken into ``.snapshots/`` "
+"first. Rows are matched by UCI ID; if the file changed on disk in the "
+"meantime the app stops and asks for a reload rather than writing to the "
+"wrong row. Edits already in the overlay are not lost — they stay, and come "
+"back when the setting is switched on. There is no control for this on any "
+"page: it is a key in the settings file."
+msgstr ""
+
+#: ../../reference/entries.rst:89 c46b5203afb0474b9f0bff56d13a4810
+msgid "The workbook the app writes"
+msgstr "Il file che scrive il programma"
+
+#: ../../reference/entries.rst:91 7ea5c34f9c4f425aaf35c06284cc57de
+msgid "``core/entry_book.py`` builds and maintains ``entry_list.xlsx``."
+msgstr ""
+
+#: ../../reference/entries.rst:102 bf9a2ed1d45a4693b9ee679934fd9ba9
+msgid ""
+"**The programme comes first.** A sheet per category with a column per event "
+"cannot be written before somebody has said which categories ride and what "
+"each rides, which is why the page that calls this refuses to run until the "
+"programme says so."
+msgstr ""
+
+#: ../../reference/entries.rst:107 8558e7f08be345f988939ba56dd50536
+msgid ""
+"**The federal sheet is kept whole** — the export as it arrived, plus the two"
+" columns of the licence check that the federation has no place for. Keeping "
+"it means a re-import can be checked against what was actually received."
+msgstr ""
+
+#: ../../reference/entries.rst:111 750a6f6751dc4acd8b23e6f67b48196c
+msgid ""
+"``merge`` shows what will change before it writes — new, no longer entered, "
+"modified, ticks preserved — and then applies one rule: the **file** wins for"
+" what the file knows (category, bib, club, federal data); the **workbook** "
+"wins for what only the jury knows (the entry marks and the licence check). "
+"Bibs already assigned are not cleared by an export that sends none. Riders "
+"are matched by UCI ID, so one who changes category is still the same rider "
+"and keeps their ticks."
+msgstr ""
+
+#: ../../reference/entries.rst:119 7a24b1e58394464c8e0d0993be67abfa
+msgid ""
+"Where the export sends no bibs, ``numbered`` assigns them one of three ways:"
+" ``1…N`` as they stand in the file, ``1…N`` per category consecutively, or "
+"from ``1`` for each category — the last only where two categories never take"
+" the track together."
+msgstr ""
+
+#: ../../reference/entries.rst:124 f35d47f00b4647bb87302b5b61dd021c
+msgid ""
+"``core.checks.Issue`` is the shape every finding takes, wherever it is "
+"raised, so they all render the same way. Nothing at the licence desk blocks:"
+" a rule set to ``error`` is red and counts in the summary; the meeting runs "
+"regardless."
+msgstr ""
+
+#: ../../reference/entries.rst:132 ab1785e2a34b4db79d75c6c80608c68e
+msgid "Communiqués"
+msgstr "Comunicati"
+
+#: ../../reference/entries.rst:134 dfac672efc3d4ed298529769d22fa946
+msgid ""
+"A communiqué is a **number on paper**. More than one sheet can go out under "
+"it — as the sprint and the keirin have always done — so the register is not "
+"a list of documents, it is a list of numbers with documents attached. "
+"Numbers run continuously across the whole competition and are **never "
+"reused**; an annulled document keeps its number and prints ``NN RET``."
+msgstr ""
+
+#: ../../reference/entries.rst:140 6c19150d300942f2b5719961a156a8e6
+msgid ""
+"Two files, answering different questions: ``programme.yaml``'s "
+"``communiques:`` block is what is **planned**; ``communiques.json`` is what "
+"has been **issued**, written when a sheet is actually printed. At print time"
+" a document takes its planned number; one that was not planned gets the next"
+" free one and is recorded, so the register always reflects what went out."
+msgstr ""
+
+#: ../../reference/entries.rst:146 f19c2e378c9d4048a76013cf84190775
+msgid ""
+"A ``Sheet`` is ``(cat, event, round_key, doc)`` — one printed table. Which "
+"sheets a round files comes from its format (``core.rounds.docs_for``) and is"
+" written into the round's ``docs:`` list."
+msgstr ""
+
+#: ../../reference/entries.rst:152 fa3154303bed4156bad447370000c364
+msgid "Not every sheet has a number"
+msgstr "Non tutti i fogli hanno un numero"
+
+#: ../../reference/entries.rst:154 eb41238ea460440f9928d897da42f6ef
+msgid ""
+"``core.communiques.UNNUMBERED`` is the empty string, and it means exactly "
+"that: nothing in the field, nothing in the register cell, nothing at the "
+"head of the sheet, nothing in the filename. Two cases produce it."
+msgstr ""
+
+#: ../../reference/entries.rst:158 f596946072084da69c9f5297fa1776e1
+msgid ""
+"The register does not plan the sheet at all. The results of the qualifying "
+"heats of a bunch event are the usual case."
+msgstr ""
+
+#: ../../reference/entries.rst:160 07f0d8f36a32480c9a7f59115be69829
+msgid ""
+"The sheet **rides under another's number** — ``number_on_classification: "
+"true``, the default: where a round's results and the event's classification "
+"go out on one communiqué, the number prints on the classification only. It "
+"is the sheet that closes the event and the one people look for."
+msgstr ""
+
+#: ../../reference/entries.rst:167 b5e7fdb8a0b047f9a7808ec123c23230
+msgid "Merge rules"
+msgstr "Regole di accorpamento"
+
+#: ../../reference/entries.rst:169 f601bb2af30c486eb5e0881dddab3a18
+msgid ""
+"Which sheets share a number is **not written in the code**. It is five "
+"rules, each generic, each on or off per format, in "
+"``regulations/communiques.json``; a competition overrides any of them in its"
+" own ``merge:`` block."
+msgstr ""
+
+#: ../../reference/entries.rst:177 023c54934c934fc189fe949709ff5c46
+msgid "Rule"
+msgstr "Regola"
+
+#: ../../reference/entries.rst:178 331ed033a1724c9e9ff0bd1913358f13
+msgid "What it does"
+msgstr "Che cosa fa"
+
+#: ../../reference/entries.rst:179 3cc5b83b078548dd8f41b7e953296b5c
+msgid "On by default for"
+msgstr "Attiva per impostazione predefinita su"
+
+#: ../../reference/entries.rst:180 2364f6fa550b41fb88a207447adff690
+msgid "``results_are_classification``"
+msgstr ""
+
+#: ../../reference/entries.rst:181 852a2f5a3e4e4fa9a9377edc1b6098ca
+msgid ""
+"Where **one race** decides the event, the finishing order *is* the "
+"classification: one sheet. A madison, a scratch, an elimination. Not a team "
+"sprint, which is decided across two finals."
+msgstr ""
+
+#: ../../reference/entries.rst:184 113ea3f95ab24e1f959ea0a0a34e3888
+msgid "always"
+msgstr ""
+
+#: ../../reference/entries.rst:185 712aaa3716d04ac396e3c3dcfca5157d
+msgid "``results_with_next_startlist``"
+msgstr ""
+
+#: ../../reference/entries.rst:186 0f69e9ada69341a8b7ab00e96346ea51
+msgid ""
+"The next round is composed from those results and goes out right after. Not "
+"in timed events, where half a day passes between qualifying and the finals."
+msgstr ""
+
+#: ../../reference/entries.rst:189 2524b9a3cb9645f288dfaf1e9c071df8
+msgid "sprint, keirin"
+msgstr ""
+
+#: ../../reference/entries.rst:190 80b274149d1d44e8ae8ab36b77c70599
+msgid "``partial_is_next_startlist``"
+msgstr ""
+
+#: ../../reference/entries.rst:191 0524ee017ac74eaba28a2a936f5c7257
+msgid ""
+"An omnium's partial standings after a race *are* the start order of the next"
+" one: one number, two titles. Not before the first race."
+msgstr ""
+
+#: ../../reference/entries.rst:193 ../../reference/entries.rst:197
+#: ../../reference/entries.rst:201 123ad39291db48fd9655a841cc14fd93
+#: 2ccab22ab9ea49e286ee54ab518b63c5 736276cf92194a59ba8824456d6f77ec
+msgid "omnium"
+msgstr ""
+
+#: ../../reference/entries.rst:194 8b963eac51d043a68d867817b4cb9db4
+msgid "``partial_is_results_of_first``"
+msgstr ""
+
+#: ../../reference/entries.rst:195 1a285ad3605f4b71a5630b2f79d3d7da
+msgid ""
+"In the first race the finishing order *is* the partial standings — there is "
+"nothing to add to yet."
+msgstr ""
+
+#: ../../reference/entries.rst:198 309ccf64c55240028a8c3af448fda52a
+msgid "``last_results_with_classification``"
+msgstr ""
+
+#: ../../reference/entries.rst:199 f7df356a0b774e27a882605086757748
+msgid ""
+"Two tables on one sheet, because the second comes out of the first with "
+"nothing in between. What the omnium's points race does."
+msgstr ""
+
+#: ../../reference/entries.rst:205 1adc812e7168423d9f1ed31d3ce8d241
+msgid "Autonumbering"
+msgstr "Numerazione automatica"
+
+#: ../../reference/entries.rst:207 59ad9ba2a52f4353b6db1d22b9eda045
+msgid ""
+"``communiques.autonumber`` reads the programme, decides which sheets travel "
+"together, and assigns every number **in the order the sheets can be "
+"published** — which is not the order they are ridden. A sheet is ready when "
+"the results it is made of have gone out; a start order is needed before its "
+"round runs. Move a round in the running order and its communiqués move with "
+"it."
+msgstr ""
+
+#: ../../reference/entries.rst:213 4da5e588e71a4c6ea70096418e8bb6a2
+msgid ""
+"Three things it never touches, and it renumbers around them: a number "
+"**already issued** (it is on paper), a number **typed by hand** "
+"(``pinned``), and an **annulled** number (``ret``)."
+msgstr ""
+
+#: ../../reference/entries.rst:217 bfef4b3b5f7248f987257866779c828d
+msgid ""
+"Numbers never move on their own. Recomputing is a button: it shows every "
+"change — moved from N to M, new, dropped, held — and writes nothing until "
+"the jury applies it."
+msgstr ""
+
+#: ../../reference/entries.rst:221 8f0b99bcdb914d8388a75aa9bad2242f
+msgid ""
+"The title of a communiqué names **everything it carries**, once. A "
+"communiqué that publishes two things and names one is the reason a start "
+"order could not be found in the register."
+msgstr ""

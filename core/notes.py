@@ -5,7 +5,7 @@ per la finale le ultime 2 coppie tra le partenti*, *La prima squadra parte sul
 rettilineo d'arrivo*, *Cambio ogni mezzo giro*. They are the same sentences at
 every championship - they come out of the regulation, not out of the
 programme - and until now they were half hard-coded in the pages that print
-them and half typed by hand into the specialità of every new `programme.yaml`.
+them and half typed by hand into the event of every new `programme.yaml`.
 
 Two things live here, and they are different in kind:
 
@@ -30,8 +30,8 @@ distance that is not a whole number of giri. `for_round` is what reads them.
 `rules` ships filled in - it is the regulation - and `texts` ships empty: what
 is not rewritten is what the catalogues say. Both are edited in Impostazioni,
 which is also why they are one file: they are what holds for the *installation*
-and not for the manifestazione, the same way `regulations/events.json` holds
-what a specialità is.
+and not for the competition, the same way `regulations/events.json` holds
+what an event is.
 
 The **numbers are the programme's**. A rule names the field it reads - the
 coppie a batteria eliminates, how many a qualification sends to the finals -
@@ -125,7 +125,7 @@ def starts_two(comp: Competition, item: ProgrammeItem, rnd: Round) -> bool:
 
     The finali of a pursuit are ridden two against two whatever the
     qualificazione did - that is what a final for the places *is* - so the fase
-    decides before the specialità does.
+    decides before the event does.
     """
     if family(rnd.key) in (FINALS, ROUND1, QUARTERS, SEMIFINALS, REPECHAGE):
         return True
@@ -142,7 +142,7 @@ class Rule:
     key: str                       # the catalogue key of the wording
     doc: str = DOC_STARTLIST       # which sheet it opens
     fmt: str = ""                  # "" = every format
-    event: str = ""                # "" = every specialità of that format
+    event: str = ""                # "" = every event of that format
     round: str = ""                # "" = every fase of it (see `family`)
     when: dict[str, Any] = field(default_factory=dict)
     args: dict[str, str] = field(default_factory=dict)

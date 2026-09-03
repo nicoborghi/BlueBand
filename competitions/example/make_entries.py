@@ -11,7 +11,7 @@ machine that matters, CI included.
 So this writes one. Not a censored copy of a real file - nothing here is
 derived from a real rider - but a file with the *shape* of the federal export
 (`Iscritti_NNNNNN.xls`, the `ksport` format in regulations/entry_formats.json):
-one sheet, one row per rider, a Categoria column and no specialita' at all.
+one sheet, one row per rider, a Categoria column and no event' at all.
 
 What is kept from a real export is what makes reading one hard, because that is
 what the tests are about:

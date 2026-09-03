@@ -19,9 +19,12 @@ from typing import Any, Iterable
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from core.config import (DEFAULT_NAME_WIDTH, NAME_FULL, SIG_TEXT,
-                         Competition)
+from core.config import (ALIGN_LEFT, ALIGN_RIGHT, DEFAULT_NAME_WIDTH,
+                         NAME_FULL, SIG_TEXT, SLOT_NONE, SLOT_PRINTED_AT,
+                         FONTS, Branding, Competition, default_text_color,
+                         font_value, text_color)
 from core.i18n import label, ordinal
+from core.models import number_text
 
 HERE = Path(__file__).resolve().parent
 TEMPLATES = HERE / "templates"
@@ -50,6 +53,12 @@ class Column:
     columns to percentages summing to 100, so a sheet can never starve a
     column into a two-character sliver (which is what turned 'Cognome' into
     'Cog nom e' when widths were declared piecemeal).
+
+    `min_mm` is the one thing a weight cannot express: how narrow this column
+    may actually get on paper. A name that loses its last letters is still a
+    name; `DNF` truncated to `DN...` and a UCI ID missing two digits are not
+    the thing they are printed for. Those columns declare the millimetres they
+    need and the table gives them, out of what the others were sharing.
     """
 
     key: str
@@ -60,12 +69,44 @@ class Column:
     wrap: bool = False  # text columns stay on one line by default
     muted: bool = False  # printed grey: a counter, not data of the race
     tight: bool = False  # one digit wide: no side padding to give the names
+    min_mm: float = 0  # never narrower than this on paper (see SHEET_MM)
 
     def __post_init__(self):
         # an explicit "" is a heading the sheet deliberately leaves blank (the
         # row counter): only an omitted label falls back to the key
         self.label = self.key if self.label is None else self.label
         self.pct = 0.0  # filled in by Table
+
+
+#: How wide a printed table is on the narrowest paper the app uses: A4
+#: portrait less the two `--pad-x` margins of print.css. A floor written in
+#: millimetres is measured against this, so a column that must read whole
+#: reads whole on the tightest sheet - on a landscape one it simply gets more.
+SHEET_MM = 194.0
+
+
+def _hold_floors(cols: list[Column]) -> None:
+    """Give every column its `min_mm` back, out of what the others share.
+
+    The floors are held first and the rest of the sheet is rescaled onto what
+    is left - which is what makes the guarantee a guarantee: a corsa a punti
+    with a dozen volate no longer buys its columns out of the Ris. one.
+
+    Where the floors alone would fill the sheet there is nothing to take from,
+    and the plain weights stand: the caller has asked for more columns than the
+    paper holds, and that is a decision for the sheet, not for a rounding here.
+    """
+    floors = [100 * c.min_mm / SHEET_MM for c in cols]
+    short = [i for i, c in enumerate(cols) if c.pct < floors[i]]
+    if not short:
+        return
+    need = sum(floors[i] - cols[i].pct for i in short)
+    spare = sum(c.pct for i, c in enumerate(cols) if i not in short)
+    if need >= spare:
+        return
+    for i, c in enumerate(cols):
+        c.pct = round(floors[i] if i in short
+                      else c.pct * (spare - need) / spare, 3)
 
 
 @dataclass
@@ -82,6 +123,7 @@ class Table:
         total = sum(c.w for c in self.columns) or 1
         for c in self.columns:
             c.pct = round(100 * c.w / total, 3)
+        _hold_floors(self.columns)
 
     @property
     def wide(self) -> bool:
@@ -151,10 +193,17 @@ class Document:
     subtitle: str = ""
     info: str = ""
     legend: str = ""
-    communique: str = ""  # "7", "92 RET" - already formatted
+    #: "7", "92 RET" - already formatted, and empty when the sheet goes out
+    #: under no number of its own (`core.models.number_text`), which is what a
+    #: sheet carried on another one's comunicato does
+    communique: str = ""
     draft: bool = False  # provisional sheet: no number, "NON DEFINITIVO" instead
     pages: str = ""  # "1/2"
     date: str = ""
+    #: Prose printed above the tables, as HTML: what the jury typed into the
+    #: *foglio intestato*, read through `render.markup`. Empty on every sheet
+    #: the app composes itself - those are tables, and a table says it all.
+    body: str = ""
     tables: list[Table] = field(default_factory=list)
     #: The tinted blocks - the decisions of the race, in the order they were
     #: taken. They print above the note, which is the standing text of the
@@ -166,6 +215,10 @@ class Document:
 
     def __post_init__(self):
         self.slug = self.slug or slugify(self.title)
+        # one reading of "no number" for the head of the sheet, the name it is
+        # filed under and everything that asks: empty. A `-1` off an older
+        # register or a race saved before this is the same answer
+        self.communique = number_text(self.communique)
 
     @property
     def blocks(self) -> list[Note]:
@@ -188,6 +241,17 @@ class Document:
         widest classification readable.
         """
         return self.landscape
+
+
+def hex_color(value: str, default: str = "") -> str:
+    """A `#rrggbb` from whatever was stored, or `default`.
+
+    The tint of a cell is written straight into the `style` of the sheet, so
+    what goes in there is a colour and nothing else: a value typed into
+    settings.json by hand cannot become markup on the printed programme.
+    """
+    m = re.fullmatch(r"#?([0-9a-fA-F]{6})", str(value or "").strip())
+    return f"#{m.group(1).lower()}" if m else default
 
 
 # ── the tints of the note blocks ────────────────────────────────────────────
@@ -228,6 +292,34 @@ def note_css_vars(colors: dict[str, str]) -> str:
     """
     return "".join(f"--note-{k}: {v};--note-{k}-rule: {darken(v)};"
                    for k, v in (colors or {}).items())
+
+
+def font_css_vars(fonts: dict[str, str]) -> str:
+    """The characters as custom properties, for the wrapper of the page.
+
+    `--font-<element>` per entry of `config.FONTS`: print.css states what an
+    element *is* and takes its typeface and its size from here, so setting the
+    titolo two points larger is a setting and never an edit to the stylesheet.
+
+    What does not read as a font never reaches the style: `config.font_value`
+    has already dropped it on the way into `Branding`, and it is checked again
+    here because this is the function that writes into the tag.
+    """
+    return "".join(f"--font-{k}: {value};"
+                   for k, v in (fonts or {}).items()
+                   if (value := font_value(k, v)))
+
+
+def color_css_vars(colors: dict[str, str]) -> str:
+    """The colours of the elements as custom properties, for the wrapper.
+
+    Only what the jury changed: print.css names each of them with the colour
+    the sheet has always printed as the fallback, so an element nobody touched
+    is not written into the page at all (`config.TEXT_COLORS`).
+    """
+    return "".join(f"--color-{k}: {value};"
+                   for k, v in (colors or {}).items()
+                   if (value := text_color(k, v)))
 
 
 def slugify(text: str) -> str:
@@ -273,6 +365,29 @@ def image_ratio(path: str | Path | None, base: Path | None = None,
             return im.height / im.width
     except Exception:
         return default
+
+
+#: What `align` means for a block image: the left and right margins that push
+#: it to a side. The other two carry the distance from the paper edge.
+_SIDES = {ALIGN_LEFT: ("auto", "0"), ALIGN_RIGHT: ("0", "auto")}
+
+
+def image_style(b: Branding, which: str) -> str:
+    """Inline style for one of the two framing images, or "" for a letterhead.
+
+    Empty is not "no opinion": it is the default - the image is the width of
+    the sheet and sits against its edge, which is what the stylesheet already
+    says and what a letterhead drawn for A4 wants.
+    """
+    frac, align = b.image_box(which)
+    off = b.image_offset(which)
+    if frac >= 1.0 and not off:
+        return ""
+    right, left = _SIDES.get(align, ("auto", "auto"))
+    edge = f"{off:g}mm" if off else "0"
+    top, bottom = (edge, "0") if which == "header" else ("0", edge)
+    width = f"width:{frac * 100:g}%;" if frac < 1.0 else ""
+    return f"{width}margin:{top} {right} {bottom} {left};"
 
 
 def _css() -> str:
@@ -344,6 +459,25 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
         "banner": data_uri(b.header_img, base) if banner and head else "",
         "banner_width": banner_width,
         "footer_img": data_uri(b.footer_img, base) if banner and head else "",
+        # A letterhead is drawn to the paper width and stays there; a logo
+        # given a size of its own carries it on the tag, so the preview in the
+        # app - which never sees print.css - places it the same way the paper
+        # does (`Branding.image_box`).
+        # The two lines of slots - the one under the testata and the one over
+        # the piè - as three items each, left to centre to right, and the air
+        # asked for between each line and its edge of the paper (Impostazioni →
+        # Aspetto dei comunicati). On the tag and not in print.css, because the
+        # preview in the app never reads the stylesheet.
+        "head_slots": b.slots("head"),
+        "foot_slots": b.slots("foot"),
+        # whether either line is printed at all: three cleared slots are a line
+        # that is not there, not a line of three empty cells
+        "head_line": any(i != SLOT_NONE for i in b.slots("head")),
+        "foot_line": any(i != SLOT_NONE for i in b.slots("foot")),
+        "head_gap": b.head_gap,
+        "foot_gap": b.foot_gap,
+        "banner_style": image_style(b, "header"),
+        "footer_style": image_style(b, "footer"),
         # the jury signs with the scanned signature or with its name in bold:
         # one or the other, never both, and neither unless the sheet asks
         "signature": (data_uri(b.signature, base)
@@ -366,9 +500,25 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
     # A numbered sheet hands its whole foot to a @page margin box - the one
     # place Chrome prints the page number - so the band has to be as tall as
     # the strip plus the line above it, on either paper orientation.
-    strip = image_ratio(b.footer_img, base) if ctx["footer_img"] else 0.0
-    ctx["foot_mm"] = round(210 * strip) + LINE_MM
-    ctx["foot_mm_land"] = round(297 * strip) + LINE_MM
+    frac, align = b.image_box("footer")
+    off = b.image_offset("footer") if ctx["footer_img"] else 0.0
+    strip = image_ratio(b.footer_img, base) * frac if ctx["footer_img"] else 0.0
+    gap = round(b.foot_gap)
+    ctx["foot_mm"] = round(210 * strip + off) + LINE_MM + gap
+    ctx["foot_mm_land"] = round(297 * strip + off) + LINE_MM + gap
+    # The margin box of a numbered sheet is one line of text, and the page
+    # number has to be in it: it is the only place Chrome resolves counter().
+    # So the foot the slots describe collapses to the one item that can share
+    # that line - «Emesso il …», where the jury put it - and the box takes the
+    # side its slot sits on.
+    ctx["foot_box_align"] = b.slot_side("foot", SLOT_PRINTED_AT) or ALIGN_RIGHT
+    ctx["foot_box_text"] = (ctx["printed_at"]
+                            if b.slot_side("foot", SLOT_PRINTED_AT) else "")
+    # the numbered sheet paints the strip as the background of a margin box,
+    # so the width, the side and the distance from the paper edge have to be
+    # said again in those two words
+    ctx["foot_size"] = f"{frac * 100:g}% auto"
+    ctx["foot_pos"] = f"{align} bottom {off:g}mm"
     doc_tpl = _env.get_template("document.html.j2")
     body = "\n".join(doc_tpl.render(doc=d, **ctx) for d in docs)
 
@@ -376,6 +526,13 @@ def to_html(docs: Document | Iterable[Document], comp: Competition, *,
         standalone=standalone, css=_css() if css or standalone else "", body=body,
         header_color=b.color or "#0a5688",
         note_vars=note_css_vars(b.note_colors),
+        font_vars=font_css_vars(b.fonts) + color_css_vars(b.text_colors),
+        font_family=font_value("family", b.fonts.get("family"))
+        or FONTS["family"],
+        footline_size=font_value("footline", b.fonts.get("footline"))
+        or FONTS["footline"],
+        footline_color=text_color("footline", b.text_colors.get("footline"))
+        or default_text_color("footline", b.color),
         page_title=docs[0].title if docs else comp.name, **ctx)
 
 
@@ -417,13 +574,16 @@ def _render_pdf(docs: list[Document], comp: Competition, *, signature: bool,
 def out_name(docs: list[Document], number: str | int = "", ext: str = "pdf") -> str:
     """`007_AL_ins_squadre_qualificazioni.pdf` - the name inside the out folder.
 
-    The jury files by comunicato number, then category, specialità, fase and
+    The jury files by comunicato number, then category, event, fase and
     batteria; a classification adds `_classifica` (see `models.race_slug`).
+    A sheet that goes out under no number of its own is filed by its name
+    alone - nothing is invented to sort it by.
     """
     if docs and docs[0].draft:
         # not a comunicato yet: it must not take a number, nor sort among them
         return f"{label('draft')}_{docs[0].slug}.{ext}"
-    n = str(number or (docs[0].communique if docs else "")).replace(" ", "-")
+    n = number_text(number or (docs[0].communique if docs else "")) \
+        .replace(" ", "-")
     prefix = f"{int(n):03d}_" if n.isdigit() else (f"{n}_" if n else "")
     return f"{prefix}{docs[0].slug if docs else label('document_slug')}.{ext}"
 
@@ -499,10 +659,21 @@ def position_label(pos: int | str | None) -> str:
 RIDER_COLS = (("bib", 7), ("last_name", 20), ("first_name", 15),
               ("uci_id", 20), ("club", 22), ("region", 17))
 
+#: Eleven digits and the padding around them, at the 9pt the tables are set
+#: in: what a UCI ID needs to print whole. It is the number the federation
+#: files the result under and half of one is worse than none, so wherever the
+#: column appears it is never squeezed below this (`Column.min_mm`).
+MIN_UCI_MM = 21.0
+
+#: The Ris. column holds `DNF`, `DNS`, `ABD` as well as `10°`: three capitals
+#: and the padding. A sigla is the whole of what that line says.
+MIN_RANK_MM = 8.5
+
 
 def cols_rider(minimal: bool = False) -> list[Column]:
     """The rider columns, headed from the catalogue (`minimal` drops the club)."""
-    return [Column(k, label(k), "c" if k in ("bib", "uci_id") else "l", w)
+    return [Column(k, label(k), "c" if k in ("bib", "uci_id") else "l", w,
+                   min_mm=MIN_UCI_MM if k == "uci_id" else 0)
             for k, w in RIDER_COLS if not (minimal and k == "club")]
 
 # Plain row counter down the left edge: it says how many riders there are and
@@ -516,7 +687,7 @@ def numbered(rows: list[dict]) -> list[dict]:
         r["_idx"] = i
     return rows
 
-W_RANK = 7         # Ris.
+W_RANK = 7         # Ris. (never below MIN_RANK_MM: see cols_rider)
 W_GROUP = 22       # Squadra / Coppia / Batteria - region names are long
 W_SPRINT = 4       # one sprint column
 W_LAPS = 6         # Giri
@@ -529,7 +700,7 @@ W_POINTS = 12      # "Punti Tempo Race" - a heading that has to read whole
 def rider_row(rider, **extra) -> dict:
     """Standard cells for one rider; `extra` adds/overrides columns."""
     row = {
-        # a declared non-starter prints "NP" where the bib would be
+        # a declared non-starter prints the not-starting code where the bib would be
         "bib": label("not_starting") if rider.not_starting else (rider.bib or ""),
         "last_name": rider.last_name,
         "first_name": rider.first_name,
@@ -624,6 +795,19 @@ def group_start(row: dict, strong: bool = False) -> dict:
     """
     row["_class"] = (row.get("_class", "") +
                      (" group-start-strong" if strong else " group-start")).strip()
+    return row
+
+
+def section_start(row: dict) -> dict:
+    """Mark a row as the first of a section - the next categoria on a grid.
+
+    A rule between one thing and the next, and deliberately neither of the
+    other two: lighter than the qualification cut (`group_start(strong)`,
+    which is a decision of the jury) and heavier than the hairline that tells
+    one coppia from the next. Like `side_start` it opens no block of its own -
+    a categoria is as long as it is, and must be free to run over the page.
+    """
+    row["_class"] = (row.get("_class", "") + " section-start").strip()
     return row
 
 

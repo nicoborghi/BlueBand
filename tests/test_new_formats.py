@@ -168,11 +168,13 @@ def test_omnium_tie_is_broken_by_the_points_race():
     assert [p.key for p in res.placings] == ["B", "A"]
 
 
-def test_omnium_excludes_a_rider_who_abandoned():
+def test_omnium_excludes_a_rider_who_abandoned_from_the_places():
+    """On the classification with her sigla, out of the places and the points."""
     competitions = {O.SCRATCH: _res(["A", "B"])}
     res = O.omnium_classification(competitions, statuses={"B": Status.DNF})
-    assert res.placings[-1].label == "DNF"
+    assert [(p.key, p.position) for p in res.placings] == [("A", 1), ("B", None)]
     assert res.by_key("B").data["total"] == 0
+    assert res.notes == []
 
 
 # ── integration with the store ──────────────────────────────────────────────
@@ -218,3 +220,44 @@ def test_compose_bracket_round_from_a_ranking(ev, entries, comp):
     ranking = state.entrants[:8]
     txt = R.compose_bracket_round(state, comp, ranking)
     assert txt == "/".join(f"{ranking[i]},{ranking[7 - i]}" for i in range(4))
+
+
+# ── l'eliminazione corsa per sé ─────────────────────────────────────────────
+#
+# Not a prova of an omnium: an event of its own, run direttamente. It used to
+# fall through `round_format` onto the points race and every sheet of it was
+# scored on volate nobody rode.
+
+@pytest.fixture(scope="session")
+def example():
+    """The fictional programme shipped with the app - it has an eliminazione."""
+    from pathlib import Path
+
+    from core.config import load_competition
+
+    path = (Path(__file__).resolve().parent.parent / "competitions"
+            / "example" / "programme.yaml")
+    if not path.exists():
+        pytest.skip(f"no example competition at {path}")
+    return load_competition(path)
+
+
+def test_a_standalone_elimination_is_scored_as_one(example):
+    cat = next(c for c in example.cat_order()
+               if "eliminazione" in example.events_for(c))
+    rnd = example.rounds(cat, "eliminazione")[0]
+    assert R.round_format(example, cat, "eliminazione", rnd.key) == R.ELIMINATION
+
+
+def test_a_standalone_elimination_ranks_on_the_order_they_went_out(example):
+    from core.models import RaceState
+
+    cat = next(c for c in example.cat_order()
+               if "eliminazione" in example.events_for(c))
+    rnd = example.rounds(cat, "eliminazione")[0]
+    state = RaceState(race_id=R.race_key(cat, "eliminazione", rnd.key),
+                      cat=cat, event="eliminazione", round_key=rnd.key,
+                      fmt=R.ELIMINATION, entrants=["1", "2", "3"],
+                      payload={"eliminated": "3, 2, 1"})
+    result = R.classify(state, None, example)
+    assert [p.key for p in result.placings] == ["1", "2", "3"]

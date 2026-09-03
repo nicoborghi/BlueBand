@@ -24,7 +24,7 @@ class Status(str, Enum):
     ABD = "ABD"  # ritirato di sua volontà: scende dalla pista, non è caduto
     DNS = "DNS"
     DSQ = "DSQ"
-    NP = "NP"  # non partente (declared before the race, entry-list level)
+    NS = "NS"  # not starting (declared before the event, entry-list level)
 
     @property
     def classified(self) -> bool:
@@ -44,7 +44,7 @@ STATUS_ORDER: dict[Status, int] = {
     Status.DNF: 2,
     Status.ABD: 3,
     Status.DNS: 4,
-    Status.NP: 5,
+    Status.NS: 5,
     Status.DSQ: 6,
 }
 
@@ -54,13 +54,19 @@ STATUS_ORDER: dict[Status, int] = {
 LEFT_RACE = (Status.DNF, Status.ABD)
 
 
+#: Tokens written by older versions of the app, still in stored race states
+#: and programme files. `NP` (non partente) was renamed `NS` (not starting).
+LEGACY_STATUS = {"NP": Status.NS.value}
+
+
 def status_of(value: Any) -> Status:
     """Coerce a stored string / None into a Status (defaults to OK)."""
     if value is None or value == "":
         return Status.OK
     if isinstance(value, Status):
         return value
-    return Status(str(value).strip().upper())
+    token = str(value).strip().upper()
+    return Status(LEGACY_STATUS.get(token, token))
 
 
 # ── Entry-list entities ─────────────────────────────────────────────────────
@@ -128,19 +134,34 @@ class Rider:
     note: str = ""
     reserve_entry: bool = False  # `Riserva` column of the ksport export
     certificate_date: str = ""   # date the medical certificate was issued
-    # The licence check happens before the racing starts, so the jury ticks who
-    # turned up (`checked_in`) and what stays unticked is the work left to do.
-    # `not_starting` is the separate, explicit statement that a rider will not
-    # start at all - that one removes them from startlists and results.
-    checked_in: bool = False     # licence checked, rider present
-    not_starting: bool = False   # "NP": not starting, whole competition
+    # `not_starting` is the explicit statement that a rider will not start at
+    # all - that one removes them from startlists and results. Verification is
+    # not a flag of its own any more: see `checked_in`.
+    not_starting: bool = False   # "NS": not starting, whole competition
     events: dict[str, EventEntry] = field(default_factory=dict)
+    #: The sigla the licence carries, when it is not the categoria the rider
+    #: races in: an *open* is ridden by EL, UN and master licences, and the
+    #: entry list arrives with those (`config.Category.accepts`). Empty in the
+    #: ordinary case, where `cat` is both.
+    licence_cat: str = ""
     source: str = ""             # which file this rider came from
     ksport_source: str = ""      # "KSPORT!12": the federal row, when there is one
 
     @property
     def full_name(self) -> str:
         return f"{self.last_name} {self.first_name}".strip()
+
+    @property
+    def checked_in(self) -> bool:
+        """Verified: the giuria has entered at least one event.
+
+        There is no tick to forget any more. The licence check ends with the
+        jury writing down what the rider rides, so that is what it is read
+        from: a rider with an event on the grid has been seen, one with
+        none is still to do. A riserva counts - being entered as one is a
+        decision about that rider, taken at the desk like any other.
+        """
+        return bool(self.events)
 
     def is_entered(self, event: str, include_reserves: bool = False) -> bool:
         e = self.events.get(event)
@@ -277,6 +298,25 @@ def race_slug(cat: str, event: str, round_key: str = "") -> str:
     rest = "_".join(p for p in (race_id("", event), race_id("", phase), heat)
                     if p)
     return f"{cat}_{rest}" if cat and rest else (cat or rest)
+
+
+def number_text(value) -> str:
+    """A comunicato number as it is read and printed - empty when there is none.
+
+    The one answer everywhere to «this sheet goes out under no number»: the
+    field in Gare, the cell on the programme, the head of the sheet and the
+    name it is filed under all say the same thing, which is nothing. Older
+    files wrote `-1` there and a `0` means the same, so both come back empty;
+    `92 RET` is a number and comes back whole.
+    """
+    txt = str("" if value is None else value).strip()
+    if not txt:
+        return ""
+    head = txt.split()[0]
+    try:
+        return "" if int(head) <= 0 else txt
+    except ValueError:
+        return txt
 
 
 def split_heat(round_key: str) -> tuple[str, str]:

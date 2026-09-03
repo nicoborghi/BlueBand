@@ -51,6 +51,11 @@ class Result:
     warnings: list[str] = field(default_factory=list)
     columns: list[str] = field(default_factory=list)   # extra data columns
     pending: int = 0               # entrants without a result yet (live sheets)
+    #: What the secretary has to know and the sheet does not say - a rider the
+    #: classification no longer names because she is out of the event. Not a
+    #: warning: nothing is wrong, and nothing has to be fixed, so it is shown
+    #: in blue and never printed (`ui.notify.text`, level INFO).
+    notes: list[str] = field(default_factory=list)
 
     def by_key(self, key: str) -> Placing | None:
         return next((p for p in self.placings if p.key == key), None)

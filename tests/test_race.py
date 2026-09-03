@@ -5,6 +5,7 @@ import re
 import pytest
 
 from core import race as R
+from core.config import DOC_CLASSIFICATION, DOC_RESULTS
 from core.entries import import_master, save_import
 from core.models import EventEntry, Status
 from core.parse import parse_time
@@ -520,9 +521,14 @@ def test_archive_writes_a_reprintable_file(ev, entries, comp):
 
 # ── what a prova di gruppo prints ───────────────────────────────────────────
 
-def test_the_classifica_of_a_prova_does_not_list_who_never_started(
+def test_the_classifica_of_a_prova_lists_who_never_started_as_dns(
         ev, entries, comp):
-    """A DNS is an absence, not a result: it goes under the table, in a line."""
+    """A DNS is a sigla like the others: at the foot of the table, not a note.
+
+    The rider stays on the sheet of the prova she was called to - in an omnium
+    she rides the next one, and a number that vanishes here is the one nobody
+    can account for afterwards.
+    """
     state = R.ensure_state(ev, comp, "AL", "omnium", "Scratch", entries)
     bibs = state.entrants[:5]
     state.payload["sprints"] = ",".join(bibs[1:])
@@ -530,9 +536,9 @@ def test_the_classifica_of_a_prova_does_not_list_who_never_started(
     doc = D.race_classification(state, R.classify(state, entries, comp),
                                 entries, comp)
     rows = doc.tables[0].rows
-    assert not any(r.get("rank") == "DNS" for r in rows)
-    assert str(bibs[0]) not in {str(r.get("bib")) for r in rows}
-    assert f"Non partiti: {bibs[0]}" in doc.legend
+    assert [r["rank"] for r in rows if r["rank"]][-1] == "DNS"
+    assert str(bibs[0]) in {str(r.get("bib")) for r in rows}
+    assert "DNS" not in doc.legend
 
 
 def test_the_riders_who_left_the_race_print_in_the_order_they_left(
@@ -889,13 +895,12 @@ def test_a_coppia_that_did_not_start_is_classified_last(madison, entries, comp):
     assert tail == [Status.DNF, Status.DNS, Status.DSQ]
     assert all(p.position is None and not p.data["total"]
                for p in result.placings[-3:])
-    # and the sheet prints them at the bottom, by status - all but the coppia
-    # that never started, which is a line under the table (`hide_dns`)
+    # and the sheet prints them at the bottom, by status - the coppia that
+    # never started among them, under its own sigla
     doc = D.race_classification(b1, result, entries, comp,
                                 doc_kind="risultati")
     rows = doc.tables[0].rows
-    assert [r["rank"] for r in rows if r["rank"]][-2:] == ["DNF", "DSQ"]
-    assert str(bibs[-1]) in doc.legend
+    assert [r["rank"] for r in rows if r["rank"]][-3:] == ["DNF", "DNS", "DSQ"]
     # a coppia that did not start is not one of the eliminated (3.2.157)
     assert R.qualify_count(b1, 2) == len(b1.entrants) - 3
 
@@ -936,6 +941,42 @@ def test_the_team_sprint_starts_one_squadra_at_a_time(ev, entries, comp):
                            heats=parse_heats(ins.payload["heats"]))
     assert doc.tables[0].columns[0].label == "Batt."
     assert "2 batterie" in doc.info
+
+
+def test_a_finale_diretta_is_headed_by_its_batterie(ev, entries, comp):
+    """«Finale diretta»: the first column is the batteria, not «Finale».
+
+    A velocità a squadre or an inseguimento a squadre with too few squadre for
+    two finals rides once against the clock, and `core.rounds` calls that one
+    fase *Finale* because it is the whole event. Nothing qualified into it: it
+    is ridden batteria by batteria like the qualification it replaces, and the
+    ordine di partenza has to say so - the column head reading «Finale» made
+    the sheet announce a final that is not being ridden. The Finali seeded from
+    a qualification are the ones that keep it.
+    """
+    from core import rounds as RD
+    from ui.pages.races import _entrant_bibs
+
+    keys = R.entrants(entries, comp, "AL", "ins_squadre")
+    heats = [[_entrant_bibs(k, entries) for k in keys[i:i + 2]]
+             for i in (0, 2)]
+
+    item = comp.scheduled("AL", "ins_squadre")
+    kept = list(item.rounds)
+    try:
+        item.rounds = RD.propose(comp, "AL", "ins_squadre",
+                                 RD.Options(direct_final=True))
+        assert [r.key for r in item.rounds] == [RD.FINAL]
+        state = R.ensure_state(ev, comp, "AL", "ins_squadre", RD.FINAL, entries)
+        doc = D.race_startlist(state, entries, comp, heats=heats)
+        assert doc.tables[0].columns[0].label == "Batt."
+        assert [r.get("group") for r in doc.tables[0].rows][0] == "1"
+    finally:
+        item.rounds = kept
+
+    fin = R.ensure_state(ev, comp, "AL", "ins_squadre", "Finali", entries)
+    doc = D.race_startlist(fin, entries, comp, heats=heats)
+    assert doc.tables[0].columns[0].label == "Finale"
 
 
 def test_a_disqualified_time_never_prints(ev, entries, comp):
@@ -1091,3 +1132,48 @@ def test_an_eliminazione_says_it_through_pending(ev, entries, comp):
     state.payload["eliminated"] = ",".join(state.entrants[:3])
     assert R.bunch_unplaced(state, entries, state.fmt) == []
     assert R.classify(state, entries, comp).pending == len(state.entrants) - 3
+
+
+def test_zz_widths(madison, entries, comp, ev):
+    b1 = R.ensure_state(madison, comp, "ES", "madison",
+                        "Qualificazioni Batteria 1", entries)
+    doc = D.race_classification(b1, R.classify(b1, entries, comp), entries,
+                                comp, doc_kind="risultati")
+    _zz("madison risultati", doc)
+    st = R.ensure_state(ev, comp, "AL", "omnium", "Corsa a Punti", entries)
+    st.payload["sprints"] = ",".join(st.entrants[:4])
+    doc = D.race_classification(st, R.classify(st, entries, comp), entries,
+                                comp, doc_kind="risultati", show_sprints=True)
+    _zz("omnium corsa a punti", doc)
+    doc = D.entry_list(entries, comp, "AL")
+    _zz("elenco iscritti", doc)
+
+
+def _zz(name, doc):
+    for t in doc.tables:
+        print("==", name, "font", t.font_size)
+        for c in t.columns:
+            print(f"   {c.key:12s} w={c.w:6.2f} pct={c.pct:6.2f} "
+                  f"= {194 * c.pct / 100:5.1f}mm  head={c.label!r}")
+
+
+# ── the mark of a prova against the clock ───────────────────────────────────
+
+def test_the_time_column_of_a_team_event_is_centred_and_bold(ev, entries, comp):
+    """On the velocità e l'inseguimento a squadre the time *is* the result.
+
+    It is read down the column and not against the name beside it, so it prints
+    centred and bold - on the risultati as on the classifica.
+    """
+    state = R.ensure_state(ev, comp, "AL", "vel_squadre", "Qualificazioni",
+                           entries)
+    keys = state.entrants[:2]
+    state.payload["times"] = {k: parse_time(f"1:0{i},500")
+                              for i, k in enumerate(keys)}
+    result = R.classify(state, entries, comp)
+
+    for doc_kind in (DOC_RESULTS, DOC_CLASSIFICATION):
+        doc = D.race_classification(state, result, entries, comp,
+                                    doc_kind=doc_kind)
+        time = next(c for c in doc.tables[0].columns if c.key == "time")
+        assert (time.align, time.bold) == ("c", True), doc_kind

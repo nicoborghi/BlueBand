@@ -1,0 +1,242 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:07+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: it <LL@li.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../install.rst:4 dc54de8211fd426aaef3a8e1b1ff8425
+msgid "Install and run"
+msgstr "Installazione e avvio"
+
+#: ../../install.rst:7 7bc2cd9a6ec245acadb0b74d172ee390
+msgid "On a jury laptop"
+msgstr "Sul portatile della giuria"
+
+#: ../../install.rst:9 ef94b88baad347ec8a3b1a560223a590
+msgid ""
+"Install `the latest BlueBand-setup.exe "
+"<https://github.com/nicoborghi/BlueBand/releases>`_ and start it from the "
+"desktop icon. No Python, no command line, no administrator prompt — the "
+"install is per-user."
+msgstr ""
+"Installa `l'ultimo BlueBand-setup.exe "
+"<https://github.com/nicoborghi/BlueBand/releases>`_ e avvialo dall'icona sul"
+" desktop. Niente Python, niente riga di comando, nessuna richiesta di "
+"password di amministratore — l'installazione è per utente."
+
+#: ../../install.rst:18 3c47f050c627484ab68c32939b132b2b
+msgid "What"
+msgstr "Che cosa"
+
+#: ../../install.rst:19 82ab974ff28945c2a1ac7c85ad764568
+msgid "Where"
+msgstr "Dove"
+
+#: ../../install.rst:20 4de17c35e9c64b9191318c7b3f1c9f2e
+msgid "Survives an uninstall"
+msgstr "Sopravvive a una disinstallazione"
+
+#: ../../install.rst:21 9980d150659c48dbaed57261a304a626
+msgid "the program"
+msgstr "il programma"
+
+#: ../../install.rst:22 0609818357ed4a8e9e7fb2b08f6c327b
+msgid "``%LOCALAPPDATA%\\Programs\\Blue Band``"
+msgstr "``%LOCALAPPDATA%\\Programs\\Blue Band``"
+
+#: ../../install.rst:23 3ee038c094814e1d9c18d1a1ad85c653
+msgid "no"
+msgstr "no"
+
+#: ../../install.rst:24 3a44aa88896844d09310d465103bcea2
+msgid "the competitions"
+msgstr "le manifestazioni"
+
+#: ../../install.rst:25 e4b553a2ba594524b0ba133b5f686575
+msgid "``Documents\\BlueBand``"
+msgstr "``Documenti\\BlueBand``"
+
+#: ../../install.rst:26 ../../install.rst:29 4632a36ab906456ab131b68e169ac090
+#: 994fc2788e8e44839e31a5cf0bed6773
+msgid "**yes**"
+msgstr "**sì**"
+
+#: ../../install.rst:27 b1fa57c80d4c437eacbeb45035536af9
+msgid "the communiqués"
+msgstr "i comunicati"
+
+#: ../../install.rst:28 0d0e8acbe02041b098a43838c1aa5e3e
+msgid "wherever Settings points, usually a shared drive"
+msgstr "dove puntano le Impostazioni, di solito un disco condiviso"
+
+#: ../../install.rst:31 a2c0031ae9be4cc581e3135e56b163cc
+msgid ""
+"Closing the console window stops the server. Closing the browser tab does "
+"not — which is what lets the jury reopen the app from browser history mid-"
+"competition."
+msgstr ""
+"Chiudere la finestra nera ferma il server. Chiudere la scheda del browser no"
+" — ed è questo che permette alla giuria di riaprire il programma dalla "
+"cronologia a manifestazione in corso."
+
+#: ../../install.rst:36 d3b270966a1b48e18e22708a2c7cd390
+msgid "From a checkout"
+msgstr "Da un checkout"
+
+#: ../../install.rst:38 34c9400979644e8bbbbd3c71e11c6ae6
+msgid "Python ≥ 3.11."
+msgstr "Python ≥ 3.11."
+
+#: ../../install.rst:47 63191a0e4d59420ca13827794a205c13
+msgid ""
+"``python launcher.py`` is the other way in, and the one the installer runs: "
+"it picks a free port, starts Streamlit in-process and opens the browser. Use"
+" it to test the packaged behaviour without building an installer."
+msgstr ""
+"``python launcher.py`` è l'altra via d'ingresso, ed è quella che esegue "
+"l'installer: sceglie una porta libera, avvia Streamlit nello stesso processo"
+" e apre il browser. Serve a provare il comportamento del pacchetto senza "
+"costruire un installer."
+
+#: ../../install.rst:51 5e97f942c144446db12e6e1c19300956
+msgid ""
+"Dependencies are **pinned, not ranged** (see ``pyproject.toml``): the same "
+"list is the Windows installer's manifest, and a version that drifts between "
+"the laptop a release was tested on and the one it was built on is a version "
+"nobody tested."
+msgstr ""
+"Le dipendenze sono **fissate, non a intervalli** (vedi ``pyproject.toml``): "
+"lo stesso elenco è il manifesto dell'installer Windows, e una versione che "
+"cambia tra il portatile su cui una release è stata provata e quello su cui è"
+" stata costruita è una versione che non ha provato nessuno."
+
+#: ../../install.rst:58 211ec51175d34f23b12236a8b012a82a
+msgid "Where the data goes"
+msgstr "Dove finiscono i dati"
+
+#: ../../install.rst:60 8103803ef46c4f6d96280dda54b9a1cf
+msgid ""
+"One folder per competition under ``competitions/``. Override the root with "
+"``COMMISSAIRE_TRACK_DATA``:"
+msgstr ""
+"Una cartella per manifestazione sotto ``competitions/``. La radice si cambia"
+" con ``COMMISSAIRE_TRACK_DATA``:"
+
+#: ../../install.rst:68 e49fcbb7b20a478faa4e9c3e05aebcc2
+msgid ""
+"Competition folders are the jury's work and stay out of the repository. See "
+":ref:`storage` for what is inside one."
+msgstr ""
+"Le cartelle delle manifestazioni sono il lavoro della giuria e restano fuori"
+" dal repository. Vedi :ref:`storage` per che cosa c'è dentro."
+
+#: ../../install.rst:73 a89a232ff8cc46789baaabf6dae8ebca
+msgid "The example competition"
+msgstr "La manifestazione di esempio"
+
+#: ../../install.rst:75 b68165b93607485abe08d8d38f639802
+msgid ""
+"One competition *is* in the repository: ``competitions/example/``, a meeting"
+" that never happened, with a fictional field of 140 riders. Open it to see "
+"the console working without holding a real entry list — and note that it is "
+"what the tests run on."
+msgstr ""
+"Una manifestazione *è* nel repository: ``competitions/example/``, una "
+"manifestazione mai avvenuta, con un campo fittizio di 140 atleti. Aprila per"
+" vedere il programma funzionare senza avere in mano un elenco iscritti vero "
+"— ed è anche quella su cui girano i test."
+
+#: ../../install.rst:80 4380fdf4e89541a4877584383e9be8ea
+msgid "``streamlit run app.py``"
+msgstr "``streamlit run app.py``"
+
+#: ../../install.rst:81 03141e898e794da9894950f6e8d62684
+msgid "Settings → pick **Trofeo di Esempio 2026**"
+msgstr "Impostazioni → scegli **Trofeo di Esempio 2026**"
+
+#: ../../install.rst:82 09e61d63a832473ebb0dd31ba00e9745
+msgid ""
+"Programme → Entries → build the entry list from ``Iscritti_999999.xlsx``, in"
+" the same folder"
+msgstr ""
+"Programma → Iscritti → costruisci l'elenco iscritti da "
+"``Iscritti_999999.xlsx``, nella stessa cartella"
+
+#: ../../install.rst:85 c20b204d6a924f02be72ed1e4dddea88
+msgid ""
+"The five pages about riders (check-in, races, decisions, documents, "
+"statistics) do not appear until an entry list exists: they have nothing to "
+"show. ``competitions/example/README.md`` says what is invented in it and "
+"what is deliberately real."
+msgstr ""
+"Le cinque pagine che riguardano gli atleti (Verifica, Gare, Decisioni, "
+"Documenti, Statistiche) non compaiono finché non esiste l'elenco iscritti: "
+"non hanno niente da mostrare. ``competitions/example/README.md`` dice che "
+"cosa è inventato e che cosa è deliberatamente vero."
+
+#: ../../install.rst:92 78a01492ac68404cb6802d2b2208822f
+msgid "PDF output"
+msgstr "La stampa in PDF"
+
+#: ../../install.rst:94 147f897e5fe24544859ecbecb63813d5
+msgid ""
+"PDFs come from a **headless Chromium** — the same engine the jury would "
+"print with by hand. Nothing to install on Windows (Edge is found); on Linux "
+"any of ``chromium``, ``chromium-browser``, ``google-chrome``, ``google-"
+"chrome-stable``, ``chrome`` or ``msedge`` on ``PATH`` will do."
+msgstr ""
+"I PDF escono da un **Chromium headless** — lo stesso motore con cui la "
+"giuria stamperebbe a mano. Su Windows non c'è niente da installare (trova "
+"Edge); su Linux va bene uno qualsiasi tra ``chromium``, ``chromium-"
+"browser``, ``google-chrome``, ``google-chrome-stable``, ``chrome`` o "
+"``msedge`` nel ``PATH``."
+
+#: ../../install.rst:99 cb5702916fae4d078b5d65ed23dc6940
+msgid ""
+"With no browser at all the app saves the self-contained HTML instead and "
+"writes the reason to ``journal.jsonl``."
+msgstr ""
+"Senza alcun browser il programma salva l'HTML autoconsistente e scrive il "
+"motivo in ``journal.jsonl``."
+
+#: ../../install.rst:104 9213e8fe9a6d4817b5fcdaef15cbc4e1
+msgid "Tests"
+msgstr "Test"
+
+#: ../../install.rst:112 1b71376e3bb345b1bf8954ed85dbd09a
+msgid ""
+"Roughly a third of the suite is skipped without the commissaire's shared "
+"folder: those tests read the federation's real entry workbook, which carries"
+" riders' personal data and is not in the repository. ``tests/conftest.py`` "
+"skips them where the file is missing, so CI coverage is a floor rather than "
+"the whole picture — read a drop, not the absolute number."
+msgstr ""
+"Circa un terzo della suite viene saltata senza la cartella condivisa del "
+"commissario: quei test leggono l'elenco iscritti vero della federazione, che"
+" contiene dati personali degli atleti e non sta nel repository. "
+"``tests/conftest.py`` li salta dove il file manca, perciò la copertura in CI"
+" è un minimo e non il quadro completo — guarda un calo, non il numero "
+"assoluto."
+
+#: ../../install.rst:120 8eb05ec422904efba42937a0002496a9
+msgid "Building the installer"
+msgstr "Costruire l'installer"
+
+#: ../../install.rst:122 7ff58f57052d45b3822079ea86f6a82c
+msgid "See :ref:`build`."
+msgstr "Vedi :ref:`build`."

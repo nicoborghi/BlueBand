@@ -22,21 +22,24 @@ from core.config import (DOC_CLASSIFICATION, DOC_KINDS, DOC_PARTIAL, DOC_RACE,
                          DOC_RESULTS_REP, DOC_STARTLIST, DOC_STARTLIST_REP,
                          EVENT_ENTRY_LIST, NAME_FULL, ROUND_SETUP,
                          Competition, madison_track_teams)
+from core.formats import derny as DYF
 from core.formats import group as G
 from core.formats import keirin as K
 from core.formats import omnium as O
 from core.formats import sprint as S
 from core.formats import timed as T
-from core.checks import bib_line
+from core.checks import INFO, bib_line
 from core.formats.base import Result
-from core.i18n import gendered, help_text, label, msg, ordinal, plural, ui
-from core.models import RaceState, Status, race_slug
+from core.i18n import (gendered, help_text, label, msg, ordinal, plural,
+                       round_short, ui)
+from core.models import RaceState, Status, number_text, race_slug
 from core.parse import (ParseError, format_time, parse_bibs, parse_heats,
                         parse_time_safe)
 from core.store import Store
 from render import documents as D
 from render.render import SIG_PREVIEW_PX, to_html
 from ui import decisions_form as DF
+from ui import derny as DY
 from ui import notify, savebar, scroll
 from ui.download import save_button
 # imported as a name, not through the module: `state` is what a RaceState is
@@ -48,17 +51,31 @@ from ui.state import sticky_select
 #: and explained with the words behind it (`HELP["status_*"]`).
 STATUS_FIELDS = [Status.DNS, Status.DNF, Status.DSQ, Status.REL]
 
-#: A prova di gruppo has one more: the rider who comes down of her own accord
-#: while the race is still on. She is not a ritirata - nothing stopped her -
-#: and the points she had scored are not printed (`formats.group`). Nowhere
-#: else: a velocità is two riders and a race against the clock is one, and
-#: neither of them has a bunch to leave.
-BUNCH_STATUS_FIELDS = [Status.DNS, Status.DNF, Status.ABD, Status.DSQ,
-                       Status.REL]
+#: A prova di gruppo takes the four decisions that end a rider's event
+#: (`race.OUT_OF_EVENT`), and only those. One of them is its own: the rider who
+#: comes down of her own accord while the race is still on - not a ritirata,
+#: nothing stopped her, and the points she had scored are not printed
+#: (`formats.group`). Nowhere else: a velocità is two riders and a race against
+#: the clock is one, and neither of them has a bunch to leave.
+#:
+#: No REL: in a bunch race a declassamento is not a placing the jury moves by
+#: typing a dorsale in a field - the arrival is what it is - and the field was
+#: an invitation to file, as a status, what belongs on the sheet of decisions.
+BUNCH_STATUS_FIELDS = [Status.DNS, Status.DNF, Status.ABD, Status.DSQ]
 
 
-def _status_fields(kind: str) -> list[Status]:
-    return BUNCH_STATUS_FIELDS if kind in R.BUNCH else STATUS_FIELDS
+def _status_fields(kind: str, state=None, scope: str = "") -> list[Status]:
+    # a derny is a bunch race whatever its scoring: a rider comes down of her
+    # own accord behind a pacer as she does in a corsa a punti
+    if not (kind in R.BUNCH or kind == R.DERNY):
+        return STATUS_FIELDS
+    fields = list(BUNCH_STATUS_FIELDS)
+    # a race that already carries a declassamento keeps the field it was typed
+    # in: dropping it would leave the decision on the sheet with nothing on
+    # screen to take it off with
+    if state is not None and Status.REL in R.statuses_of(state, scope).values():
+        fields.append(Status.REL)
+    return fields
 
 
 def render(competition: str, comp: Competition, store: Store) -> None:
@@ -69,7 +86,7 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     # them on the entry list before anything reads a number off it
     R.apply_pair_numbers(store, comp, el)
 
-    cat, event, round_key = _pick_race(comp, store)
+    box, cat, event, round_key = _pick_race(comp, store)
     if not event:
         notify.warn("no_race_for_category")
         return
@@ -88,14 +105,15 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     # the pickers stay on screen, the race header comes to the top: on a laptop
     # the two together do not fit above the fold. Only on the two presses that
     # open a race - the *fase* selectbox, which is the last of the three to be
-    # picked, and a pill of the recent row: moving the page under a jury that is
-    # still choosing the categoria is exactly the kind of help nobody asked for.
+    # picked, and a button of the recent row: moving the page under a jury that
+    # is still choosing the categoria is exactly the kind of help nobody asked
+    # for.
     scroll.anchor("race")
     scroll.requested("race")
     if kind == R.SETUP:
         savebar.render(label=ui("save_pairing"))
         _pairing_page(state, el, comp, store)
-        _recent_races(comp, store)
+        _recent_races(box, comp, store)
         return
     # This is the header the jury reads while working: the document's own
     # letterhead is dropped from the preview below (`head=False`) instead.
@@ -119,6 +137,11 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     elif keirin:
         with heat_box:
             _keirin_composition(state, el, comp, store)
+    elif kind == R.DERNY:
+        # the chart is the race: it is called into, read off and corrected on
+        # this page while the derny is running (see `ui.derny`)
+        with heat_box:
+            DY.render(state, el, comp, store)
     elif scheme is not None:
         with heat_box:
             _sprint_not_loaded(state, comp, store, scheme)
@@ -142,7 +165,7 @@ def render(competition: str, comp: Competition, store: Store) -> None:
                 if R.is_sprint(comp, event) else False)
         _statuses(state, el, kind, R.status_scope(doc_kind))
         _decision_panel(state, comp, store, el, R.status_scope(doc_kind))
-        # what the log says about the riders of this specialità: the W travels
+        # what the log says about the riders of this event: the W travels
         # from the fase it was taken in to every fase after it, and the tick is
         # what puts it on paper
         warned = R.warnings_carried(store, comp, cat, event, round_key)
@@ -180,16 +203,24 @@ def render(competition: str, comp: Competition, store: Store) -> None:
             ui("points_race_detail"), value=True, key=f"det_{state.race_id}",
             help=help_text("points_race_detail"))
         # the times belong to the risultati of each fase: off by default here,
-        # and the width goes to the names instead. A velocità or a keirin has
-        # no time to offer at all - places 1-8 come from the batterie and the
-        # rest from the ranking of the 200 m, and the classification carries no
-        # time column (`formats.sprint.scheme_classification`): there the tick
-        # was one that did nothing, and a control that does nothing is worse
-        # than no control.
-        timed = comp.event(event).fmt not in ("sprint", "keirin")
+        # and the width goes to the names instead. The tick is only worth
+        # drawing where there is a time to put under it, and one fase in the
+        # app measures one: `formats.timed` is the only place a result comes
+        # back with a `time` column, so the tick follows the fase and not the
+        # event. An eliminazione, una corsa a punti, uno scratch, una
+        # madison, un derny and the classifica of a velocità or di un keirin
+        # are all placed on something other than the clock - there the tick was
+        # one that did nothing, and a control that does nothing is worse than
+        # no control.
+        timed = kind in (R.TIMED, R.TIMED_TEAM)
         time_col = st.checkbox(ui("time_column"), key=f"time_{state.race_id}",
                                help=help_text("time_column")
                                ) if classifica and timed else True
+        # a derny: the giri persi are the one column its classifica can carry,
+        # and the tick lives on the race so Stampa prints the same sheet
+        # (`ui.derny.laps_down_tick`)
+        if kind == R.DERNY and classifica:
+            DY.laps_down_tick(state, store)
         # a madison is read by coppia: the dorsale is a second number for the
         # same rider and stays off unless the jury wants it on the sheet
         show_bib = kind != R.MADISON or st.checkbox(
@@ -240,7 +271,7 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     _save_bar(state, store)
     # ... and only now the row of recent races, into the place kept for it at
     # the top: whatever was just saved is already the first of them
-    _recent_races(comp, store)
+    _recent_races(box, comp, store)
 
 
 def _save_bar(state, store: Store) -> None:
@@ -517,18 +548,21 @@ def _final_round(comp: Competition, cat: str, event: str) -> str:
 
 # ── race picker ─────────────────────────────────────────────────────────────
 
-def _pick_race(comp: Competition, store: Store) -> tuple[str, str, str]:
+def _pick_race(comp: Competition, store: Store):
     """The three selectboxes, reopened on the race left last time.
 
-    The row of recent races goes above them, but it is *drawn* at the end of
+    Returns the container kept for the row of recent races, and the race the
+    pickers stand on. The row goes above them, but it is *drawn* at the end of
     the run (`_recent_races`): a race saved further down the page would
     otherwise reach the row only on the next click, which is exactly the
-    moment the jury looks for it. The container reserves the place here; the
-    tap that came from it is picked up here too, before the pickers below are
-    drawn, because that is what moves them.
+    moment the jury looks for it. The place for it is reserved here and handed
+    back to the caller - a container belongs to the run that made it, and one
+    left in the session outlives the page it was cut out of. The tap that came
+    from the row is picked up here too, before the pickers below are drawn,
+    because that is what moves them.
     """
     last = store.settings.get("last_race") or {}
-    st.session_state[RECENT_BOX] = st.container()
+    box = st.container()
     _jump_requested(comp, store)
 
     c1, c2, c3 = st.columns(3)
@@ -549,7 +583,7 @@ def _pick_race(comp: Competition, store: Store) -> tuple[str, str, str]:
     picked = {"cat": cat, "event": event, "round": round_key}
     if picked != last:
         store.set_setting("last_race", picked)
-    return cat, event, round_key
+    return box, cat, event, round_key
 
 
 def _round_picked() -> None:
@@ -565,14 +599,22 @@ RECENT = 4
 
 
 def _jump_requested(comp: Competition, store: Store) -> None:
-    """Move the pickers onto the race whose pill was tapped, if one was.
+    """Move the pickers onto the race whose button was pressed, if one was.
 
-    A *tap*, not a selection. Acting on whatever the row happens to hold would
-    drag the page back there on every rerun and make the three selectboxes
-    unusable; clearing the pill afterwards is not allowed either - a widget's
-    own key cannot be written once it is drawn. So the tap is recorded by the
-    callback, consumed here exactly once, and the same pill tapped again works
-    like the first time.
+    A *press*, and nothing more: it does by itself exactly what the jury would
+    have done with the three selectboxes, in the same single run the press
+    already starts. The callback records which race, before the script runs;
+    here - still above the pickers, so their keys can be written - it is
+    consumed once and spent on the three of them.
+
+    **No `st.rerun()`.** The row used to be a selection (`st.pills`) whose tap
+    set the keys and then reran, so one press built the page twice: the first
+    half of a run drew widgets that the second run replaced, and the browser
+    was left holding buttons - *Salva*, the fase, the ones that recompose a
+    classifica - that the script had never registered on that run. They did
+    nothing until the page was reloaded. The pickers are drawn a few lines
+    below this: writing their session values here is all it takes, and the run
+    that carries the press is the run that opens the race.
     """
     picked = st.session_state.pop(RECENT_JUMP, None)
     race = next((r for r in _recent(comp, store) if r.race_id == picked), None)
@@ -582,32 +624,39 @@ def _jump_requested(comp: Competition, store: Store) -> None:
     # values before they exist is what moves them
     st.session_state.update({"ga_cat": race.cat, "ga_event": race.event,
                              "ga_round": race.round_key})
-    # a pill is a press like the fase is: the run it starts scrolls to the race
+    # a press on the row is a press like the fase is: it scrolls to the race
     scroll.request("race")
-    st.rerun()
 
 
-def _recent_races(comp: Competition, store: Store) -> None:
-    """The fasi last saved, one tap away - drawn into the place kept for it.
+def _recent_races(box, comp: Competition, store: Store) -> None:
+    """The fasi last saved, one press away - drawn into the place kept for it.
 
-    A championship is not run one specialità at a time: the risultati of a
+    A championship is not run one event at a time: the risultati of a
     batteria are typed while another event is on the track, and the jury moves
     between four or five fasi all afternoon. Doing that through three
-    selectboxes - categoria, then specialità, then fase, each one reloading the
+    selectboxes - categoria, then event, then fase, each one reloading the
     next - is three picks to go back to the sheet left two minutes ago.
+
+    Buttons, not a selection. The row is a shortcut to the pickers and holds no
+    state of its own: pressing the fase the page is already on works like every
+    other press, and a row that reorders itself after a save - which it does,
+    every save - does not carry a stale pick from one shape of the row into the
+    next. Each button is keyed on its race, so the browser and the script agree
+    on what was pressed however the row has moved.
 
     Called last, so a race saved anywhere on the page is already at the head of
     the row when the row is built.
     """
-    box = st.session_state.get(RECENT_BOX)
     races = _recent(comp, store)
     if box is None or not races:
         return
-    labels = {r.race_id: _race_pill(comp, r) for r in races}
     with box:
-        st.pills(ui("recent_races"), list(labels), key=RECENT_PILL,
-                 format_func=labels.get, label_visibility="collapsed",
-                 on_change=_jump_to, help=help_text("recent_races"))
+        row = st.container(key=RECENT_ROW)
+        for col, race in zip(row.columns(len(races)), races):
+            col.button(_race_pill(comp, race), on_click=_jump_to,
+                       key=f"{RECENT_ROW}_{race.race_id}",
+                       args=(race.race_id,),
+                       help=help_text("recent_races"))
 
 
 def _recent(comp: Competition, store: Store) -> list:
@@ -616,15 +665,15 @@ def _recent(comp: Competition, store: Store) -> list:
             if comp.scheduled(r.cat, r.event)]
 
 
-#: The pill row: where it is drawn, what it is keyed by, and where a tap on it
-#: is left for the script to pick up.
-RECENT_BOX = "ga_recent_box"
-RECENT_PILL = "ga_recent"
+#: The row of recent races: what it is keyed by, and where a press on it is
+#: left for the script to pick up.
+RECENT_ROW = "ga_recent"
 RECENT_JUMP = "ga_recent_jump"
 
 
-def _jump_to() -> None:
-    st.session_state[RECENT_JUMP] = st.session_state.get(RECENT_PILL)
+def _jump_to(race_id: str) -> None:
+    """The callback of one button of the row: it runs before the script does."""
+    st.session_state[RECENT_JUMP] = race_id
 
 
 def _race_pill(comp: Competition, race) -> str:
@@ -698,6 +747,8 @@ def _inputs(state, kind: str, el, comp: Competition, scheme=None,
         _bracket_inputs(state, el)
     elif kind in (R.TIMED, R.TIMED_TEAM):
         _timed_inputs(state, el)
+    elif kind == R.DERNY:
+        pass  # the whole race is called in at the top of the page (`ui.derny`)
     else:
         _sprint_inputs(state, kind, el)
         started = R.bunch_startlist(state, el, kind)
@@ -862,26 +913,14 @@ _FIELD_CSS = """
 
 
 def _timed_order(state) -> list[str]:
-    """The entrants in the order they start, once the grid has been composed.
+    """The entrants in the order they start (`race.start_order`).
 
-    The times arrive one start at a time, in the order the grid says; reading
-    down a sidebar still in entry order while the track runs in start order is
-    how a time lands on the wrong squadra. The grid is composed above in the
-    page body and read back from the payload here, so the fields follow it in
-    the same run - saving it is not needed to line them up.
-
-    Whatever the grid does not place - a squadra not yet inserted, a race whose
-    batterie are still loose notation - keeps its entry order at the bottom:
-    nothing disappears from the sidebar because the composition is unfinished.
+    The grid is composed above in the page body and read back from the payload
+    here, so the fields follow it in the same run - saving it is not needed to
+    line them up. It is the same order the classifica lists the ones still to
+    be timed in, which is the point: sidebar and sheet read alike.
     """
-    order: list[str] = []
-    seen: set[str] = set()
-    for row in (state.payload or {}).get("heat_sides") or []:
-        for key in row:
-            if key and key not in seen and key in state.entrants:
-                seen.add(key)
-                order.append(key)
-    return order + [k for k in state.entrants if k not in seen]
+    return R.start_order(state)
 
 
 def _timed_inputs(state, el) -> None:
@@ -1288,7 +1327,7 @@ def _velocita_result(state, doc_kind: str):
 
     The statuses are the round's own: this sheet files what happened in this
     round, and a rider who was not at the gate for it did not start it - DNS,
-    which is what the jury typed. What she did to the *specialità* is another
+    which is what the jury typed. What she did to the *event* is another
     sheet's business: on the classifica that DNS drops away and she is ranked
     on her 200 m time, like anybody else who went out in that round
     (`race.sprint_statuses`).
@@ -1374,7 +1413,7 @@ def _doc_slug(state, doc_kind: str) -> str:
     The recuperi and the 5°-8° final are filed under the round they are ridden
     in - two results sheets on one round would otherwise overwrite each other
     in the comunicati folder. So are the sheets of an omnium prova: a classifica
-    parziale filed as a *classifica* would overwrite the one of the specialità.
+    parziale filed as a *classifica* would overwrite the one of the event.
     """
     if doc_kind in (DOC_RESULTS_REP, DOC_RESULTS_58, DOC_RESULTS_B,
                     DOC_PARTIAL, DOC_RACE):
@@ -2173,7 +2212,7 @@ def _starts_mode(state, comp: Competition) -> bool:
     """
     picked = st.session_state.get(_starts_key(state.race_id))
     if picked is not None and R.can_choose_starts(
-            comp, state.event, state.fmt or "", state.round_key):
+            comp, state.event, state.fmt or "", state.round_key, state.cat):
         return bool(picked)
     return R.solo_starts(comp, state)
 
@@ -2197,7 +2236,7 @@ def _starts_picker(state, comp: Competition, solo: bool, team: bool) -> None:
     """
     p, rid = state.payload, state.race_id
     if not R.can_choose_starts(comp, state.event, state.fmt or "",
-                               state.round_key):
+                               state.round_key, state.cat):
         return
     modes = (False, True)   # due alla volta | una alla volta
     labels = {False: ui("starts_two"),
@@ -2317,7 +2356,7 @@ def _statuses(state, el, kind: str = "", scope: str = "") -> None:
     """
     st.subheader(ui("statuses"))
     saved = R.status_dict(state, scope)
-    fields = _status_fields(kind)
+    fields = _status_fields(kind, state, scope)
     if kind == R.TIMED_TEAM:
         # a squadra is DNS as a squadra: nothing here is typed as a dorsale
         for status in fields:
@@ -2374,7 +2413,7 @@ def _statuses(state, el, kind: str = "", scope: str = "") -> None:
 # Decisioni page is that log read back, filtered and printed.
 #
 # The ammonizione is the one that comes back here. It travels with the rider
-# through the specialità (a W on every sheet from the fase it was given in),
+# through the event (a W on every sheet from the fase it was given in),
 # and a second one in the same fase is a squalifica - written into the DSQ
 # field of the race, where the jury can still take it out.
 
@@ -2384,7 +2423,7 @@ def _decision_panel(state, comp: Competition, store: Store, el,
     """File a decision from the race it was taken in.
 
     What the panel reads before it files the next one comes first: the recap of
-    the whole specialità, fase by fase, then who is already carrying an
+    the whole event, fase by fase, then who is already carrying an
     ammonizione into this one. Only then the button - because a decision taken
     without knowing what was decided an hour ago in the turno 1 is the one that
     gets contested.
@@ -2410,10 +2449,10 @@ def _decisions_on(store: Store, state, doc_kind: str, kinds=()) -> list:
 
     A decision goes out **once**, on the comunicato of the fase it was taken
     in, and the classifica does not repeat it: the classifica ranks the
-    specialità, and a sheet that reprints every retrocessione of every turno
+    event, and a sheet that reprints every retrocessione of every turno
     under a final ranking reads as a fresh set of sanctions rather than as the
     order they produced. `kinds` is what this round files (`_doc_kinds`): only
-    where the classifica is the round's *own* result sheet - a specialità
+    where the classifica is the round's *own* result sheet - an event
     ridden in one go, filed as a classification and nothing else - does it
     carry the decisions taken in it, because there is no other comunicato they
     could go out on.
@@ -2477,7 +2516,7 @@ def _decisions_here(comp: Competition, store: Store, state, taken: list
 
 
 def _warned_here(taken: list, state) -> None:
-    """Who carries an ammonizione in this specialità, under the panel."""
+    """Who carries an ammonizione in this event, under the panel."""
     warned = DEC.warned_bibs(taken, state.cat, state.event)
     st.caption(msg("warned_carried",
                    bibs=", ".join(str(b) for b in sorted(warned)))
@@ -2491,7 +2530,7 @@ def _heat_size_warnings(heats, comp: Competition, state) -> list[str]:
     carries five names: four of them start. Said here, on the sheet the jury
     reads out at the track, while there is still time to strike one out.
     """
-    size = comp.event(state.event).team_size or 0
+    size = comp.team_size(state.cat, state.event)
     if not size or not heats:
         return []
     return [msg("heat_wrong_size", heat=h + 1, lane=s + 1, n=len(side),
@@ -2515,34 +2554,53 @@ def _is_prova(comp: Competition, state) -> bool:
             and state.round_key in O.ROUNDS)
 
 
-def _omnium_docs(round_key: str, docs: list[str]) -> list[str]:
+def _omnium_docs(comp: Competition, state, docs: list[str]) -> list[str]:
     """The sheets a prova files, on top of the two the programme declares.
 
     The tempo race files its result twice: the *gara*, one column per volata,
     which is what the jury scores it on, and the *risultati*, which publish the
-    order and the omnium points it is worth. The first three prove each close on
-    the classifica parziale that starts the next one.
+    order and the omnium points it is worth. Every prova but the last closes on
+    the classifica parziale that starts the next one - the last one closes on
+    the classifica of the omnium, which is a sheet of the event.
     """
+    round_key = state.round_key
     out = list(docs)
     if round_key == O.TEMPO and DOC_RESULTS in out:
         out.insert(out.index(DOC_RESULTS), DOC_RACE)
-    if round_key in O.PLACING_ROUNDS:
+    # a programme may declare it itself - `docs: [partenti, risultati,
+    # classifica_parziale]` - and the sheet is the same one either way: added
+    # twice it is two identical pills in the picker, and the second of them
+    # writes over the first
+    if _next_prova(comp, state) and DOC_PARTIAL not in out:
         out.append(DOC_PARTIAL)
     return out
 
 
-def _omnium_subtitle(state, doc_kind: str) -> str:
+def _prove(comp: Competition, state) -> list[str]:
+    """The prove this omnium rides, as the programme schedules them."""
+    return R.omnium_prove(comp, state.cat, state.event)
+
+
+def _next_prova(comp: Competition, state) -> str:
+    """The prova this one starts, or nothing when it is the last."""
+    prove = _prove(comp, state)
+    i = prove.index(state.round_key) if state.round_key in prove else -1
+    return prove[i + 1] if 0 <= i < len(prove) - 1 else ""
+
+
+def _omnium_subtitle(comp: Competition, state, doc_kind: str) -> str:
     """What a sheet of a prova is called.
 
     A classifica parziale says both things it is: the standings after this
     prova, and the ordine di partenza of the next one - which is what it is
-    printed for.
+    printed for, and which prova that is the programme says (`_next_prova`),
+    not the canonical four.
     """
     rk = state.round_key
     if doc_kind == DOC_PARTIAL:
+        nxt = _next_prova(comp, state)
         if rk == O.SCRATCH:
-            return ui("partial_after_scratch", scratch=O.SCRATCH, next=O.TEMPO)
-        nxt = O.ROUNDS[O.ROUNDS.index(rk) + 1]
+            return ui("partial_after_scratch", scratch=O.SCRATCH, next=nxt)
         return ui("partial_standings", next=nxt)
     if doc_kind == DOC_RACE:
         return f"{rk} - {label('gara')}"
@@ -2551,21 +2609,28 @@ def _omnium_subtitle(state, doc_kind: str) -> str:
     return ""
 
 
-def _omnium_points_cols(state, doc_kind: str) -> list[tuple[str, str]]:
+def _omnium_points_cols(comp: Competition, state,
+                        doc_kind: str) -> list[tuple[str, str]]:
     """The points columns at the end of a sheet of a prova.
 
     A classifica parziale carries one column per prova ridden and, once there
     is more than one, their total; the risultati of a prova carry what that one
     prova scored.
+
+    The prove are the ones this omnium rides, in the order the programme has
+    them: a column headed *Punti Scratch* on a sheet of an omnium that rides no
+    scratch is a column that can only ever be empty.
     """
     rk = state.round_key
     if doc_kind == DOC_PARTIAL:
-        done = O.ROUNDS[:O.ROUNDS.index(rk) + 1]
-        cols = [(O.points_key(n), f"{label('points_of')} {n}") for n in done]
+        prove = _prove(comp, state)
+        done = prove[:prove.index(rk) + 1] if rk in prove else [rk]
+        cols = [(O.points_key(n), f"{label('points_of')} {round_short(n)}")
+                for n in done]
         return cols if len(cols) == 1 else cols + [("total",
                                                     label("points_total"))]
     if doc_kind == DOC_RESULTS and rk in (O.TEMPO, O.ELIMINATION):
-        return [("prova_points", f"{label('points_of')} {rk}")]
+        return [("prova_points", f"{label('points_of')} {round_short(rk)}")]
     return []
 
 
@@ -2620,7 +2685,7 @@ def _doc_kinds(comp: Competition, state, store: Store) -> list[str]:
         # ridden
         docs = [d for d in docs if d != DOC_RESULTS_B]
     if _is_prova(comp, state):
-        docs = _omnium_docs(state.round_key, docs)
+        docs = _omnium_docs(comp, state, docs)
     rounds = [r.key for r in comp.rounds(state.cat, state.event)]
     planned = any(c.doc == DOC_CLASSIFICATION and c.cat == state.cat
                   and c.event == state.event for c in comp.communiques)
@@ -2707,7 +2772,7 @@ def _default_notes(state, comp: Competition, store: Store,
     through, how many turned up for a keirin.
 
     `Event.note()` is the older way of saying the same thing, one line per
-    specialità typed into `programme.yaml`, and it still opens the ordini di
+    event typed into `programme.yaml`, and it still opens the ordini di
     partenza of a file written that way.
     """
     notes = dict(_madison_notes(state, comp, store))
@@ -2721,6 +2786,8 @@ def _default_notes(state, comp: Competition, store: Store,
     qualifying = comp.event(state.event).qualifying_note
     if qualifying and not finals:
         notes.setdefault(DOC_RESULTS, qualifying)
+    if state.fmt == R.DERNY:
+        notes.update(_derny_notes(state, comp))
     rnd = comp.round_of(state.cat, state.event, state.round_key)
     if rnd.results_note:
         notes[DOC_RESULTS] = rnd.results_note
@@ -2730,6 +2797,25 @@ def _default_notes(state, comp: Competition, store: Store,
             comp.event(state.event).note(finals=finals,
                                          female=comp.female(state.cat))) if p)
     return notes
+
+
+def _derny_notes(state, comp: Competition) -> dict[str, str]:
+    """The one thing a derny's sheets say by themselves: the giri it ran.
+
+    A derny is called lap by lap and stopped by the jury, not by an odometer:
+    the head can come round one giro short of what the programme plans, or one
+    too many, and nobody notices until the classifica has gone out. So the
+    sheet that closes the race carries the count when it does not agree with
+    the programme - a line to read and delete, not a block on anything
+    (`formats.derny`, and the giri are set in Programma -> fase).
+    """
+    planned = float(state.n_laps or 0)
+    done = DYF.board(DYF.passages(state.payload or {}),
+                     (state.payload or {}).get(DYF.START)).leader_laps
+    if not planned or not done or abs(done - planned) < 0.5:
+        return {}
+    return {DOC_CLASSIFICATION: msg("derny_laps_mismatch", done=done,
+                                    planned=f"{planned:g}")}
 
 
 def _note_field(state, comp: Competition, doc_kind: str,
@@ -2792,8 +2878,12 @@ def _output(state, result, el, comp, store: Store, kind: str, font: int,
     # the sheet the jury is on, kept with the race it is on (see `_seed_doc`)
     if doc_kind != store.settings.get(LAST_DOC):
         store.set_setting(LAST_DOC, doc_kind)
+    # empty is a real answer: a sheet carried on another comunicato's number
+    # (the risultati under a classifica) goes out without one, and so does a
+    # sheet the register does not plan. A `-1` written by an older version
+    # reads back the same way (`models.number_text`).
     com = head[1].text_input(label("communique_no"),
-                             value=state.communiques.get(doc_kind, "")
+                             value=number_text(state.communiques.get(doc_kind, ""))
                              or C.number_for(comp, state.cat, state.event,
                                              state.round_key, doc_kind),
                              key=f"com_{state.race_id}_{doc_kind}")
@@ -2825,6 +2915,10 @@ def _output(state, result, el, comp, store: Store, kind: str, font: int,
     prova = _is_prova(comp, state)
     if prova:
         result = _omnium_result(state, el, comp, store, result, doc_kind)
+    # what the secretary has to know and the sheet does not say: in blue, to
+    # the screen and never to the paper (`formats.base.Result.notes`)
+    for note in (result.notes if result is not None else []):
+        notify.text(note, level=INFO)
 
     extra = (D.composition_tables(
         R.sprint_composition(store, comp, el, state, doc_kind), el, state.cat,
@@ -2898,16 +2992,18 @@ def _output(state, result, el, comp, store: Store, kind: str, font: int,
                     if doc_kind == DOC_CLASSIFICATION
                     else _velocita_subtitle(state, doc_kind) if sprint
                     else _keirin_subtitle(state, el, comp, doc_kind) if keirin
-                    else _omnium_subtitle(state, doc_kind) if prova
-                    and _omnium_subtitle(state, doc_kind)
+                    else _omnium_subtitle(comp, state, doc_kind) if prova
+                    and _omnium_subtitle(comp, state, doc_kind)
                     else ui("round_results", round=state.round_key)
                     if state.round_key else label("risultati"))
         # a finals round prints its two finals as they were ridden, and names
         # the champion only on the classification of the event
         finals = bool(state.payload.get("final_heats"))
-        # a madison assigns the title in one race: the classifica of anything
-        # that is not a batteria closes the specialità and names the champions
-        title_race = finals or (kind == R.MADISON
+        # a madison assigns the title in one race, and so does a derny: the
+        # classifica of anything that is not a batteria closes the event
+        # and names the champion - campione or campionessa d'Italia, as on the
+        # sheet of every other event of a campionato
+        title_race = finals or (kind in (R.MADISON, R.DERNY)
                                 and not R.heat_number(state.round_key))
         # a velocità is won in the 1°-2° final, a keirin in the final for the
         # title and an omnium on the points of four prove: the classification
@@ -2921,7 +3017,8 @@ def _output(state, result, el, comp, store: Store, kind: str, font: int,
             result, extra, block_title = _keirin_blocks(
                 state, result, el, comp, font, club, show_bib, extra)
         # what the sheets of an omnium show of the race under them
-        points_cols = _omnium_points_cols(state, doc_kind) if prova else []
+        points_cols = (_omnium_points_cols(comp, state, doc_kind) if prova
+                       else [])
         show_sprints, show_rank, show_carried = not aggregate, True, False
         show_uci = show_laps = True
         if prova and doc_kind == DOC_PARTIAL:
@@ -2950,19 +3047,19 @@ def _output(state, result, el, comp, store: Store, kind: str, font: int,
                                     show_carried=show_carried,
                                     lane_col=lane and doc_kind == DOC_PARTIAL,
                                     warned=warned, decisions=filed,
-                                    # the standings of an omnium keep the DNS:
-                                    # there the sigla is what says the rider is
-                                    # out of the event, not an absence from one
-                                    # prova (`documents.race_classification`)
-                                    hide_dns=False if aggregate else None,
                                     points_cols=points_cols,
                                     # the classifica of an omnium files the
                                     # society by name: the code is on the
                                     # elenco iscritti, and the sheet is full
                                     show_club_code=not (aggregate and omnium),
                                     by_final=finals and doc_kind == DOC_RESULTS,
-                                    champion=title_race
-                                    and doc_kind == DOC_CLASSIFICATION,
+                                    # a title is assigned at a campionato and
+                                    # nowhere else: at an ordinary meeting the
+                                    # winner is first, not CAMPIONE D'ITALIA
+                                    # (Programma → Gara)
+                                    champion=(title_race
+                                              and doc_kind == DOC_CLASSIFICATION
+                                              and comp.assigns_titles),
                                     doc_kind=doc_kind, show_club=club,
                                     show_time=time_col, show_bib=show_bib,
                                     champion_label=(
@@ -3224,7 +3321,7 @@ def _load_finals(state, result, el, comp: Competition, store: Store,
             for k in ranking}
     p["qual_ranking"] = ranking
     # le non classificate non corrono le finali, ma la classifica della
-    # specialità è il foglio che deposita la decisione presa su di loro
+    # event è il foglio che deposita la decisione presa su di loro
     p["qual_out"] = {pl.key: pl.status.value for pl in result.placings
                      if pl.status is not Status.OK and not pl.position}
     p["qual_times"] = dict(q.get("times") or {})

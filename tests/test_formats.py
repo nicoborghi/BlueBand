@@ -59,6 +59,24 @@ def test_points_race_ties_broken_by_last_sprint():
     assert order(r2) == ["2", "1"]
 
 
+def test_only_the_last_sprint_breaks_a_tie():
+    """Chi all'ultima volata non e' passato non ha un piazzamento da opporre.
+
+    La giuria batte i quattro che fanno punti, non tutto il gruppo: tenere il
+    piazzamento dell'ultima volata in cui il corridore compariva confrontava
+    una volata con un'altra, e faceva precedere chi all'ultima non era passato
+    davanti a chi ci era passato quarto.
+    """
+    # #5 vince la prima volata (5 punti) e all'ultima non passa; #6 e' 2o nella
+    # prima (3) e 4o nell'ultima, doppia (2): pari a 5, ma #6 ha il passaggio
+    r = group_classification(startlist=[1, 2, 3, 4, 5, 6],
+                             sprints=[[5, 6, 3, 4], [1, 2, 3, 6]],
+                             scoring=POINTS, n_sprint=2)
+    pts = {p.key: p.data["total"] for p in r.placings}
+    assert pts["5"] == pts["6"] == 5
+    assert order(r).index("6") < order(r).index("5")
+
+
 def test_points_race_warns_on_short_sprint_and_unknown_bib():
     r = group_classification(startlist=[1, 2, 3, 4], sprints=[[1, 2], [1, 2, 3, 9]],
                              scoring=POINTS, n_sprint=2)
@@ -137,10 +155,22 @@ def test_relegated_rider_is_classified_last():
 # ── eliminazione ────────────────────────────────────────────────────────────
 
 def test_elimination_first_out_is_last():
+    """The winner is the last number typed, and it is typed like the others."""
     r = elimination_classification(startlist=[1, 2, 3, 4, 5],
-                                   eliminated=[5, 4, 3, 2])
+                                   eliminated=[5, 4, 3, 2, 1])
     assert order(r) == ["1", "2", "3", "4", "5"]
     assert labels(r) == ["1°", "2°", "3°", "4°", "5°"]
+    assert not r.pending
+
+
+def test_elimination_never_wins_a_race_for_a_rider_nobody_typed():
+    """The last one left is the winner of the race: the app does not decide
+    that on its own, whether the number is missing because the segreteria has
+    not written it down yet or because it should not be in the race at all."""
+    r = elimination_classification(startlist=[1, 2, 3, 4, 5],
+                                   eliminated=[5, 4, 3, 2])
+    assert r.by_key("1").label == "" and r.pending == 1
+    assert labels(r) == ["", "2°", "3°", "4°", "5°"]
 
 
 def test_elimination_in_progress_leaves_the_leaders_blank():
@@ -152,7 +182,7 @@ def test_elimination_in_progress_leaves_the_leaders_blank():
 
 def test_elimination_ignores_riders_who_did_not_start():
     r = elimination_classification(startlist=[1, 2, 3, 4],
-                                   eliminated=[4, 3],
+                                   eliminated=[4, 3, 1],
                                    statuses={"2": Status.DNS})
     # only three riders are classified, so the first eliminated is 3rd
     assert r.by_key("4").label == "3°"
@@ -201,6 +231,26 @@ def test_entrants_without_a_time_stay_pending():
     assert r.pending == 1
     assert order(r) == ["C", "A", "B"]
     assert labels(r) == ["1°", "2°", ""]
+
+
+def test_who_is_still_to_go_is_listed_in_start_order():
+    """Half a classifica, half the list of who is still on the line.
+
+    The dorsali say nothing while a chilometro is being ridden: what the jury
+    reads down the bottom of the sheet is who starts next, so the ones without
+    a time follow the grid (`race.start_order`) and not the entry order.
+    """
+    entrants = ["1", "2", "3", "4", "5"]
+    r = timed_classification(entrants, {"3": 900},
+                             order=["5", "3", "1", "4", "2"])
+    assert order(r) == ["3", "5", "1", "4", "2"]
+
+    # a squadra the grid does not place keeps the entry order, at the bottom
+    r = timed_classification(entrants, {}, order=["4", "2"])
+    assert order(r) == ["4", "2", "1", "3", "5"]
+
+    # and with no grid composed at all nothing moves
+    assert order(timed_classification(entrants, {})) == entrants
 
 
 def test_timed_statuses():

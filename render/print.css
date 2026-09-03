@@ -16,12 +16,33 @@
  * hide the app chrome when printing.
  */
 
+/* The characters of a sheet, element by element. Declared here so the
+ * stylesheet stands on its own, and overridden on the wrapper by whatever was
+ * set in Impostazioni -> Aspetto dei comunicati (render.font_css_vars): every
+ * rule below takes its font from one of these and never states one itself. */
 .cmsr {
     --header-color: #0a5688;
     --rule: #b9c2cc;
     --pad-x: 8mm;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: #111;
+    --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-title: 15pt;
+    --font-subtitle: 12pt;
+    --font-table_title: 12pt;
+    --font-info: 9pt;
+    --font-legend: 7.5pt;
+    --font-communique: 10pt;
+    --font-printed_at: 8pt;
+    --font-decision: 9.5pt;
+    --font-decision_tag: 8pt;
+    --font-signature_label: 9pt;
+    --font-signature: 10pt;
+    --font-body: 10pt;
+    --font-footline: 8pt;
+    font-family: var(--font-family);
+    /* Every colour below is `var(--color-<element>, <what it has always
+     * been>)`: what Impostazioni has not changed falls back to the sheet as it
+     * printed before there was anything to change (render.color_css_vars). */
+    color: var(--color-family, #111);
 }
 
 /* ── sheet frame ─────────────────────────────────────────────────────── */
@@ -56,36 +77,66 @@
     padding: 5mm var(--pad-x) 3mm var(--pad-x);
 }
 
-/* The comunicato number sits top right on its own line; the title is
- * centred under it, as on the jury workbooks. */
+/* The line above the title: three slots across the paper, and the title is
+ * centred under them as on the jury workbooks. What sits in each of them is a
+ * setting (Impostazioni → Aspetto dei comunicati); by default the comunicato
+ * number is top right and the other two are empty. */
 .cmsr .comunicato-row {
-    text-align: right;
     margin-bottom: 4mm;      /* the title needs air, not a number stuck to it */
+}
+
+/* Three equal cells, so the middle one is the middle of the sheet and not the
+ * middle of whatever is beside it. `align-items: baseline` keeps the boxed
+ * comunicato and the grey timestamp on one line. */
+.cmsr .slot-row {
+    display: flex;
+    align-items: baseline;
+    gap: 3mm;
+}
+
+.cmsr .slot-row > .slot {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.cmsr .slot-row > .slot:nth-child(1) { text-align: left; }
+.cmsr .slot-row > .slot:nth-child(2) { text-align: center; }
+.cmsr .slot-row > .slot:nth-child(3) { text-align: right; }
+
+/* When the sheet came off the printer: the same discreet grey wherever it is
+ * put, in the head or in the foot. */
+.cmsr .printed-at {
+    white-space: nowrap;
+    font-size: var(--font-printed_at);
+    color: var(--color-printed_at, #777);
+    letter-spacing: 0.2px;
 }
 
 .cmsr .comunicato {
     white-space: nowrap;
-    font-size: 10pt;
+    font-size: var(--font-communique);
     font-weight: bold;
-    border: 1px solid var(--header-color);
-    color: var(--header-color);
+    /* the box is one thing: its rule is the colour of the number in it */
+    border: 1px solid var(--color-communique, var(--header-color));
+    color: var(--color-communique, var(--header-color));
     padding: 1mm 2mm;
     border-radius: 1mm;
 }
 
 .cmsr .title {
     text-align: center;
-    color: var(--header-color);
+    color: var(--color-title, var(--header-color));
     font-weight: bold;
-    font-size: 15pt;
+    font-size: var(--font-title);
     line-height: 1.15;
     letter-spacing: 0.3px;
 }
 
 .cmsr .subtitle {
     text-align: center;
-    font-size: 12pt;
+    font-size: var(--font-subtitle);
     font-weight: bold;
+    color: var(--color-subtitle, inherit);
     margin-top: 1mm;
 }
 
@@ -94,8 +145,9 @@
    subtitle of what follows, in black - the colour belongs to the letterhead */
 .cmsr .table-title {
     text-align: center;
-    font-size: 12pt;
+    font-size: var(--font-table_title);
     font-weight: bold;
+    color: var(--color-table_title, inherit);
     /* well clear of the table above it: it heads what follows, and read too
        close to the rows before it, it looks like their total */
     margin: 9mm 0 1.5mm 0;
@@ -105,15 +157,15 @@
 
 .cmsr .info {
     text-align: center;
-    font-size: 9pt;
-    color: #444;
+    font-size: var(--font-info);
+    color: var(--color-info, #444);
     margin-top: 1mm;
 }
 
 /* key to the column sigle: sits under the table it explains, aligned with it */
 .cmsr .legend {
-    font-size: 7.5pt;
-    color: #555;
+    font-size: var(--font-legend);
+    color: var(--color-legend, #555);
     margin-top: 2mm;
     padding: 0 var(--pad-x);
 }
@@ -173,6 +225,13 @@
     background: #f4f6f8;
 }
 
+/* a pause in the running order: it is the one line of a foglio programma that
+ * is not a race, so it is set in italic and reads as an aside rather than as
+ * one more fase (`documents._pause_row`) */
+.cmsr table.data tbody tr.pause td {
+    font-style: italic;
+}
+
 /* a rule above the first row of a team / pair / heat, instead of a blank row */
 .cmsr table.data tbody tr.group-start td,
 .cmsr table.data tbody tr.side-start td {
@@ -183,6 +242,12 @@
  * rule, because it is the line the jury would draw on the workbook by hand */
 .cmsr table.data tbody tr.group-start-strong td {
     border-top: 2px solid #55606b;
+}
+
+/* between one categoria and the next on a grid that carries several: enough
+ * to read as blocks, not so much as to look like a cut (`render.section_start`) */
+.cmsr table.data tbody tr.section-start td {
+    border-top: 1.2px solid #6b7681;
 }
 
 /* and one under the last row, so the table is closed on the same rule its
@@ -227,6 +292,15 @@
 
 .cmsr table.data tbody tr.pending td { color: #666; }
 
+/* The blank line between the riders nobody has typed in yet - who print above
+ * it, grey - and the race as it has been filed. A line of air and no rule: the
+ * sheet is not saying anything there, it is separating two things. */
+.cmsr table.data tbody tr.spacer td {
+    height: 2.6mm;
+    padding: 0;
+    border: none;
+}
+
 /* Bands: a line of their own across the sheet. The final these two teams rode,
  * and - under the first line of the classification - the champion, in the blue
  * of the title and with room to breathe above it. */
@@ -252,7 +326,7 @@
  * files it as a comunicato by mistake. */
 .cmsr .bozza {
     white-space: nowrap;
-    font-size: 10pt;
+    font-size: var(--font-communique);
     font-weight: bold;
     border: 1px solid #b45309;
     background: #fde68a;
@@ -276,7 +350,8 @@
     border-left: 3px solid var(--header-color);
     background: #f4f6f8;
     font-weight: bold;
-    font-size: 9.5pt;
+    font-size: var(--font-decision);
+    color: var(--color-decision, inherit);
     white-space: pre-line;
     /* the tint has to survive the printer: browsers drop backgrounds by
      * default, and a squalifica that prints white is a squalifica nobody
@@ -319,7 +394,8 @@
 /* The word the block opens with - SQUALIFICA, RETROCESSIONE - set apart from
  * the sentence so the sheet can be read at a glance from across the table. */
 .cmsr .decisione .dec-tag {
-    font-size: 8pt;
+    font-size: var(--font-decision_tag);
+    color: var(--color-decision_tag, inherit);
     letter-spacing: 0.6px;
     text-transform: uppercase;
     padding: 0.3mm 1.2mm;
@@ -337,14 +413,16 @@
     justify-content: flex-end;
     align-items: center;
     gap: 3mm;
-    font-size: 9pt;
+    font-size: var(--font-signature_label);
+    color: var(--color-signature_label, inherit);
 }
 
 /* the typed alternative to the scanned image: the name in bold, on the same
  * line as the label and nothing under it */
 .cmsr .signature .sig-name {
     font-weight: bold;
-    font-size: 10pt;
+    font-size: var(--font-signature);
+    color: var(--color-signature, inherit);
     white-space: nowrap;
 }
 
@@ -360,12 +438,62 @@
     padding-top: 3mm;
 }
 
-/* One discreet line: when the sheet was printed, nothing the letterhead
- * already says. No rule above it - the strip below is separation enough. */
+/* The prose of a foglio intestato: the one sheet of the app that is text and
+ * not a table. Set at reading size and left-ranged - a letter is read across,
+ * not scanned down a column - and every block of it stays on one page where it
+ * can (`orphans` / `widows`). */
+.cmsr .doc-body {
+    font-size: var(--font-body);
+    color: var(--color-body, inherit);
+    line-height: 1.5;
+    text-align: left;
+    orphans: 3;
+    widows: 3;
+}
+
+.cmsr .doc-body p {
+    margin: 0 0 3mm 0;
+}
+
+.cmsr .doc-body h3,
+.cmsr .doc-body h4,
+.cmsr .doc-body h5 {
+    margin: 4mm 0 2mm 0;
+    color: var(--header-color);
+    page-break-after: avoid;
+}
+
+.cmsr .doc-body h3 { font-size: 12pt; }
+.cmsr .doc-body h4 { font-size: 11pt; }
+.cmsr .doc-body h5 { font-size: 10pt; }
+
+.cmsr .doc-body ul,
+.cmsr .doc-body ol {
+    margin: 0 0 3mm 0;
+    padding-left: 6mm;
+}
+
+.cmsr .doc-body li {
+    margin-bottom: 1mm;
+}
+
+.cmsr .doc-body code {
+    font-family: "Courier New", monospace;
+    font-size: 9pt;
+}
+
+.cmsr .doc-body hr {
+    border: 0;
+    border-top: 1px solid #ccc;
+    margin: 4mm 0;
+}
+
+/* One discreet line: what the slots were given - by default when the sheet was
+ * printed, nothing the letterhead already says. No rule above it - the strip
+ * below is separation enough. */
 .cmsr .footline {
-    text-align: right;
-    font-size: 8pt;
-    color: #777;
+    font-size: var(--font-footline);
+    color: var(--color-footline, #777);
     letter-spacing: 0.2px;
     padding: 0 var(--pad-x) 1.5mm var(--pad-x);
 }
@@ -480,5 +608,9 @@
 
     .cmsr table.data tbody tr.group-start-strong td {
         border-top: 2.5px solid #333c45;
+    }
+
+    .cmsr table.data tbody tr.section-start td {
+        border-top: 1.5px solid #59636e;
     }
 }

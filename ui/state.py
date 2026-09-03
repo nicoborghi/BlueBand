@@ -24,9 +24,16 @@ PROGRAMME = "programme.yaml"
 # the letterhead and the footer strip change venue every year, the signature
 # changes with the jury president.
 BRANDING_SETTINGS = ("signature", "header_img", "footer_img",
+                     "header_fit", "header_width", "header_align",
+                     "header_top", "footer_fit", "footer_width",
+                     "footer_align", "footer_bottom",
                      "signature_mode", "signature_name", "signature_scope",
                      "name_style", "name_width", "note_colors",
-                     "decision_codes")
+                     "fonts", "text_colors",
+                     "decision_codes", "communique_align",
+                     # the six slots and the two gaps of the head / foot lines
+                     "head_left", "head_center", "head_right", "head_gap",
+                     "foot_left", "foot_center", "foot_right", "foot_gap")
 
 
 #: Where the language of this competition is stored (Impostazioni → Lingua).
@@ -98,7 +105,9 @@ def competition(name: str) -> Competition | None:
     comp = _stale_free(str(p), p.stat().st_mtime)
     # an empty value is not a choice - a signature never set must not blank the
     # one the programme carries - but False *is* one: a tick taken off in
-    # Impostazioni has to win over a programme that turns it on
+    # Impostazioni has to win over a programme that turns it on. A cleared slot
+    # is written as `SLOT_NONE` for the same reason: it is a choice, and an
+    # empty string would read here as an absence (`config.SLOT_ITEMS`).
     over = {k: settings[k] for k in BRANDING_SETTINGS
             if settings.get(k) or isinstance(settings.get(k), bool)}
     if over:
@@ -162,7 +171,7 @@ def sticky_select(container, label: str, options: list, key: str, saved=None,
     changes, so a pick was kept and the next one thrown away, alternately.
 
     It also states what a *dependent* picker does when the list under it
-    changes: a specialità held in the session that the new categoria does not
+    changes: an event held in the session that the new categoria does not
     contest is replaced here, in the open, rather than left to whatever the
     widget would do with a value that is no longer on offer.
     """

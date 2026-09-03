@@ -24,6 +24,11 @@ competitions/example/*
 # copies of the last saved PDFs, served to the browser
 static/
 
+# the built documentation (sphinx); the source is docs/. The .po catalogues
+# under docs/locales/ are source and are tracked; the compiled .mo are not.
+/docs/_build/
+*.mo
+
 # the build: PyInstaller's work and dist trees, and the generated icon
 /build/
 /dist/

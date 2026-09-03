@@ -56,7 +56,7 @@ def render(competition: str, comp: Competition, store: Store) -> None:
         show_matrix = st.checkbox(ui("event_matrix"), value=False,
                                   key="pa_matrix",
                                   help=help_text("event_matrix"))
-        include_np = st.checkbox(ui("include_np"), value=False, key="pa_np")
+        include_ns = st.checkbox(ui("include_ns"), value=False, key="pa_np")
         include_ris = st.checkbox(ui("include_reserves"), value=True,
                                   key="pa_ris")
         only_ver = st.checkbox(ui("only_verified"), value=False, key="pa_ver",
@@ -100,7 +100,7 @@ def render(competition: str, comp: Competition, store: Store) -> None:
                    + (f" · {p.not_starting} NP" if p.not_starting else ""))
 
     docs = _build(el, comp, mode, cat, event, show_matrix, show_index,
-                  include_np, include_ris, only_ver, minimal, font,
+                  include_ns, include_ris, only_ver, minimal, font,
                   "" if draft else com, decision)
     if not docs:
         notify.warn("no_riders_for_selection")
@@ -140,7 +140,7 @@ def _default_com(comp: Competition, cat: str, event: str) -> str:
     The four opening comunicati hang off the pseudo-event `entry_list`; an
     event's own elenco is planned under the event. `find` is the register's own
     lookup, and the loose one on purpose: this sheet is not a round, so it
-    takes the number planned for the specialità whichever fase carries it - the
+    takes the number planned for the event whichever fase carries it - the
     jury sees the number in the field and corrects it. The two hand-rolled
     copies of this loop that used to live here disagreed with it in one case
     (`_com_for` matched the string "partenti" rather than the constant).
@@ -149,12 +149,12 @@ def _default_com(comp: Competition, cat: str, event: str) -> str:
     return planned.label if planned else ""
 
 
-def _build(el, comp, mode, cat, event, show_matrix, show_index, include_np,
+def _build(el, comp, mode, cat, event, show_matrix, show_index, include_ns,
            include_ris, only_ver, minimal, font, com, decision) -> list:
     if mode == BY_CATEGORY:
         return [D.entry_list(el, comp, cat, matrix=show_matrix,
                              index=show_index,
-                             include_np=include_np, only_verified=only_ver,
+                             include_ns=include_ns, only_verified=only_ver,
                              minimal=minimal, communique=com, font_size=font,
                              decision=decision)]
     if mode == BY_EVENT:

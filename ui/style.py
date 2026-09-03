@@ -159,18 +159,21 @@ section[data-testid="stSidebar"] .stElementContainer:has(hr) {
 # The row of races last worked on (`races._recent_races`). Six of them wrap to
 # a second line on a laptop and push the pickers down the page, which is the
 # opposite of what a shortcut is for: one line, and the ones that do not fit
-# are scrolled to sideways.
+# are scrolled to sideways. The row is one button per race in a column of its
+# own, so the columns are what is kept on the line - each as wide as the name
+# of the sheet it opens, not a quarter of the page.
 _RECENT = """
-.st-key-ga_recent,
-.st-key-ga_recent > div,
-.st-key-ga_recent [data-testid="stButtonGroup"],
-.st-key-ga_recent [role="group"] {
+.st-key-ga_recent [data-testid="stHorizontalBlock"] {
     flex-wrap: nowrap !important;
     overflow-x: auto;
     scrollbar-width: thin;
+    gap: .4rem;
 }
-.st-key-ga_recent [data-testid="stButtonGroup"] > *,
-.st-key-ga_recent [role="group"] > * { flex: 0 0 auto; }
+.st-key-ga_recent [data-testid="stColumn"] {
+    flex: 0 0 auto;
+    width: auto !important;
+    min-width: 0;
+}
 .st-key-ga_recent button p { white-space: nowrap; }
 """
 
@@ -192,6 +195,75 @@ section[data-testid="stSidebar"] .cmsr-credit a {
 """
 
 
+# The derny board (`ui.derny`). `st.html` throws away a `<style>` handed to it,
+# so the chart carries classes and the rules live here, with the rest of the
+# app's own CSS. Everything is drawn in the page's own colour - the app has a
+# light and a dark theme and a hard-coded grey reads as a hole in one of them -
+# except the two things that must be seen from across the desk: the lap a
+# rider lost, in red, and the lap whose time is off, in yellow.
+_DERNY = """
+/* rtl so the box opens on the lap being ridden; the table itself stays on the
+   left of it - the segretario reads the chart from the first giro, and a table
+   pinned to the right edge of a wide column is read as a second thing */
+.dy-scroll { overflow-x: auto; direction: rtl; scrollbar-width: thin; }
+.dy-scroll > table { direction: ltr; margin-right: auto; }
+.dy-chart { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.dy-chart th {
+    font-size: .7rem;
+    font-weight: 600;
+    opacity: .55;
+    padding: 0 .35rem;
+    border-bottom: 1px solid rgba(128, 128, 128, .35);
+}
+.dy-chart td {
+    text-align: center;
+    padding: .05rem .35rem;
+    font-size: .9rem;
+    min-width: 2.1rem;
+}
+/* the lap he did not ride, printed very light where it should have been: the
+   column reads complete, and the grey says he was not actually in it */
+.dy-chart td.dy-lost { color: rgba(128, 128, 128, .55); }
+/* the passage nobody could name: it holds its place and says nothing */
+.dy-chart td.dy-unknown { opacity: .45; }
+/* and the lap he came back on - the one where the giro was lost */
+.dy-chart td.dy-late { color: #d02020; font-weight: 700; }
+/* and the lap whose time nobody can explain */
+.dy-chart td.dy-hot {
+    background: #f6d24a;
+    color: #1a1a1a;
+    font-weight: 700;
+    border-radius: .2rem;
+}
+.dy-recap h4 { font-size: .85rem; opacity: .6; margin: 0 0 .35rem 0; }
+.dy-standings { border-collapse: collapse; width: 100%; }
+.dy-standings td {
+    padding: .05rem .4rem;
+    font-size: .9rem;
+    border-bottom: 1px solid rgba(128, 128, 128, .15);
+}
+.dy-standings .dy-pos { opacity: .5; text-align: right; width: 2.4rem; }
+.dy-standings .dy-bib { font-weight: 700; white-space: nowrap; }
+.dy-standings .dy-star { color: #d02020; font-weight: 700; }
+.dy-dim { opacity: .55; font-size: .8rem; margin-left: .5rem; }
+.dy-card { margin-bottom: .35rem; border-radius: .25rem; }
+/* a rider with a giro outside the band: the chart itself goes yellow, the
+   same yellow as the cell on the Passaggi chart - light enough that the line
+   over it still reads */
+.dy-card-hot { background: rgba(246, 210, 74, .28); padding: .2rem .3rem; }
+.dy-card-head { font-size: .85rem; }
+.dy-svg { width: 100%; height: 60px; display: block; }
+.dy-splits th {
+    font-size: .7rem;
+    font-weight: 600;
+    opacity: .55;
+    text-align: right;
+    padding: 0 .4rem;
+}
+.dy-splits td { text-align: right; font-variant-numeric: tabular-nums; }
+"""
+
+
 def _nav_icons() -> str:
     """The icon of each page, keyed on its position in the picker."""
     return "\n".join(
@@ -203,5 +275,5 @@ def _nav_icons() -> str:
 def inject() -> None:
     """Put print.css on the page. Cheap enough to repeat on every run."""
     st.markdown(f"<style>{stylesheet()}{_HIDDEN_FRAMES}{_NAV}{_SAVEBAR}"
-                f"{_SIDEBAR_RULE}{_RECENT}{_CREDIT}{_nav_icons()}</style>",
+                f"{_SIDEBAR_RULE}{_RECENT}{_CREDIT}{_DERNY}{_nav_icons()}</style>",
                 unsafe_allow_html=True)

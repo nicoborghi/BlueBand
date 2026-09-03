@@ -18,15 +18,15 @@ So it is a table, kept where the other regulations are kept:
       "ins_squadre": {"AL": {"*": 3}}
     }
 
-Three levels, all matched loosely: **specialità → categoria → fase**. A fase is
+Three levels, all matched loosely: **event → categoria → fase**. A fase is
 looked up by its own name first, then by the family it belongs to
 (`qualificazioni`, `final` - the same two prefixes the rest of the app reads a
-round key by), then by `*`, which is "every fase of this specialità for this
+round key by), then by `*`, which is "every fase of this event for this
 categoria". A categoria of `*` is the same idea one level up: the distance that
 holds whoever rides it.
 
 Nothing here is invented. The file ships **seeded from a programme that was
-actually run** (`seed`), and the jury corrects it in Impostazioni; a specialità
+actually run** (`seed`), and the jury corrects it in Impostazioni; an event
 the table says nothing about proposes no distance at all, which is a blank
 field on the page rather than a wrong number on a sheet.
 
@@ -49,7 +49,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .config import (PREFIX_FINALS, PREFIX_QUALIFYING, ROUND_SETUP,
+from .config import (PREFIX_FINALS, PREFIX_QUALIFYING, ROUND_PAUSE, ROUND_SETUP,
                      Competition, sprints_from_laps)
 from .formats.group import MADISON, POINTS, TEMPO
 
@@ -62,7 +62,7 @@ META = "_last_updated_"
 #: How many giri a bunch race runs between one volata and the next.
 LAPS_PER_SPRINT = "_laps_per_sprint_"
 
-#: Everything at the top level that is not a specialità.
+#: Everything at the top level that is not an event.
 RESERVED = (META, LAPS_PER_SPRINT)
 
 #: "This one holds for every categoria / every fase."
@@ -107,7 +107,7 @@ def updated_at() -> str:
 
 
 def events(table: dict | None = None) -> list[str]:
-    """The specialità the table has an entry for, in alphabetical order."""
+    """The event the table has an entry for, in alphabetical order."""
     table = load() if table is None else table
     return sorted(k for k, v in table.items()
                   if k not in RESERVED and isinstance(v, dict))
@@ -225,7 +225,7 @@ def seed(comp: Competition) -> dict[str, Any]:
     """Harvest the table out of a programme that has already been run.
 
     Every fase that states a distance becomes an entry. Where every fase of a
-    (specialità, categoria) is ridden over the same distance the entries
+    (event, categoria) is ridden over the same distance the entries
     collapse into one `*`, which is both shorter to read and what the jury
     would have written by hand; where they differ - the qualificazioni and the
     finale of a madison - each family keeps its own line.
@@ -242,7 +242,8 @@ def seed(comp: Competition) -> dict[str, Any]:
         for rnd in item.rounds:
             km = _km(rnd.distance)
             if not km:
-                if rnd.kind != ROUND_SETUP:      # a setup fase is not ridden
+                # neither a setup fase nor a pausa is ridden at all
+                if rnd.kind not in (ROUND_SETUP, ROUND_PAUSE):
                     silent.add((item.event, item.cat))
                 continue
             key = family_of(rnd.key) or rnd.key

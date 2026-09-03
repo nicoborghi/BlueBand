@@ -7,7 +7,7 @@ Layout under the competition root:
       entries_import.json      entries_overlay.json
       comunicati.json
       races/<race_id>.json
-      out/<NNN>_<CAT>_<specialita>_<fase>_<batteria>.pdf
+      out/<NNN>_<CAT>_<event>_<fase>_<batteria>.pdf
       .snapshots/<relpath>/<ts>.json     previous content of every overwrite
       journal.jsonl                      append-only log of every write
 
@@ -70,8 +70,15 @@ class Store:
             return json.load(fh)
 
     def write_json(self, rel: str | Path, data: Any, *, action: str = "write",
-                   snapshot: bool = True, actor: str = "") -> Path:
-        """Atomically write `data` as JSON, snapshotting the previous content."""
+                   snapshot: bool = True, actor: str = "",
+                   journal: bool = True) -> Path:
+        """Atomically write `data` as JSON, snapshotting the previous content.
+
+        `journal=False` is for a write that happens by itself many times a
+        minute - a derny writes the file at every number the judge calls, and
+        eight hundred lines of "derny_call" would bury the day's decisions in
+        the log that is meant to hold them.
+        """
         p = self.path(rel)
         p.parent.mkdir(parents=True, exist_ok=True)
         if snapshot and p.exists():
@@ -80,7 +87,8 @@ class Store:
         with tmp.open("w", encoding="utf-8") as fh:
             json.dump(data, fh, ensure_ascii=False, indent=1, default=str)
         os.replace(tmp, p)
-        self.journal(action=action, target=str(rel), actor=actor)
+        if journal:
+            self.journal(action=action, target=str(rel), actor=actor)
         return p
 
     def write_text(self, rel: str | Path, text: str, *, action: str = "render",
@@ -116,6 +124,22 @@ class Store:
         else:
             data[key] = value
         self.write_json(SETTINGS, data, action=f"set_{key}", actor=actor)
+
+    def clear_settings(self, keys, *, actor: str = "") -> list[str]:
+        """Forget several settings at once; returns the ones that were set.
+
+        One write and one line in the journal: «ripristina tutto» in
+        Impostazioni is one decision, and a settings file caught halfway
+        through a key-by-key reset is a sheet set half in the old way.
+        """
+        data = self.settings
+        gone = [k for k in keys if k in data]
+        if not gone:
+            return []
+        for k in gone:
+            data.pop(k, None)
+        self.write_json(SETTINGS, data, action="clear_settings", actor=actor)
+        return gone
 
     @property
     def out_dir(self) -> Path:
@@ -172,12 +196,17 @@ class Store:
         return st
 
     def save_race(self, state: RaceState, *, action: str = "save_race",
-                  actor: str = "") -> Path:
+                  actor: str = "", snapshot: bool = True,
+                  journal: bool = True) -> Path:
+        """Write the race. `snapshot`/`journal` off is the live autosave of a
+        derny: a copy aside and a log line per number called would be eight
+        hundred of each in one race (see `write_json`)."""
         state.updated_at = now_iso()
         if not state.created_at:
             state.created_at = state.updated_at
         return self.write_json(self.race_rel(state.race_id), state.to_dict(),
-                               action=action, actor=actor)
+                               action=action, actor=actor,
+                               snapshot=snapshot, journal=journal)
 
     def list_races(self) -> list[str]:
         return sorted(p.stem for p in (self.root / "races").glob("*.json"))

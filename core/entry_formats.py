@@ -3,7 +3,7 @@
 The elenco iscritti does not arrive in one shape. The federal system exports a
 flat list (`Iscritti_NNNNNN.xls`, one row per rider, the *ksport* format); a
 meeting that has been run before sends back the workbook this app writes, with
-a sheet per categoria and a column per specialità. Both are read here, and a
+a sheet per categoria and a column per event. Both are read here, and a
 third will be a block in a table rather than a branch in the code:
 
     regulations/entry_formats.json
@@ -99,6 +99,12 @@ def applied(comp: Competition, code: str) -> Competition:
     match a file somebody actually received, and that always wins. What the
     format supplies is the part nobody has written down - which, for a
     competition being set up, is all of it.
+
+    A mapping is taken **whole**: a competition that states one is describing a
+    file it has in front of it, and the table's answer for the same field is
+    about a different file. Merging the two key by key left a mapping with two
+    headers pointing at one field, and the import took whichever came first in
+    the file.
     """
     values = layout(code)
     if not values:
@@ -109,11 +115,17 @@ def applied(comp: Competition, code: str) -> Competition:
     # is not a statement - a competition that has never mentioned its entry
     # file would otherwise be read as insisting on the header being on row 6.
     stated = bool(sheet.columns or sheet.ksport)
-    merged = {}
+    merged = {"mapped": bool(sheet.ksport)}
     for field_name, value in values.items():
         mine = getattr(sheet, field_name, None)
         if isinstance(value, dict):
-            merged[field_name] = {**value, **(mine or {})}
+            # **whole, or not at all.** A mapping is a statement about one
+            # file, and half of it read off this file plus half inherited from
+            # the table is not a mapping of either: a competition that says
+            # `Note -> region` would go on carrying the table's `Regione ->
+            # region` beside it, and which of the two columns the import took
+            # would come down to their order in the file.
+            merged[field_name] = dict(mine) if mine else dict(value)
         elif not stated:
             merged[field_name] = value
     return replace(comp, entry_sheet=replace(sheet, **merged))

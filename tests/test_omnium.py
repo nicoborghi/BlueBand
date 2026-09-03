@@ -16,8 +16,10 @@ from core import race as R
 from core.config import (DOC_CLASSIFICATION, DOC_PARTIAL, DOC_RACE,
                          DOC_RESULTS, DOC_STARTLIST)
 from core.entries import import_master, save_import
+from core.formats import group as G
 from core.formats import omnium as O
 from core.formats.base import Placing, Result
+from core.i18n import label, round_short
 from core.models import Status
 from render import documents as D
 from render.render import to_html
@@ -48,17 +50,32 @@ def _text(html: str) -> str:
 
 # ── scoring ─────────────────────────────────────────────────────────────────
 
-def test_a_prova_not_finished_is_carried_into_the_standings():
-    """A DNF in one prova takes the rider out of the omnium classification."""
+def test_a_prova_not_finished_takes_the_rider_out_of_the_places():
+    """A DNF in one prova ends the omnium: she keeps no place in it.
+
+    She stays on the classifica all the same, under the classified and with
+    her sigla - the same line the risultati of that prova print. Out of the
+    places is not off the sheet, and no note stands in for her.
+    """
     rounds = {O.SCRATCH: _res(["A", "B", "C"]),
               O.TEMPO: _res(["A", "C", "B"], {"B": Status.DNF})}
     res = O.omnium_classification(rounds)
+    assert [(p.key, p.position) for p in res.placings] == [("A", 1), ("C", 2),
+                                                           ("B", None)]
     assert res.by_key("B").status is Status.DNF
-    assert res.by_key("B").position is None
-    assert res.by_key("B").data["total"] == 0
-    # the classified are numbered without it
-    assert [p.key for p in res.placings if p.position] == ["A", "C"]
-    assert res.placings[-1].key == "B"
+    assert res.notes == []
+
+
+def test_every_rider_out_of_the_omnium_keeps_her_line_and_her_sigla():
+    rounds = {O.SCRATCH: _res(["7", "10", "2"], {"10": Status.DNS}),
+              O.TEMPO: _res(["7", "2"], {"2": Status.DSQ})}
+    res = O.omnium_classification(rounds)
+    assert [(p.key, p.position) for p in res.placings] == [("7", 1),
+                                                           ("10", None),
+                                                           ("2", None)]
+    # sorted the way every other classification sorts the non-classified
+    assert [p.status for p in res.placings[1:]] == [Status.DNS, Status.DSQ]
+    assert res.notes == []
 
 
 def test_riders_on_the_same_points_are_split_by_the_last_prova():
@@ -83,10 +100,40 @@ def test_riders_on_the_same_points_are_split_by_the_last_prova():
     assert tail == order[:5]
 
 
-def test_the_worst_status_of_the_four_prove_wins():
+def test_the_omnium_tie_is_broken_by_the_last_sprint_of_the_points_race():
+    """A pari punti decide il passaggio all'ultima volata, non la classifica.
+
+    Due corridori a pari punti nell'omnium non sono a pari punti nella corsa a
+    punti - i punti portati sono diversi - e la classifica di quella corsa li
+    ha gia' separati sui punti, che e' un criterio che l'omnium non applica.
+    Quello che scioglie il pari merito e' il passaggio all'ultima volata: chi
+    ci e' transitato davanti sta davanti, anche se nella corsa a punti ha
+    chiuso piu' indietro.
+    """
+    # #1 fa le prime due volate, #3 passa davanti a lui all'ultima: nella corsa
+    # a punti #1 e' 2o e #3 3o, ma all'ultima volata #3 e' passato 2o e #1 4o.
+    points = G.group_classification(startlist=[1, 2, 3, 4],
+                                    sprints=[[1, 2, 3, 4], [1, 2, 3, 4],
+                                             [4, 3, 2, 1]],
+                                    scoring=G.POINTS, n_sprint=3)
+    assert [p.key for p in points.placings] == ["4", "1", "3", "2"]
+    assert points.by_key("1").data["total"] == 12
+    assert points.by_key("3").data["total"] == 10
+
+    # lo scratch li rimette a pari: #3 porta 40 + 10, #1 porta 38 + 12
+    rounds = {O.SCRATCH: _res(["3", "1", "2", "4"]), O.POINTS_RACE: points}
+    res = O.omnium_classification(rounds)
+    assert res.by_key("3").data["total"] == res.by_key("1").data["total"] == 50
+    assert [p.key for p in res.placings][:2] == ["3", "1"]
+
+
+def test_one_decision_in_any_prova_is_enough_to_be_out():
     rounds = {O.SCRATCH: _res(["A", "B"], {"B": Status.DNF}),
               O.TEMPO: _res(["A", "B"], {"B": Status.DSQ})}
-    assert O.omnium_classification(rounds).by_key("B").status is Status.DSQ
+    res = O.omnium_classification(rounds)
+    # the worst of the two sigle is the one the classifica prints
+    out = res.by_key("B")
+    assert (out.position, out.status, out.data["total"]) == (None, Status.DSQ, 0)
 
 
 def test_a_declassamento_is_not_carried():
@@ -103,10 +150,12 @@ def test_a_declassamento_is_not_carried():
     assert res.by_key("B").data["total"] == 38
 
 
-def test_an_explicit_status_wins_over_what_the_prove_say():
-    rounds = {O.SCRATCH: _res(["A", "B"], {"B": Status.DNF})}
+def test_an_explicit_status_takes_the_rider_out_too():
+    """The caller knows better: a status passed in is read like the prove's."""
+    rounds = {O.SCRATCH: _res(["A", "B"])}
     res = O.omnium_classification(rounds, statuses={"B": Status.DNS})
-    assert res.by_key("B").status is Status.DNS
+    out = res.by_key("B")
+    assert (out.position, out.status, out.data["total"]) == (None, Status.DNS, 0)
 
 
 def test_the_standings_carry_what_each_rider_took_into_the_points_race():
@@ -165,14 +214,40 @@ def test_the_points_race_sheet_is_ordered_on_the_omnium_total():
     Whoever won the race has not won the omnium unless the total says so, and
     two riders on the same total are separated by this race (3.2.109).
     """
-    result = Result(placings=[Placing(key="7", position=1, data={"total": 20}),
-                              Placing(key="9", position=2, data={"total": 6}),
-                              Placing(key="4", position=3, data={"total": 6})],
-                    columns=["points", "laps", "total"])
+    result = Result(placings=[
+        Placing(key="7", position=1, data={"total": 20, "_tiebreak": 0}),
+        Placing(key="9", position=2, data={"total": 6, "_tiebreak": 1}),
+        Placing(key="4", position=3, data={"total": 6, "_tiebreak": 2})],
+        columns=["points", "laps", "total"])
     out = R.omnium_points_race(result, {"7": 60, "9": 84, "4": 84})
     assert [p.key for p in out.placings] == ["9", "4", "7"]
     assert [p.position for p in out.placings] == [1, 2, 3]
     assert [p.data["total"] for p in out.placings] == [90, 90, 80]
+
+
+def test_the_points_race_sheet_splits_a_tie_on_the_last_sprint():
+    """Il foglio e' la classifica finale: stesso spareggio, stesso ordine.
+
+    Sul foglio dei risultati della corsa a punti due pari totale si leggono nel
+    passaggio all'ultima volata, non nel piazzamento in quella corsa - o il
+    foglio e la classifica finale uscirebbero in due ordini diversi.
+    """
+    def points():                       # il foglio la consuma, la classifica no
+        return G.group_classification(startlist=[1, 2, 3, 4],
+                                      sprints=[[1, 2, 3, 4], [1, 2, 3, 4],
+                                               [4, 3, 2, 1]],
+                                      scoring=G.POINTS, n_sprint=3)
+
+    # #1 e' 2o nella corsa a punti e #3 3o, ma all'ultima volata sono passati
+    # in ordine inverso; lo scratch li rimette a pari totale
+    assert [p.key for p in points().placings] == ["4", "1", "3", "2"]
+    sheet = R.omnium_points_race(points(), {"1": 38, "3": 40, "2": 36, "4": 34})
+    assert [p.key for p in sheet.placings][:2] == ["3", "1"]
+
+    standings = O.omnium_classification({O.SCRATCH: _res(["3", "1", "2", "4"]),
+                                         O.POINTS_RACE: points()})
+    assert ([p.key for p in sheet.placings]
+            == [p.key for p in standings.placings] == ["3", "1", "4", "2"])
 
 
 def test_a_prova_carries_the_points_its_placings_are_worth():
@@ -197,7 +272,7 @@ def test_the_documents_a_prova_files(ev, entries, comp, round_key, docs):
 def test_the_classifica_parziale_says_which_prova_it_starts(ev, entries, comp):
     def subtitle(round_key):
         state = R.ensure_state(ev, comp, "AL", "omnium", round_key, entries)
-        return _omnium_subtitle(state, DOC_PARTIAL)
+        return _omnium_subtitle(comp, state, DOC_PARTIAL)
 
     assert subtitle(O.SCRATCH) == ("Risultati Scratch e Ordine di Partenza "
                                    "Tempo Race")
@@ -210,7 +285,8 @@ def test_the_classifica_parziale_says_which_prova_it_starts(ev, entries, comp):
 def test_the_points_columns_of_each_sheet(ev, entries, comp):
     def cols(round_key, doc):
         state = R.ensure_state(ev, comp, "AL", "omnium", round_key, entries)
-        return [head for _key, head in _omnium_points_cols(state, doc)]
+        return [head for _key, head
+                in _omnium_points_cols(comp, state, doc)]
 
     # the first one has one prova to show and nothing to total
     assert cols(O.SCRATCH, DOC_PARTIAL) == ["Punti Scratch"]
@@ -230,15 +306,15 @@ def test_the_points_columns_of_each_sheet(ev, entries, comp):
     # the sheet that goes out is the classifica parziale; the risultati of the
     # prova and the partenti of the next one are the jury's own
     ("ED", O.SCRATCH, DOC_STARTLIST, "39"),
-    ("ED", O.SCRATCH, DOC_RESULTS, "-1"),
+    ("ED", O.SCRATCH, DOC_RESULTS, ""),
     ("ED", O.SCRATCH, DOC_PARTIAL, "54"),
-    ("ED", O.TEMPO, DOC_RACE, "-1"),
+    ("ED", O.TEMPO, DOC_RACE, ""),
     ("ED", O.TEMPO, DOC_RESULTS, "63"),
     ("ED", O.TEMPO, DOC_PARTIAL, "64"),
-    ("ED", O.ELIMINATION, DOC_STARTLIST, "-1"),
+    ("ED", O.ELIMINATION, DOC_STARTLIST, ""),
     ("ED", O.ELIMINATION, DOC_RESULTS, "67"),
     ("ED", O.ELIMINATION, DOC_PARTIAL, "68"),
-    ("ED", O.POINTS_RACE, DOC_STARTLIST, "-1"),
+    ("ED", O.POINTS_RACE, DOC_STARTLIST, ""),
     ("ED", "", DOC_CLASSIFICATION, "72"),
     ("AL", O.SCRATCH, DOC_PARTIAL, "101"),
     ("AL", O.ELIMINATION, DOC_PARTIAL, "110"),
@@ -427,3 +503,146 @@ def test_an_omnium_without_batterie_starts_everybody(ev, entries, comp):
     scratch = R.ensure_state(ev, comp, "ED", "omnium", O.SCRATCH, entries)
     assert scratch.entrants == everyone
     assert R.omnium_field(ev, comp, entries, "ED", "omnium") == everyone
+
+
+# ── the sheets of a prova: what the programme rides, not the canonical four ──
+
+def _prova_state(cat: str, round_key: str):
+    """The three fields the sheet helpers read off a race."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(cat=cat, event="omnium", round_key=round_key)
+
+
+def test_the_parziale_carries_a_column_per_prova_the_omnium_rides(comp):
+    """`Punti Scratch` on an omnium with no scratch is a column of blanks."""
+    import dataclasses
+
+    cat = next(i.cat for i in comp.programme if i.event == "omnium")
+    heads = [h for _key, h in _omnium_points_cols(
+        comp, _prova_state(cat, O.ELIMINATION), "classifica_parziale")]
+    assert heads[:3] == [f"{label('points_of')} {round_short(n)}"
+                         for n in (O.SCRATCH, O.TEMPO, O.ELIMINATION)]
+    # the heading is abbreviated where the name would eat the column
+    assert heads[2] == f"{label('points_of')} Elim."
+
+    # the same omnium ridden without the scratch: three prove, and the sheet
+    # of the second of them carries the two that have been ridden
+    item = next(i for i in comp.programme
+                if i.event == "omnium" and i.cat == cat)
+    short = dataclasses.replace(
+        item, rounds=[r for r in item.rounds if r.key != O.SCRATCH])
+    trimmed = dataclasses.replace(
+        comp, programme=[short if i is item else i for i in comp.programme])
+    heads = [h for _key, h in _omnium_points_cols(
+        trimmed, _prova_state(cat, O.ELIMINATION), "classifica_parziale")]
+    assert heads[:2] == [f"{label('points_of')} {round_short(n)}"
+                         for n in (O.TEMPO, O.ELIMINATION)]
+    assert f"{label('points_of')} {O.SCRATCH}" not in heads
+
+
+def test_a_prova_offers_one_classifica_parziale_and_no_more(comp):
+    """The programme may declare it as well: the sheet is the same one."""
+    from ui.pages.races import _omnium_docs
+
+    cat = next(i.cat for i in comp.programme if i.event == "omnium")
+    state = _prova_state(cat, O.TEMPO)
+    docs = _omnium_docs(comp, state, ["partenti", "risultati",
+                                      "classifica_parziale"])
+    assert docs.count("classifica_parziale") == 1
+    # and the last prova has no next one to start: it closes on the classifica
+    assert "classifica_parziale" not in _omnium_docs(
+        comp, _prova_state(cat, O.POINTS_RACE), ["partenti", "risultati"])
+
+
+# ── who is still in the specialità ──────────────────────────────────────────
+
+@pytest.fixture
+def example(tmp_path):
+    """The fictional meeting that ships with the repo, in a store of its own.
+
+    An ES omnium of three prove and an entry list nobody needs the Drive folder
+    to read: what a rider does in one prova and what the next one starts is a
+    rule of the app, not of one championship, and it is tested where it can
+    always run.
+    """
+    from conftest import EXAMPLE_ENTRIES, EXAMPLE_PROGRAMME
+    from core import entry_formats as F
+    from core.config import load_competition
+    from core.entries import import_ksport_export, save_import
+    from core.models import EventEntry
+    from core.store import Store
+
+    # the programme says nothing about the layout of the file: the mapping is
+    # the format's, as it is everywhere the app reads one
+    comp = F.applied(load_competition(EXAMPLE_PROGRAMME), "ksport")
+    el = import_ksport_export(EXAMPLE_ENTRIES, comp)
+    # the flat export says who is at the meeting, not in which specialità:
+    # the omnium is ticked at the verifica, and here by hand
+    for rider in el.by_cat("ES"):
+        rider.events["omnium"] = EventEntry()
+    store = Store(tmp_path / "evt")
+    save_import(store, el)
+    return comp, store, el
+
+
+@pytest.mark.parametrize("status", [Status.DNS, Status.DNF, Status.ABD,
+                                    Status.DSQ])
+def test_a_rider_out_of_the_omnium_does_not_start_the_next_prova(example, status):
+    """The four decisions that end a specialità end it: she is not on the
+    ordine di partenza of what follows, and not a result anybody is waiting
+    for. The classifica still names her - with the sigla, no place and no
+    points - which is what a classification is for."""
+    comp, store, el = example
+    tempo = R.ensure_state(store, comp, "ES", "omnium", O.TEMPO, el)
+    bib = tempo.entrants[0]
+    R.set_status(tempo, bib, status)
+    store.save_race(tempo)
+
+    elim = R.ensure_state(store, comp, "ES", "omnium", O.ELIMINATION, el)
+    assert bib not in elim.entrants
+    assert len(elim.entrants) == len(tempo.entrants) - 1
+
+    standings = R.omnium_standings(store, comp, el, "ES", "omnium")
+    out = standings.by_key(bib)
+    assert (out.position, out.status) == (None, status)
+    assert out.data["total"] == 0, "out of the omnium, out of the points"
+    assert out is standings.placings[-1]
+    assert standings.notes == []
+
+    # a decision taken back is a rider back in the race
+    R.set_status(tempo, bib, Status.OK)
+    store.save_race(tempo)
+    back = R.ensure_state(store, comp, "ES", "omnium", O.ELIMINATION, el)
+    assert bib in back.entrants
+
+
+def test_the_eliminazione_does_not_crown_a_rider_who_is_not_in_it(example):
+    """A phantom entrant is never eliminated, so the format read her as the
+    last one standing - first place, and 40 omnium points with it."""
+    comp, store, el = example
+    tempo = R.ensure_state(store, comp, "ES", "omnium", O.TEMPO, el)
+    gone = tempo.entrants[0]
+    R.set_status(tempo, gone, Status.DNF)
+    store.save_race(tempo)
+
+    elim = R.ensure_state(store, comp, "ES", "omnium", O.ELIMINATION, el)
+    # the whole race typed in, first out first and the winner last
+    elim.payload["eliminated"] = ",".join(reversed(elim.entrants))
+    res = R.classify(elim, el, comp)
+    won = [p.key for p in res.placings if p.position == 1]
+    assert won == [elim.entrants[0]] and gone not in res.order
+    assert not res.pending
+
+
+def test_the_riders_still_to_be_typed_print_above_the_race(example):
+    """A rider nobody has entered yet is not last: she is not in the sheet."""
+    comp, store, el = example
+    elim = R.ensure_state(store, comp, "ES", "omnium", O.ELIMINATION, el)
+    # everybody but the last three: three riders the jury still has to type
+    elim.payload["eliminated"] = ",".join(reversed(elim.entrants[3:]))
+    doc = D.race_classification(elim, R.classify(elim, el, comp), el, comp)
+    rows = doc.tables[0].rows
+    assert [r.get("_class") for r in rows[:4]] == ["pending"] * 3 + ["spacer"]
+    assert all(not r["rank"] for r in rows[:3]), "no place is theirs yet"
+    assert rows[4]["rank"], "the classification starts under the blank line"

@@ -275,6 +275,18 @@ def penalty_name(code: str) -> str:
         return str(code)
 
 
+def round_short(name: str) -> str:
+    """A prova as a column heading calls it ('Eliminazione' -> 'Elim.').
+
+    Only the ones that do not fit are abbreviated (`ROUNDS_SHORT`); everything
+    else is the name the programme schedules the fase under, unchanged.
+    """
+    try:
+        return _entry("ROUNDS_SHORT", str(name))
+    except KeyError:
+        return str(name)
+
+
 def note_kind_name(kind: str) -> str:
     """What a block on a sheet is ('relegation' -> 'Retrocessione')."""
     try:

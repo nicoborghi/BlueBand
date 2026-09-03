@@ -37,9 +37,21 @@ dependencies = [
 # nobody touched.
 dev = ["pytest>=8", "pytest-cov", "ruff==0.16.4"]
 build = ["pyinstaller==6.11.1"]
+# the documentation (docs/conf.py), built by Read the Docs in two languages
+# from one English source. No gallery and no notebook execution: the pages are
+# prose and tables, and a plugin that runs code is a plugin that breaks the
+# docs build for reasons unrelated to the docs.
+docs = [
+    "sphinx>=7.2",
+    "sphinx-book-theme>=1.1",
+    "sphinx-copybutton>=0.5",
+    "myst-parser>=2.0",
+    "sphinx-intl>=2.2",
+]
 
 [project.urls]
 Homepage = "https://github.com/nicoborghi/BlueBand"
+Documentation = "https://blueband.readthedocs.io/"
 
 [tool.setuptools]
 packages = ["core", "core.formats", "core.i18n", "render", "ui", "ui.pages"]

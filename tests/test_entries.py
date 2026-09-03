@@ -347,11 +347,12 @@ def test_the_edits_can_be_written_into_the_workbook_itself(store, iscritti_path,
 def test_the_licence_check_is_written_where_the_file_has_a_column(store, comp,
                                                                   iscritti_path,
                                                                   tmp_path):
-    """Verificato and NP go into the columns the giuria added, in both sheets.
+    """NP goes into the column the giuria added, in both sheets.
 
-    The federation's layout has neither: they are declared in
-    `entries.check_in` and written on the foglio di categoria *and* on the
-    KSPORT sheet, so a re-import reads the same answer from either one.
+    The federation's layout has none: it is declared in `entries.check_in` and
+    written on the foglio di categoria *and* on the KSPORT sheet, so a
+    re-import reads the same answer from either one. Verificato is derived
+    from the specialità now, so there is nothing to write for it.
     """
     import shutil
 
@@ -361,20 +362,18 @@ def test_the_licence_check_is_written_where_the_file_has_a_column(store, comp,
     shutil.copy2(iscritti_path, path)
     el = import_master(path, comp)
     rider = next(r for r in el.riders.values() if r.ksport_source)
-    assert rider.checked_in is False
+    assert rider.not_starting is False
 
     written, refused = E.write_back(path, comp, el, [
-        Patch(target=rider.key, op="set_checked_in", value=True),
         Patch(target=rider.key, op="set_not_starting", value=True)], store=store)
-    assert refused == [] and written == 4      # two flags, two sheets each
+    assert refused == [] and written == 2      # one flag, two sheets
 
     again = import_master(path, comp)
-    assert again.riders[rider.key].checked_in is True
     assert again.riders[rider.key].not_starting is True
-    # and untickable again: the cell is cleared, not left saying SI
+    # and clearable again: the cell is emptied, not left saying SI
     E.write_back(path, comp, again, [
-        Patch(target=rider.key, op="set_checked_in", value=False)], store=store)
-    assert import_master(path, comp).riders[rider.key].checked_in is False
+        Patch(target=rider.key, op="set_not_starting", value=False)], store=store)
+    assert import_master(path, comp).riders[rider.key].not_starting is False
 
 
 def test_the_licence_check_says_so_when_the_file_has_no_column(store, comp,
@@ -391,7 +390,7 @@ def test_the_licence_check_says_so_when_the_file_has_no_column(store, comp,
     assert E.check_in_columns(bare) == ()
 
     written, refused = E.write_back(path, bare, el, [
-        Patch(target=rider.key, op="set_checked_in", value=True)], store=store)
+        Patch(target=rider.key, op="set_not_starting", value=True)], store=store)
     assert written == 0 and len(refused) == 1
     assert rider.full_name in refused[0]
 
@@ -438,7 +437,7 @@ def test_np_rider_is_excluded_from_entries(iscritti_path, comp):
     assert len(el.entered("AL", "keirin")) == before - 1
 
 
-# ── licence check: partenti are ticked, NP is separate ──────────────────────
+# ── licence check: a specialità is the tick, NP is separate ────────────────
 
 def _rider(key, cat="AL", events=(), **kw):
     return Rider(key=key, cat=cat, bib=int(key), last_name=key.upper(),
@@ -451,20 +450,25 @@ def _list(*riders):
 
 
 def test_verifica_progress_counts_what_is_left():
-    el = _list(_rider("1", checked_in=True), _rider("2"),
-               _rider("3", not_starting=True), _rider("4", cat="DA", checked_in=True))
+    """Verified is "has at least one specialità" - there is no tick to count."""
+    el = _list(_rider("1", events=[("omnium", True)]), _rider("2"),
+               _rider("3", not_starting=True),
+               _rider("4", cat="DA", events=[("keirin", False)]))
     p = check_in_progress(el)
     assert (p.entries, p.verificati, p.missing, p.not_starting) == (3, 2, 1, 1)
     assert p.done is False
-    assert check_in_progress(el, "DA").done is True  # only rider 4, ticked
+    # rider 4 is entered as a riserva only, and that is still a decision taken
+    assert check_in_progress(el, "DA").done is True
 
 
-def test_verificato_is_a_patch_and_survives_reimport(store, iscritti_path, comp):
+def test_verificato_is_the_specialita_and_survives_reimport(store,
+                                                            iscritti_path, comp):
+    """The specialità entered in verifica is what makes a rider verified."""
     el = import_master(iscritti_path, comp)
-    key = next(r.key for r in el.by_cat("ES") if r.bib)
+    key = next(r.key for r in el.by_cat("ES") if r.bib and not r.events)
     save_import(store, el)
-    save_overlay(store, [Patch(target=key, op="set_verificato", value=True,
-                               reason="verifica licenze")])
+    save_overlay(store, [Patch(target=key, op="set_event", field="omnium",
+                               value="X", reason="iscritto in verifica")])
     save_import(store, import_master(iscritti_path, comp))
     eff, stale = effective_entries(store, comp)
     assert stale == []
@@ -473,12 +477,23 @@ def test_verificato_is_a_patch_and_survives_reimport(store, iscritti_path, comp)
     assert eff.riders[key].not_starting is False
 
 
-def test_verificato_does_not_filter_the_entry_list(iscritti_path, comp):
+def test_an_old_verificato_patch_is_read_and_dropped(store, iscritti_path, comp):
+    """An overlay from before still loads: the op means nothing, and is not stale."""
     el = import_master(iscritti_path, comp)
-    before = len(el.entered("AL", "keirin"))
-    for r in el.riders.values():
-        r.checked_in = False
-    assert len(el.entered("AL", "keirin")) == before
+    key = next(r.key for r in el.by_cat("ES") if r.bib)
+    save_import(store, el)
+    save_overlay(store, [Patch(target=key, op="set_verificato", value=True,
+                               reason="verifica licenze")])
+    eff, stale = effective_entries(store, comp)
+    assert stale == []
+
+
+def test_verificato_does_not_filter_the_entry_list(iscritti_path, comp):
+    """Nobody drops off a startlist for not being verified: only NP does that."""
+    el = import_master(iscritti_path, comp)
+    before = el.entered("AL", "keirin")
+    assert before and all(r.checked_in for r in before)  # they are, by entering
+    assert len(el.entered("AL", "keirin")) == len(before)
 
 
 # ── event-count limit (STP comunicato 016) ──────────────────────────────
@@ -627,7 +642,6 @@ def test_reimporting_the_flat_export_keeps_what_the_jury_typed(store,
               reason="dorsale corretto"),
         Patch(target=key, op="set_field", field="region", value="CAMPANIA",
               reason="regione mancante nel file"),
-        Patch(target=key, op="set_checked_in", value=True),
     ])
 
     save_import(store, E.import_entries(ksport_path, comp))
@@ -635,7 +649,8 @@ def test_reimporting_the_flat_export_keeps_what_the_jury_typed(store,
     assert stale == []
     rider = eff.riders[key]
     assert rider.events["keirin"].starter is True
-    assert (rider.bib, rider.region, rider.checked_in) == (201, "CAMPANIA", True)
+    assert (rider.bib, rider.region) == (201, "CAMPANIA")
+    assert rider.checked_in is True          # it has a specialità now
     assert eff.entered("AL", "keirin") == [rider]
 
 
@@ -666,3 +681,60 @@ def test_an_entry_the_programme_does_not_run_is_reported(comp):
     assert "keirin" not in comp.events_for("ES")
     found = [i for i in validate_entries(el, comp) if i.code == "event_not_run"]
     assert len(found) == 1 and "Keirin" in found[0].message
+
+
+# ── how many ride in a squadra: the number this race was given ─────────────
+
+def _team_riders(n: int, event: str = "ins_squadre"):
+    return [Rider(key=str(i), cat="AL", bib=i, last_name=f"R{i}",
+                  region="TOSCANA",
+                  events={event: EventEntry(starter=True, pair=1)})
+            for i in range(1, n + 1)]
+
+
+def test_the_squadre_are_built_to_the_size_this_race_rides():
+    """Four in an inseguimento a squadre - unless the programme says otherwise.
+
+    The regulation's number is what nearly every programme rides and it is
+    nowhere in the file; a categoria authorised to field one fewer says so on
+    its race, and the check-in has to count to *that* (`Competition.team_size`).
+    """
+    from conftest import programme_path
+    from core.config import load_competition
+
+    comp = load_competition(programme_path())
+    el = _list(*_team_riders(4))
+    build_teams_and_pairs(el, comp)
+    assert len(el.teams) == 1 and not el.errors
+
+    comp.scheduled("AL", "ins_squadre").team_size = 3
+    build_teams_and_pairs(el, comp)
+    assert len(el.errors) == 1
+    assert "3" in el.errors[0], el.errors[0]
+
+# ── the open categories: one race, several licences ─────────────────────────
+
+def test_an_open_takes_in_the_licences_it_is_ridden_by():
+    from core import catalogue as C
+    from core.config import Competition
+
+    comp = Competition(categories={c: C.category(c, i) for i, c
+                                   in enumerate(("OM", "OF", "JU"))})
+    # EL, UN and every master ride the open; the sex decides which one
+    assert comp.category_of("EL", "M") == "OM"
+    assert comp.category_of("UN", "M") == "OM"
+    assert comp.category_of("DE", "F") == "OF"
+    assert comp.category_of("DU", "F") == "OF"
+    assert comp.category_of("M40", "M") == "OM"
+    assert comp.category_of("M40", "F") == "OF"
+    # a categoria the programme runs is itself, and one it does not is left be
+    assert comp.category_of("JU", "M") == "JU"
+    assert comp.category_of("AL", "M") == "AL"
+
+
+def test_a_categoria_that_is_not_open_takes_in_nobody_else():
+    from core import catalogue as C
+
+    assert C.category("JU").takes("JU")
+    assert not C.category("JU").takes("EL")
+    assert C.category("OM").takes("M2") and C.category("OM").takes("EL")

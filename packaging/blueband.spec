@@ -76,7 +76,7 @@ for package in ("streamlit", "pandas", "numpy", "pyarrow", "altair", "pydeck",
 # an oversight: they are three quarters of the installed size and they are what
 # `st.dataframe` and `st.data_editor` are made of. Doing without them meant
 # hand-writing the tables and the grids, and the result was worse to use than
-# the widgets - so the size is paid on purpose (see `docs/BUILD.md`).
+# the widgets - so the size is paid on purpose (see `docs/reference/build.md`).
 #
 # What is excluded is only what a *scientific* working environment drags along
 # and no jury laptop needs. Build in a clean virtual environment anyway: this

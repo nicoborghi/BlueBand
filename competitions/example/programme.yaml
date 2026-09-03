@@ -61,6 +61,10 @@ events:
     name: CHILOMETRO DA FERMO
     short: Chilometro
     order: 5
+  derny:
+    name: DERNY
+    short: Derny
+    order: 6
 
 # ── quote di iscrizione (comunicato STP) ────────────────────────
 quotas:
@@ -129,6 +133,12 @@ programme:
     day: 1
     rounds:
       - {key: Finale, seq: 5, start: "10:20", docs: []}
+  # il derny: si chiama al traguardo, giro per giro (pagina Gare -> Passaggi)
+  - cat: JU
+    event: derny
+    day: 1
+    rounds:
+      - {key: Finale, seq: 6, distance: 13, laps: 40, start: "10:40", docs: [partenti, risultati, classifica]}
   - cat: JU
     event: madison
     day: 1
@@ -276,3 +286,9 @@ communiques:
   # ── giorno 1 ──────────────────────────────────────────────
   - {n: 83, day: 1, cat: ED, event: omnium, round: Corsa a Punti, doc: risultati, title: ED Omnium Corsa a Punti - Risultati}
   - {n: 84, day: 1, cat: ED, event: omnium, round: "", doc: classifica, title: ED Omnium - Classifica}
+
+  # il derny: la lista partenti va pubblicata come ogni altra, e la classifica
+  # chiude la specialità (i giri sono quelli della fase, sopra)
+  - {n: 85, day: 1, cat: JU, event: derny, round: Finale, doc: partenti, title: JU Derny Finale - Partenti}
+  - {n: 86, day: 1, cat: JU, event: derny, round: Finale, doc: risultati, title: JU Derny Finale - Risultati}
+  - {n: 87, day: 1, cat: JU, event: derny, round: "", doc: classifica, title: JU Derny - Classifica}

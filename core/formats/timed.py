@@ -27,8 +27,18 @@ FINALS = [(2, 3), (0, 1)]
 
 def timed_classification(entrants: list[str], times: dict[str, int], *,
                          statuses: dict[str, Status] | None = None,
-                         qualification: dict[str, int] | None = None) -> Result:
-    """Rank entrants by time (ms, ascending). Missing times are left pending."""
+                         qualification: dict[str, int] | None = None,
+                         order: list[str] | None = None) -> Result:
+    """Rank entrants by time (ms, ascending). Missing times are left pending.
+
+    `order` is the **start order** (`race.start_order`), and it is what the
+    ones still to be timed are listed in. While a chilometro is being ridden
+    the sheet is half a classifica and half a list of who is still to go, and
+    that half is read at the track: in entry order it says nothing, in start
+    order it says who is on the line next. Whoever the grid does not place
+    keeps the entry order, at the bottom, so nothing disappears from the sheet
+    because the composition is unfinished.
+    """
     statuses = dict(statuses or {})
     warnings: list[str] = []
 
@@ -46,6 +56,9 @@ def timed_classification(entrants: list[str], times: dict[str, int], *,
             pending.append(e)
 
     timed_.sort(key=lambda e: (times[e], e))
+    if order:
+        seq = {e: i for i, e in enumerate(order)}
+        pending.sort(key=lambda e: (seq.get(e, len(seq)), entrants.index(e)))
     placings = [Placing(key=e, status=statuses.get(e, Status.OK),
                         data=data_for(e)) for e in timed_ + pending + out]
 
@@ -127,7 +140,7 @@ def finals_classification(final_heats: list[list[str]],
       time they rode, and that is the time the sheet carries.
 
     `qual_out` are the squadre the qualification did not classify - DNS, DSQ,
-    DNF. They never reach the finals, but the classification of the specialità
+    DNF. They never reach the finals, but the classification of the event
     is the sheet that files the decision taken on them: they print at the
     bottom, with their status and no place, like every other non-classified.
     """

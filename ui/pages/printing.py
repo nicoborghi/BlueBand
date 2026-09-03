@@ -7,7 +7,7 @@ comunicato number:
 * one event across the categories that contest it,
 * everything scheduled on one day,
 * exactly what one comunicato number publishes,
-* one sheet per squadra, and the tabella specialità of the whole meeting.
+* one sheet per squadra, and the tabella event of the whole meeting.
 
 `render_register` is the register itself: what is planned, what has gone out.
 It reads the programme and the comunicati, not the entry list, so it is the one
@@ -28,7 +28,7 @@ from core import entries as E
 from core import race as R
 from core import recap as RC
 from core.config import (DOC_CLASSIFICATION, DOC_RESULTS, DOC_STARTLIST,
-                         EVENT_ENTRY_LIST, Competition)
+                         EVENT_ENTRY_LIST, Competition, is_pause)
 from core.i18n import help_text, label, ui
 from core.store import Store
 from render import documents as D
@@ -49,7 +49,7 @@ MODES = [BY_CATEGORY, BY_EVENT, BY_DAY, BY_COMMUNIQUE, BY_TEAM,
 #: The batches that publish what the register says, not a pick of documents.
 FIXED_DOCS = (BY_COMMUNIQUE, BY_TEAM, SPECIALITY_TABLE)
 
-#: The batches whose sheets carry a column per specialità, and so a choice
+#: The batches whose sheets carry a column per event, and so a choice
 #: between the UCI sigla and the short name at the head of it.
 EVENT_HEADED = (BY_TEAM, SPECIALITY_TABLE)
 
@@ -74,9 +74,9 @@ def render(competition: str, comp: Competition, store: Store) -> None:
         # riepilogo is one sheet per squadra: picking the kinds again here
         # would be a second, contradictory answer
         disabled=mode in FIXED_DOCS)
-    # only the two sheets with a column per specialità have anything to head
+    # only the two sheets with a column per event have anything to head
     short_headers = mode in EVENT_HEADED and st.sidebar.checkbox(
-        ui("short_headers"), key="stp_short_heads",
+        ui("short_headers"), value=True, key="stp_short_heads",
         help=help_text("short_headers"))
 
     docs = _build(mode, comp, el, store, docs_wanted, font,
@@ -115,10 +115,12 @@ def _build(mode: str, comp: Competition, el, store: Store,
                                    short_headers=short_headers)]
     day = st.sidebar.selectbox(ui("day"), comp.days(), key="stp_day")
     out = []
-    # by fase, so a specialità split over two giornate is printed on both - and
+    # by fase, so an event split over two giornate is printed on both - and
     # each race once, however many of its fasi are ridden that day
     seen: list[tuple[str, str]] = []
     for item, _rnd in comp.rounds_on(day):
+        if is_pause(item):
+            continue        # time the giornata is not racing: nothing to print
         if (item.cat, item.event) in seen:
             continue
         seen.append((item.cat, item.event))
@@ -148,10 +150,26 @@ def _team_recaps(comp: Competition, el, store: Store, font: int, *,
     all_of_them = ui("all_f")
     pick = st.sidebar.selectbox(ui("team"), [all_of_them, *names],
                                 key="stp_team", help=help_text("team_recap"))
+    # the sheet is handed over before the verifica as often as after it, and
+    # then it is what the events are collected on: the grid comes with
+    # every column of the categorie, ruled off where the categoria changes
+    all_events = st.sidebar.checkbox(ui("all_event_columns"), value=True,
+                                     key="stp_recap_all_ev",
+                                     help=help_text("all_event_columns"))
+    uci_id = st.sidebar.checkbox(ui("show_column", name=label("uci_id")),
+                                 value=True, key="stp_recap_uci")
+    tail = D.recap_tail(group)
+    show_tail = st.sidebar.checkbox(ui("show_column", name=label(tail)),
+                                    key="stp_recap_tail")
+    rule_cats = st.sidebar.checkbox(ui("rule_categories"), value=True,
+                                    key="stp_recap_rule",
+                                    help=help_text("rule_categories"))
     # read once for the whole batch: every saved race is opened to find it
     heats = RC.heat_index(store, comp, el)
     docs = [D.team_recap(el, comp, name, group=group, heats=heats,
-                         font_size=font, short_headers=short_headers)
+                         font_size=font, short_headers=short_headers,
+                         all_events=all_events, show_tail=show_tail,
+                         uci_id=uci_id, rule_categories=rule_cats)
             for name in (names if pick == all_of_them else [pick])]
     if len(docs) > 1:
         # one file carries the whole pile, and `out_name` names it after the
@@ -326,7 +344,7 @@ def _register_range(rows: list[dict]) -> list[dict]:
     """The stretch of numbers being printed.
 
     A championship register runs to 140 entries over four days, and what a
-    jury reprints is usually a handful of them - the ones of the specialità
+    jury reprints is usually a handful of them - the ones of the event
     just finished. One slider, and it says which numbers are on the sheet.
     """
     numbers = [r["n"] for r in rows if r["n"]]

@@ -31,5 +31,23 @@
  "DU": {
   "sex": "F",
   "name": {"it": "UNDER 23 FEMMINE", "en": "UNDER 23 WOMEN"}
+ },
+ "EL": {
+  "sex": "M",
+  "name": {"it": "ELITE MASCHI", "en": "ELITE MEN"}
+ },
+ "DE": {
+  "sex": "F",
+  "name": {"it": "ELITE FEMMINE", "en": "ELITE WOMEN"}
+ },
+ "OM": {
+  "sex": "M",
+  "name": {"it": "OPEN MASCHI", "en": "OPEN MEN"},
+  "accepts": ["EL", "UN", "M*"]
+ },
+ "OF": {
+  "sex": "F",
+  "name": {"it": "OPEN FEMMINE", "en": "OPEN WOMEN"},
+  "accepts": ["DE", "DU", "M*"]
  }
 }

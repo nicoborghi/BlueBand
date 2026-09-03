@@ -4,11 +4,11 @@ One question, asked at the end of every championship - *how did we do* - and
 one honest answer. The count is built from what the jury has actually filed,
 never from a guess:
 
-* a **specialità is counted once**, on its final classification. Which race
+* a **event is counted once**, on its final classification. Which race
   that is depends on the format: an omnium, a velocità and a keirin are
   decided across every round (`race.*_standings`), everything else on the last
   round the programme lists that has a result;
-* a specialità whose last round is still empty is **not concluded** and is
+* an event whose last round is still empty is **not concluded** and is
   reported as such rather than counted from a qualifying round. The caller
   decides whether to include it (a championship read at the end of day one is
   half provisional, and the jury knows it);
@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 
 from . import race as R
 from . import recap as RC
-from .config import Competition
+from .config import EVENT_ENTRY_LIST, Competition, is_pause
 from .formats.base import Result
 from .i18n import label
 from .models import EntryList, Status
@@ -41,7 +41,7 @@ MEDALS = (1, 2, 3)
 
 @dataclass
 class Podium:
-    """One podium place of one specialità, with the squadra behind it."""
+    """One podium place of one event, with the squadra behind it."""
 
     cat: str
     event: str
@@ -83,7 +83,7 @@ class TeamMedals:
         return (-self.gold, -self.silver, -self.bronze, self.team.lower())
 
 
-# ── the final classification of one specialità ──────────────────────────────
+# ── the final classification of one event ──────────────────────────────
 
 #: Formats decided across every round rather than on the last one.
 AGGREGATE = ("omnium", "sprint", "keirin")
@@ -123,7 +123,7 @@ def final_result(store, comp: Competition, el: EntryList, cat: str,
                  event: str) -> tuple[Result | None, str, bool]:
     """(classification, round it came from, whether the event is concluded).
 
-    `None` when the specialità has no result at all. The event is concluded
+    `None` when the event has no result at all. The event is concluded
     when the last round of its programme is the one that placed the field:
     anything earlier means the jury has more racing to run, and the standings
     are still provisional.
@@ -234,7 +234,7 @@ def names_of(key: str, el: EntryList, cat: str, state=None) -> list[str]:
     """Who is on this place - the riders the race classified, and only them.
 
     For a quartetto or a coppia this is **the line-up of the race that decided
-    the specialità**, exactly as that race's own classification prints it
+    the event**, exactly as that race's own classification prints it
     (`race.team_lineup`): the riders who rode it, then - marked `(ris)` - the
     rider a reserve took the place of, who is on the sheet because he rode the
     qualification and earned the squadra its time. A reserve entered and never
@@ -276,15 +276,15 @@ def placing_keys(state, comp: Competition, el: EntryList) -> dict[str, str]:
 class Survey:
     """What one reading of the competition found.
 
-    Both halves come out of the same pass: the podiums, and the specialità
+    Both halves come out of the same pass: the podiums, and the event
     that are not concluded. Reading it twice would mean loading every race of
     the championship twice, on a page the jury opens between two races.
     """
 
     places: list[Podium] = field(default_factory=list)
-    #: (categoria, specialità, whether anything at all has been filed)
+    #: (categoria, event, whether anything at all has been filed)
     open_events: list[tuple[str, str, bool]] = field(default_factory=list)
-    counted: int = 0        # specialità concluded and counted
+    counted: int = 0        # event concluded and counted
 
 
 def survey(store, comp: Competition, el: EntryList, *,
@@ -294,7 +294,7 @@ def survey(store, comp: Competition, el: EntryList, *,
     """Read the whole competition once: podiums, and what is still open.
 
     `cats` and `events` restrict what is read (None = all of them);
-    `include_unfinished` keeps the specialità whose last round has not been
+    `include_unfinished` keeps the event whose last round has not been
     ridden yet, their places marked `complete=False`.
     """
     # A madison is scored by the number the jury gave the coppia in its setup
@@ -310,12 +310,17 @@ def survey(store, comp: Competition, el: EntryList, *,
     out = Survey()
     seen: set[tuple[str, str]] = set()
     for item in comp.programme:
+        # the pausa of a giornata is on the programme and is not an event:
+        # counted here it took a line of "non ancora concluse" on every
+        # medagliere printed at a meeting whose programme has a break in it
+        if is_pause(item) or item.event == EVENT_ENTRY_LIST:
+            continue
         if cats is not None and item.cat not in cats:
             continue
         if events is not None and item.event not in events:
             continue
         if (item.cat, item.event) in seen:
-            continue        # a specialità is read once, not once per round
+            continue        # an event is read once, not once per round
         seen.add((item.cat, item.event))
         result, where, complete = final_result(store, comp, el,
                                                item.cat, item.event)
@@ -324,7 +329,7 @@ def survey(store, comp: Competition, el: EntryList, *,
         if result is None or (not complete and not include_unfinished):
             continue
         out.counted += 1
-        # the race that decided the specialità: who rode it - a riserva who
+        # the race that decided the event: who rode it - a riserva who
         # took a place, the rider she replaced - is on it and nowhere else
         deciding = (store.load_race(R.race_key(item.cat, item.event, where))
                     if where else None)
@@ -378,7 +383,7 @@ def ranked(table: list[TeamMedals]) -> list[tuple[int, TeamMedals]]:
 
 def unfinished(store, comp: Competition, el: EntryList,
                **kw) -> list[tuple[str, str, bool]]:
-    """(categoria, specialità, has any result) of what is not concluded yet.
+    """(categoria, event, has any result) of what is not concluded yet.
 
     What the medagliere is *not* counting, so a jury reading a table that
     looks short can see why in one glance.

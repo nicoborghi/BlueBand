@@ -45,6 +45,7 @@ FIELDS = {
     "sex": "Sesso",
     "birth_date": "Nato/a il",
     "certificate_date": "Certificato",
+    "reserve_entry": "Riserva",
     "checked_in": "Ver.",
     "not_starting": "NP",
     "n_events": "N.sp",
@@ -86,6 +87,9 @@ RACE = {
     "reserve_short": "ris",       # marks the rider a reserve replaced
     "final": "Finale",
     "champion_team": "SQUADRA CAMPIONE D'ITALIA",
+    # art. 9: chi vince il Trofeo delle Regioni è campione d'Italia come
+    # Comitato Regionale, non come atleta - la fascia è quella e nessun'altra
+    "champion_region": "COMITATO REGIONALE CAMPIONE D'ITALIA SU PISTA",
     "champion_m": "CAMPIONE D'ITALIA",
     "champion_f": "CAMPIONESSA D'ITALIA",
     # velocità: two runs and a decider that is often not ridden
@@ -104,6 +108,10 @@ RACE = {
     "team_en": "Team",           # the entrant a rider rides for, on a sheet
     "general_classification": "CLASSIFICA GENERALE",
     "final_classification": "Classifica Finale",
+
+    # derny: the chart is read by laps, and a lost one is an asterisk
+    "laps_down": "Giri persi",
+
 }
 
 
@@ -170,6 +178,17 @@ DOCS = {
     "medal_silver": "Argento",
     "medal_bronze": "Bronzo",
     "podium_detail_title": "PODI",
+    # la classifica del Trofeo delle Regioni: il medagliere conta le medaglie,
+    # questa conta i punti del regolamento, prova per prova
+    "trofeo_table_title": "CLASSIFICA TROFEO DELLE REGIONI",
+    "trofeo_table_slug": "classifica-trofeo",
+    "trofeo_detail_title": "PUNTEGGI PROVA PER PROVA",
+    "trofeo_points": "Punti",
+    "trofeo_placing_points": "Piazz.",
+    "trofeo_participation": "Partec.",
+    "trofeo_starters": "Partenti",
+    "trofeo_wins": "Vittorie",
+    "trofeo_placings": "Piazzamenti",
     "programme_title": "PROGRAMMA GARE",
     "programme_slug": "programma",
     "programme_start": "Ora",
@@ -180,6 +199,7 @@ DOCS = {
     "entry_list_slug": "iscritti",
     "startlist_slug": "partenti",
     "register_slug": "registro-comunicati",
+    "letterhead_slug": "foglio-intestato",
     "document_slug": "documento",
 }
 
@@ -193,7 +213,7 @@ STATUSES = {
     "ABD": "ABD",          # sceso di sua volontà
     "DNS": "DNS",          # non partito
     "DSQ": "DSQ",          # squalificato
-    "NP": "NP",            # non partente (dichiarato prima della gara)
+    "NS": "NP",            # non partente (dichiarato prima della gara)
     "W": "W",              # ammonizione: la porta con sé nelle fasi successive
 }
 
@@ -203,7 +223,7 @@ STATUS_NAMES = {
     "ABD": "Sceso",
     "DNS": "Non partito",
     "DSQ": "Squalificato",
-    "NP": "Non partente",
+    "NS": "Non partente",
     "W": "Ammonito",
 }
 
@@ -213,6 +233,16 @@ STATUS_NAMES = {
 # The four degrees a penalty is given in (`core.decisions.CLASSES`), in
 # increasing gravity. The letter is what the jury writes and what the UCI
 # tables use; this is what it means.
+
+#: Come si chiama una prova quando il suo nome deve stare in una intestazione
+#: di colonna. Le chiavi sono il vocabolario del programma (`formats.omnium`),
+#: non etichette: qui c'è solo quello che per esteso non ci sta - «Punti
+#: Eliminazione» mangia la colonna accanto, «Punti Elim.» no. Una prova che non
+#: è qui si stampa com'è scritta.
+ROUNDS_SHORT = {
+    "Eliminazione": "Elim.",
+}
+
 
 PENALTIES = {
     "A": "Ammonizione",
@@ -258,6 +288,8 @@ CODES = {
     "quota_club": "Quota società",
     "quota_club_region": "Quota società per squadra",
     "quota_teams": "Quota squadre",
+    "quota_cat": "Quota categoria",
+    "quota_teams_cat": "Quota squadre categoria",
     "round_no_day": "Fase senza giornata",
     "cat_no_event": "Categoria senza specialità",
     "day_empty": "Giornata vuota",
@@ -332,13 +364,11 @@ UI = {
     "state_all": "Tutti",
     "state_todo": "Da verificare",
     "state_done": "Verificati",
-    "state_np": "NP",
+    "state_ns": "NP",
     "checks_summary": "Controlli - {errors} da risolvere, {warnings} avvisi",
     "stp_exemptions": "Deroghe autorizzate STP: {list}",
     "edit_reason": "Motivo della modifica (obbligatorio)",
     "save_edits": "Salva modifiche",
-    "mark_verified": "Segna verificati i {n} atleti filtrati",
-    "check_in_reason": "verifica licenze",
     "edits_recorded": "Modifiche registrate ({n})",
     "undo_last_edit": "Annulla l'ultima modifica",
     "edit_when": "quando",
@@ -367,10 +397,13 @@ UI = {
     "mode_by_team": "Per squadra",
     "mode_speciality_table": "Tabella specialità",
     "short_headers": "Nomi brevi al posto delle sigle",
+    "all_event_columns": "Una colonna per ogni specialità",
+    "show_column": "Mostra {name}",
+    "rule_categories": "Separa le categorie con una linea",
     "communique_carries": "Comunicato {n} · {title} — {docs}",
     "row_number": "Numero di riga",
     "event_matrix": "Matrice specialità",
-    "include_np": "Includi NP",
+    "include_ns": "Includi NP",
     "include_reserves": "Includi riserve",
     "only_verified": "Solo verificati",
     "minimal_columns": "Colonne essenziali",
@@ -612,9 +645,64 @@ UI = {
     "save_medals_pdf": "Salva il medagliere in PDF",
     "stats_print_detail": "Stampa anche i podi",
     "stats_no_printed_at": "Senza «Emesso il…»",
+    "trofeo_table": "Classifica Trofeo delle Regioni",
+    "trofeo_detail": "Punteggi, prova per prova",
+    "trofeo_scale": "Tabella punti",
+    "trofeo_scale_final": "Finale nazionale (art. 9)",
+    "trofeo_scale_qualifying": "Prova di qualificazione (art. 8)",
+    "trofeo_total": "Totale",
+    "trofeo_champion": "Campione",
+    "trofeo_teams_scored": "Squadre a punti",
+    "trofeo_points_awarded": "Punti assegnati",
+    "trofeo_print_detail": "Stampa anche i punteggi prova per prova",
+    "save_trofeo_pdf": "Salva la classifica Trofeo in PDF",
+    "trofeo_download": "⬇ Scarica CSV",
 
     # -- programme ("Programma") ---------------------------------------------
     "prog_tab_competition": "Gara",
+    "prog_tab_check": "Verifica",
+    "prog_tab_checks": "Controlli",
+    "check_cat": "Categoria",
+    "check_event": "Specialità",
+    "check_unit": "Conta",
+    "check_per": "Per",
+    "check_max": "Max",
+    "check_level": "Livello",
+    "check_reserves": "Riserve",
+    "check_note": "Articolo",
+    "check_any": "Tutte",
+    "check_unit_riders": "atleti",
+    "check_unit_teams": "squadre",
+    "check_unit_pairs": "coppie",
+    "check_unit_events": "specialità",
+    "check_per_region": "rappresentativa",
+    "check_per_club": "società",
+    "check_per_club_in_region": "società nella rappresentativa",
+    "check_per_cat": "categoria",
+    "check_per_rider": "atleta",
+    "check_level_error": "errore",
+    "check_level_warn": "avviso",
+    "check_level_off": "spento",
+    "checks_migrate": "Converti le vecchie quote in regole",
+    "date": "Data",
+    "count_categories": "Categorie",
+    "count_rounds": "Fasi",
+    "count_days": "Giornate",
+    "count_riders": "Atleti iscritti",
+    "event_minutes": "Durata (min)",
+    "day_begin": "Inizio",
+    "day_end": "Fine",
+    "ready_dates": "Le date della manifestazione",
+    "ready_events": "Ogni categoria ha le sue specialità",
+    "ready_events_no": "{n} categorie senza specialità: {list}",
+    "ready_days": "Ogni fase è su una giornata",
+    "ready_days_no": "{n} fasi non sono su nessuna giornata",
+    "ready_clock": "Ogni giornata ha un'ora di inizio",
+    "ready_clock_no": "Giornate senza ora di inizio: {list}",
+    "ready_register": "Il registro dei comunicati è pianificato",
+    "ready_register_no": ("Il registro è indietro sul programma: {n} righe "
+                          "cambierebbero (Giornate → Ricalcola i numeri)"),
+    "ready_entries": "L'elenco iscritti è stato creato",
     "entry_format": "Formato del file",
     "entry_upload": "File iscritti (.xls / .xlsx)",
     "entry_read": "Letti {n} atleti · {cats}",
@@ -623,6 +711,17 @@ UI = {
     "entry_bibs_by_cat": "1…N per categoria, di seguito",
     "entry_bibs_by_cat_restart": "Da 1 per ogni categoria",
     "entry_build": "Crea l'elenco della manifestazione",
+    "entry_import_first": "Importa l'elenco iscritti",
+    "map_columns": "⇄ Mappa le colonne",
+    "map_columns_save": "Salva la mappatura",
+    "map_columns_none": "— nessuna —",
+    "entry_import_open": "Importa un elenco corretto",
+    "entry_replace": "Sostituisci l'elenco",
+    "entry_delta_added": "Nuovi",
+    "entry_delta_removed": "Non più iscritti",
+    "entry_delta_changed": "Modificati",
+    "entry_delta_kept": "Spunte conservate",
+    "entry_delta_detail": "Dettaglio ({n})",
     "entry_book_here": "Elenco della manifestazione: `{path}`",
     "entry_book_sync": "↻ Aggiorna al programma",
     "prog_tab_categories": "Categorie, specialità e giornate",
@@ -635,6 +734,10 @@ UI = {
     "competition_short": "Sigla",
     "competition_id": "ID FCI",
     "competition_location": "Sede",
+    "competition_kind": "Tipo di manifestazione",
+    "kind_championship": "Campionato",
+    "kind_ordinary": "Ordinaria",
+    "kind_trofeo_regioni": "Trofeo delle Regioni",
     "track_len": "Lunghezza pista (km)",
     "dates": "Date (una per giornata, separate da virgola)",
     "dates_hint": "2026-09-05, 2026-09-06",
@@ -652,8 +755,40 @@ UI = {
                               "(un omnium senza scratch parte dall'eliminazione).",
     "round_ridden": "In gara",
     "running_order": "N.",
+    "pick": "•",
+    "move_whole_race": "Muovi tutta la gara",
+    "move_to_day": "Sposta a giornata…",
+    "move_go": "Sposta",
+    "picked_n": "{n} fasi selezionate",
+    "title_join": " e ",
+    "number_on_classification": "Numera solo la classifica",
+    "communique_rules": "Regole dei comunicati",
+    "recount": "Ricalcola i numeri",
+    "recount_go": "Applica i numeri",
+    "recount_regroup": "Rifà anche gli accorpamenti",
+    "recount_this_day": "Solo la giornata {day}",
+    "recount_what": "Cosa",
+    "recount_was": "Ora",
+    "recount_now": "Diventa",
+    "recount_why": "Perché non si muove",
+    "recount_more": "…e altri {n}.",
+    "recount_moved": "si sposta",
+    "recount_added": "nuovo",
+    "recount_dropped": "esce dal registro",
+    "recount_held": "resta",
+    "held_issued": "già emesso",
+    "held_pinned": "scritto a mano",
+    "held_ret": "annullato",
+    "sheet_on": "comunicato {n}",
+    "sheet_carried": "il numero si stampa sull'altro foglio",
+    "sheet_unnumbered": "nessun comunicato",
+    "rides_with": "Esce insieme a…",
+    "rides_with_go": "Accorpa",
+    "rides_alone": "esce da solo",
+    "rides_alone_go": "Staccalo dal comunicato",
     "composition_round": "{name}: la compone la giuria in Gare, prima che si corra.",
-    "round_start_optional": "Ora (facoltativa)",
+    "round_duration": "Durata",
+    "day_start": "Inizio delle prove",
     "round_start_hint": "14:30",
     "round_sheet_note": "Nota sull'ordine di partenza",
     "round_sheet_note_hint": "Si stampa sull'ordine di partenza",
@@ -682,8 +817,7 @@ UI = {
     "events": "Specialità",
     "events_settings_edit": "Che cos'è ogni specialità",
     "save_events": "💾 Salva le specialità",
-    "sheet_lines": "Righe dei comunicati",
-    "sheet_lines_edit": "Come sono scritte",
+    "sheet_lines": "Note dei comunicati di default",
     "sheet_lines_language": "Nella lingua della manifestazione: {language}.",
     "save_sheet_lines": "💾 Salva le righe",
     "restore_sheet_lines": "↩ Torna a quelle predefinite",
@@ -708,11 +842,6 @@ UI = {
     "docs_classification": "Classifica sull'ultima fase di ogni specialità",
     "docs_repechages": "Fogli dei recuperi (velocità e keirin)",
     "docs_keep_edited": "Non toccare le fasi già cambiate a mano",
-    "propose_register_go": "Proponi i numeri",
-    "register_entry_lists": "Elenchi iscritti in testa alla giornata",
-    "register_ahead": "Ordini di partenza in anticipo",
-    "register_classification": "Classifica con la fase che chiude la specialità",
-    "register_follow": "Rinumera anche le giornate successive",
     "com_partenti": "Com. partenti",
     "com_risultati": "Com. risultati",
     "com_classifica": "Com. classifica",
@@ -720,9 +849,12 @@ UI = {
     "merge_communiques": "⇄ Un solo comunicato",
     "show_communiques": "Numeri dei comunicati",
     "show_race_line": "Km, giri e volate",
+    "mark_issued": "Evidenzia",
+    "issued_tint": "Colore",
     "communiques_left_caption": "Quello che esce in questa giornata e non è una "
                                 "fase della scaletta qui sopra.",
     "n_km": "{n} km",
+    "n_minutes": "{n}′",
     "n_laps": "{n} giri",
     "n_sprints": "{n} volate",
     "laps_derived": "{km} km su una pista di {track} m sono {laps} giri.",
@@ -744,8 +876,6 @@ UI = {
                                   "sono lo stesso foglio**: è così che un "
                                   "comunicato porta un ordine di partenza e una "
                                   "classifica insieme.",
-    "propose_register": "Proponi dalla programmazione",
-    "renumber_all": "Rinumera tutto 1..N",
     "register_range": "comunicati {first}-{last} ({n} documenti)",
 
     # -- settings ("Impostazioni") ------------------------------------------
@@ -764,9 +894,57 @@ UI = {
     "file": "File",
     "modified": "Modificato",
     "appearance": "Aspetto dei comunicati",
+    "fonts": "Caratteri",
+    "font_element": "Elemento",
+    "font_value": "Carattere",
+    "font_color": "Colore",
+    "font_default": "Predefinito",
+    "font_sample": "Trofeo di Esempio - 1ª prova",
+    "set": "Imposta",
+    "restore_all_defaults": "↩ Ripristina tutti i valori predefiniti",
+    "font_family": "Tutto il foglio (famiglia)",
+    "font_title": "Titolo",
+    "font_subtitle": "Sottotitolo",
+    "font_table_title": "Titolo di tabella",
+    "font_info": "Riga informazioni",
+    "font_legend": "Legenda",
+    "font_communique": "Riquadro «Comunicato n.»",
+    "font_printed_at": "Data di stampa",
+    "font_decision": "Riquadro della decisione",
+    "font_decision_tag": "Dicitura della decisione",
+    "font_signature_label": "Dicitura «Per la giuria»",
+    "font_signature": "Firma",
+    "font_body": "Testo del foglio intestato",
+    "font_footline": "Riga a piè di pagina",
     "letterhead": "Testata e piè di pagina",
+    "communique_align": "Numero di comunicato",
+    "sheet_slots": "Righe di testata e piè",
+    "docs_letterhead": "Foglio intestato",
+    "letterhead_title": "Titolo",
+    "letterhead_subtitle": "Sottotitolo",
+    "letterhead_text": "Testo",
+    "slot_head": "Sotto la testata",
+    "slot_foot": "Sopra il piè di pagina",
+    "slot_left": "A sinistra",
+    "slot_center": "Al centro",
+    "slot_right": "A destra",
+    "slot_none": "-",
+    "slot_communique": "Comunicato n.",
+    "slot_printed_at": "Emesso il",
+    "head_gap": "Spazio sopra (mm)",
+    "foot_gap": "Spazio sotto (mm)",
     "header_img": "Testata",
     "footer_img": "Piè di pagina",
+    "image_fit": "Come sta nel foglio",
+    "fit_page": "Adatta alla pagina",
+    "fit_size": "Dimensione e allineamento",
+    "image_width": "Larghezza (% del foglio)",
+    "image_align": "Allineamento",
+    "header_top": "Distanza dal bordo superiore (mm)",
+    "footer_bottom": "Distanza dal bordo inferiore (mm)",
+    "align_left": "A sinistra",
+    "align_center": "Centrato",
+    "align_right": "A destra",
     "save_named": "Salva {what}",
     "advanced": "Impostazioni avanzate",
     "signature": "Firma",
@@ -800,6 +978,9 @@ UI = {
     "option_heats": "Batterie di qualificazione",
     "option_eliminate": "Eliminati per batteria",
     "option_qualify": "Qualificati alle finali",
+    "option_team_size": "Atleti per squadra",
+    "add_pause": "➕ Aggiungi una pausa",
+    "pause_text": "Testo della pausa",
     "edited_fields": "modificati a mano: {list}",
     "setup_title": "Nuova manifestazione",
     "setup_intro": "Costruiamo il programma",
@@ -828,12 +1009,16 @@ UI = {
     "export_xlsx": "Esporta Excel",
     "credit": "Released under the GPLv3 License © 2026 {name}",
     "programme_print": "Foglio programma",
-    "programme_times": "Colonna ora",
-    "programme_merge_round": "Specialità e fase in una colonna",
-    "programme_merge_results": "Risultati e classifica in una colonna",
+    "prog_sheet_columns": "Colonne",
+    "prog_sheet_merge": "Colonne unite",
+    "prog_sheet_issued": "Comunicati emessi",
+    "prog_sheet_layout": "Impaginazione",
+    "programme_times": "Ora",
+    "programme_durations": "Durata",
+    "programme_merge_round": "Specialità e fase",
+    "programme_merge_results": "Risultati e classifica",
+    "programme_bold_final": "Classifiche finali in grassetto",
     "save_programme_pdf": "Salva il programma in PDF",
-    "freeze_numbering": "Congela i numeri dei comunicati",
-    "pinned_count": "{n} fissati a mano",
     "reset_event": "Azzera una gara",
     "reset_confirm": "Confermo: cancella {n} gare di {cat} · {event}",
     "reset_with_results": " ({n} con risultati)",
@@ -848,6 +1033,40 @@ UI = {
     "col_last_saved": "Ultimo salvataggio",
     "yes_short": "sì",
     "none_short": "-",
+
+    # -- derny: the call, the chart, the lap times ---------------------------
+    "derny_view": "Vista",
+    "derny_board": "Passaggi",
+    "derny_log": "Cronologico",
+    "derny_stats": "Statistiche",
+    "derny_call": "Numero al traguardo",
+    "derny_start": "Via",
+    "derny_start_at": "Partenza {at}",
+    "derny_start_clear": "Togli partenza",
+    "derny_undo": "Annulla ultimo numero",
+    "derny_standings": "Classifica provvisoria",
+    "derny_lap_n": "G{n}",
+    "derny_lap": "Giro",
+    "derny_clock": "Ora",
+    "derny_lap_time": "Sul giro",
+    "derny_sigma": "Deviazione dalla media (σ)",
+    "derny_mean": "media",
+    "derny_sd": "σ",
+    "derny_laps_ridden": "giri",
+    "derny_delete": "Elimina",
+    "derny_flagged": "{n} giri fuori soglia",
+    "derny_start_time": "Ora di partenza",
+    "derny_row_no": "Prog.",
+    "derny_splits": "Parziali",
+    "derny_insert": "Inserisci un passaggio",
+    "derny_insert_do": "Inserisci",
+    "derny_prev_lap": "Passaggio giro precedente",
+    "derny_laps_left": "{n} giri rimanenti",
+    "derny_over": "Arrivo: il primo ha tagliato, la classifica è chiusa",
+    "derny_after_row": "Dopo la riga n.",
+    "derny_lap_axis": "N. giro",
+    "laps_down_column": "Colonna giri persi",
+
 }
 
 
@@ -858,11 +1077,28 @@ UI = {
 # not a search through ui/. Compose several with `help_text("a", "b")`.
 
 HELP = {
+    "check_cat": ("La categoria a cui si applica la regola. «Tutte» quando "
+                  "l'articolo non distingue."),
+    "check_event": ("La specialità a cui si applica. «Tutte» per una regola "
+                    "che vale sull'intera manifestazione - il numero massimo "
+                    "di specialità per atleta è così."),
+    "check_unit": ("Che cosa viene contato: atleti iscritti, squadre, coppie "
+                   "di madison, oppure specialità - l'unica cosa che si conta "
+                   "per atleta."),
+    "check_per": ("Per che cosa si conta: rappresentativa, società, società "
+                  "dentro una rappresentativa, o l'intera categoria."),
+    "check_max": "Quanti se ne possono avere. 0 spegne la regola.",
+    "check_level": ("Come viene riportato lo sforamento: errore (rosso), "
+                    "avviso, o spento. Nessuno dei due blocca il lavoro."),
+    "check_reserves": ("Se le riserve contano nel totale. Di norma no: si "
+                       "contano i partenti."),
+    "check_note": ("Da dove viene la regola - «Art. 4 reg. TR 2026». Viene "
+                   "stampata in coda al rilievo."),
     # -- notation ------------------------------------------------------------
     "bibs_csv": "Dorsali separati da virgola.",
     "teams_pick": "Si sceglie la squadra, non il dorsale.",
-    "status_dns": ("Non partiti: non hanno preso il via. Non compaiono in "
-                   "classifica, restano solo come nota sotto la tabella."),
+    "status_dns": ("Non partiti: non hanno preso il via. Restano in fondo "
+                   "alla classifica con la sigla DNS, come i ritirati."),
     "status_dnf": ("Ritirati: partiti, non arrivati. Tengono i punti fatti e "
                    "si scrivono nell'ordine in cui lasciano la gara: l'ultimo "
                    "che lascia è il primo dei ritirati."),
@@ -884,7 +1120,7 @@ HELP = {
     "heat_notation_same": "Stessa notazione: `/` separa le batterie.",
     "laps_csv": ("Dorsali separati da virgola. Un dorsale ripetuto conta un "
                  "giro per volta: `3, 3` = due giri."),
-    "elimination_order": "Il primo eliminato è l'ultimo in classifica.",
+    "elimination_order": ("Il primo eliminato è l'ultimo in classifica. Si scrivono tutti, vincitore compreso: è l'ultimo dorsale della riga. Chi non viene scritto resta senza piazzamento."),
     "time_format": "Tempo in m:ss,mmm.",
     "unridden_final": ("Come si chiude la finale se non viene disputata. "
                        "«Pari merito»: le due si classificano insieme al "
@@ -963,6 +1199,16 @@ HELP = {
     "time_column": "I tempi restano sui risultati di ogni fase.",
     "bib_column": "Aggiunge il dorsale «classico» accanto al numero di coppia.",
     "font_pdf": "Corpo del testo nel PDF da stampare.",
+    "font_color": ("Il colore con cui l'elemento si stampa. Il titolo e il "
+                   "riquadro «Comunicato n.» seguono il colore della "
+                   "manifestazione: cambiandolo qui smettono di seguirlo, e "
+                   "Ripristina predefinita li rimette in riga."),
+    "font_element": ("Che cosa si sta componendo: il titolo, il sottotitolo, "
+                     "il riquadro di una decisione. «Tutto il foglio» è la "
+                     "famiglia di caratteri di ogni comunicato."),
+    "restore_all_defaults": ("Cancella da settings.json tutte le scelte di "
+                             "questa sezione: si torna ai fogli come li "
+                             "stampa l'app appena installata."),
     "font_screen": ("Solo l'anteprima qui sotto: è la pagina che legge lo "
                     "speaker durante la gara."),
     "landscape": ("Più spazio per le colonne, ma su un foglio orizzontale il "
@@ -978,8 +1224,8 @@ HELP = {
                    "e dà alla giuria un riferimento da indicare sul foglio."),
     "event_matrix": ("Colonne a destra con le sigle delle specialità e la X di "
                      "chi vi è iscritto."),
-    "only_verified": ("Stampa solo chi ha passato la verifica licenze (spunta "
-                      "Ver. nella pagina Verifica)."),
+    "only_verified": ("Stampa solo chi ha passato la verifica licenze (almeno "
+                      "una specialità inserita nella pagina Verifica)."),
     "draft": ("Foglio provvisorio: al posto del numero di comunicato stampa un "
               "riquadro arancione NON DEFINITIVO, e il file si salva come "
               "bozza_."),
@@ -1013,6 +1259,15 @@ HELP = {
                    "sola, una colonna per specialità con X, R o la lettera "
                    "dell'accoppiamento e, dove la giuria l'ha già composta, "
                    "la batteria."),
+    "all_event_columns": ("Stampa la colonna di ogni specialità che le "
+                          "categorie della squadra corrono, anche dove non "
+                          "risulta ancora nessun iscritto: è il foglio che si "
+                          "consegna prima della verifica per raccogliere le "
+                          "specialità a mano. Spento, restano solo le colonne "
+                          "in cui qualcuno è già iscritto."),
+    "rule_categories": ("Traccia una linea dove cambia la categoria, "
+                        "così un foglio con quattro categorie si legge a "
+                        "blocchi invece che come un elenco unico."),
     "short_headers": ("Intesta le colonne delle specialità con il nome breve "
                       "(«Ins. Individuale», «Madison») invece della sigla UCI "
                       "(«IP», «MD»). Si legge senza legenda, ma le colonne "
@@ -1057,11 +1312,12 @@ HELP = {
                          "fase per fase."),
 
     # -- check-in ------------------------------------------------------------
-    "checked_in": "Licenza verificata: l'atleta è presente.",
+    "checked_in": ("Verificato: la giuria ha inserito almeno una specialità. "
+                   "Non c'è una spunta da mettere, basta scrivere cosa corre."),
     "not_starting": "Non partente: non prende parte alle gare.",
     "n_events": "Specialità come titolare{reserves}.",
     "n_events_reserves": " o riserva",
-    "edit_reason": "Le spunte Ver./NP non richiedono un motivo.",
+    "edit_reason": "La spunta NP non richiede un motivo.",
     "event_flag": "{event}: X iscritto, R riserva",
     "event_flag_group": ("{event}: X iscritto, R riserva; una lettera "
                          "(A, B, C, ...) la {what} della regione, la stessa "
@@ -1081,6 +1337,19 @@ HELP = {
                             "medagliere si ristampa tutto il giorno: senza data "
                             "e ora due copie identiche restano identiche. Il "
                             "numero di pagina resta."),
+    "trofeo_table": ("La classifica per regione del regolamento Trofeo delle "
+                     "Regioni: i primi dieci di ogni prova prendono i punti "
+                     "della tabella, più 1 punto di partecipazione per ogni "
+                     "atleta, squadra o coppia madison che prende il via. A "
+                     "parità: più gare vinte, più punti partecipazione, "
+                     "miglior punteggio nell'ultima prova in programma."),
+    "trofeo_scale": ("Art. 9 per la finale nazionale (14-12-10-8-6-5-4-3-2-1), "
+                     "art. 8 per le prove di qualificazione "
+                     "(10-9-8-7-6-5-4-3-2-1). Il punto di partecipazione è lo "
+                     "stesso in entrambe."),
+    "trofeo_print_detail": ("Sul foglio, sotto la classifica, il punteggio di "
+                            "ogni regione in ogni prova: una riga si verifica "
+                            "sui comunicati senza riaprire l'app."),
 
     # -- programme -----------------------------------------------------------
     "save_programme": ("Riscrive `programme.yaml`. La versione precedente resta "
@@ -1090,12 +1359,6 @@ HELP = {
                         "di ogni foglio: una riga per fase, nell'ordine in cui "
                         "si corre. È il foglio che sta sul tavolo della "
                         "giuria."),
-    "freeze_numbering": ("Acceso, i numeri restano quelli che sono. Spento, si "
-                         "rinumerano da soli a ogni modifica del programma - "
-                         "prima gli ordini di partenza, poi i risultati, fase "
-                         "per fase. Un numero scritto a mano non si muove più, "
-                         "e uno già emesso nemmeno: quel foglio è in mano alle "
-                         "squadre."),
     "reload_programme": "Butta via le modifiche non salvate e rilegge il file.",
     "track_len": ("Da qui si calcolano i giri di ogni distanza che non li "
                   "dichiara."),
@@ -1108,6 +1371,9 @@ HELP = {
     "team_size": "Atleti che schiera una squadra (0 se è individuale).",
     "per_start": ("Quanti partono insieme in una fase a cronometro: 2 "
                   "l'inseguimento, 1 la velocità a squadre e i 200 m."),
+    "event_minutes": ("Quanto dura una fase di questa specialità, in minuti. "
+                      "È la durata che vale quando una fase non ne dichiara "
+                      "una sua, e da lì escono gli orari della giornata."),
     "entry_columns": ("Come si chiama la colonna nel file iscritti, se non "
                       "coincide col nome. Più varianti separate da virgola."),
     "restore_sheet_lines": ("Cancella le righe riscritte in questa lingua: "
@@ -1131,15 +1397,55 @@ HELP = {
                             "che corre una categoria che non ha quattro "
                             "squadre. In tutti e due i casi si sceglie qui "
                             "accanto se si parte a due o a uno alla volta."),
-    "repropose": ("Rifà le fasi dal regolamento, tenendo le tue note e le ore "
-                  "di partenza. Quello che avevi corretto a mano torna alla "
+    "pause_text": ("Quello che viene stampato sul foglio programma, in "
+                   "corsivo, nella colonna della specialità - una pausa non "
+                   "è una gara e si legge come tale. Vuoto vale «Pausa»."),
+    "option_team_size": ("Quanti atleti schiera ogni squadra in questa "
+                         "gara. Il numero proposto è quello del regolamento "
+                         "per la specialità - quattro nell'inseguimento a "
+                         "squadre, tre nella velocità a squadre - e si cambia "
+                         "solo dove questa categoria è autorizzata a correre "
+                         "con un numero diverso. È il numero su cui si "
+                         "compongono le squadre alla verifica e su cui la "
+                         "giuria viene avvisata al velodromo."),
+    "repropose": ("Rifà le fasi dal regolamento, tenendo le tue note e le "
+                  "durate. Quello che avevi corretto a mano torna alla "
                   "proposta."),
-    "round_start": ("Ora di partenza della fase, sul foglio programma. Non è "
-                    "il tempo di gara: quello sta nei risultati."),
+    "round_start": ("Ora di partenza della fase, sul foglio programma. Non si "
+                    "scrive: è l'inizio della giornata più le durate di quello "
+                    "che corre prima. Non è il tempo di gara: quello sta nei "
+                    "risultati."),
+    "scaletta_pick": ("Spunta le fasi da spostare, poi usa le frecce qui "
+                      "sotto. La selezione resta anche dopo lo spostamento, "
+                      "così si sposta di tre posti premendo tre volte."),
+    "move_whole_race": ("Spunta una fase sola e si muove tutta la sua "
+                        "specialità, nell'ordine in cui è - anche le fasi che "
+                        "stanno dall'altra parte della giornata."),
+    "scaletta_top": "In cima alla giornata.",
+    "scaletta_up": "Su di un posto.",
+    "scaletta_down": "Giù di un posto.",
+    "scaletta_bottom": "In fondo alla giornata.",
+    "round_duration": ("Quanto dura la fase, in minuti. È da qui che esce "
+                       "l'orario di tutta la giornata. Vuota vale quanto dura "
+                       "di solito quella specialità (Impostazioni → "
+                       "Specialità), come per la distanza: quello che scrivi "
+                       "qui è la correzione."),
+    "day_start": ("L'ora in cui si comincia: l'unica che si decide. Tutte le "
+                  "altre vengono da questa più le durate, e non esiste un "
+                  "orario scritto sulla singola fase - sarebbe una seconda "
+                  "origine, ed è quello che faceva sembrare le durate inutili. "
+                  "Vuota, la giornata non ha orari: è quello che è giusto "
+                  "stampare finché non si sanno."),
     "new_competition": ("Crea una cartella sotto `competitions/` e ci apre "
                         "dentro la costruzione del programma. Il nome è quello "
                         "della cartella, non del campionato: corto, senza "
                         "spazi - CITA26."),
+    "competition_kind": ("Se la manifestazione assegna titoli. In un campionato "
+                         "le classifiche stampano SQUADRA CAMPIONE D'ITALIA "
+                         "sotto il quartetto e CAMPIONE / CAMPIONESSA D'ITALIA "
+                         "sotto chi vince la specialità; in una manifestazione "
+                         "ordinaria non si stampa nulla - c'è un vincitore, non "
+                         "un campione. Vale su tutte le classifiche."),
     "track_len_m": ("In metri: 250, 333.33, 400. Da qui escono i giri di ogni "
                     "distanza e quante coppie tiene la madison."),
     "add_categories": ("Le categorie di sempre, già pronte: sigla, nome e "
@@ -1198,13 +1504,36 @@ HELP = {
     "show_communiques": ("Mostra nella scaletta il numero di comunicato di "
                          "ordine di partenza, risultati e classifica, e li "
                          "lascia scrivere lì."),
+    "mark_issued": ("Colora nella scaletta le celle dei comunicati già "
+                    "emessi, come li ha registrati la giuria: il foglio dice "
+                    "da solo a che punto è la giornata. Da spegnere per la "
+                    "copia da affiggere."),
+    "issued_tint": ("Il colore con cui sono evidenziati i comunicati già "
+                    "emessi. Tenue: il foglio si legge per i numeri."),
     "show_race_line": ("Mostra accanto a ogni specialità che cosa si corre: "
                        "chilometri, giri e volate, come vengono dalla pista "
                        "quando la fase non li dichiara."),
-    "entry_format": ("In che forma è arrivato il file. «ksport» è l'export "
-                     "federale, una riga per atleta; «per categorie» è il "
-                     "foglio già impaginato, quello che questa pagina "
-                     "produce."),
+    "programme_bold_final": ("Stampa in grassetto il numero della "
+                             "classifica finale, quella che chiude la "
+                             "specialità. Le classifiche parziali - le "
+                             "prove di un omnium - restano in tondo."),
+    "programme_times": ("La colonna «Ora»: l'inizio della giornata più le "
+                        "durate di quello che corre prima. Vuota se la "
+                        "giornata non ha un'ora di inizio."),
+    "programme_durations": ("La colonna «Durata»: quanto dura ogni fase. È "
+                            "quello che si legge quando la giornata si sta "
+                            "ancora pianificando; sul foglio da attaccare in "
+                            "bacheca di solito si toglie."),
+    "entry_format": ("In che forma è arrivato il file. «Export federale» è "
+                     "quello del sistema della federazione - Fattore K o "
+                     "ksport, è lo stesso file - una riga per atleta; «per "
+                     "categorie» è il foglio già impaginato, quello che questa "
+                     "pagina produce. L'intestazione la trova da sé, con o "
+                     "senza testata sopra."),
+    "map_columns": ("Dice quale colonna del file è quale campo di Blue Band. "
+                    "Da usare quando il file chiama le cose a modo suo o mette "
+                    "un dato dove non te lo aspetti - la squadra dentro "
+                    "«Note», il dorsale in una colonna senza nome."),
     "entry_upload": ("Il file che manda la federazione. Viene copiato nella "
                      "cartella della manifestazione: è la prova di che cosa è "
                      "stato ricevuto."),
@@ -1216,6 +1545,25 @@ HELP = {
                         "adesso. Dorsali, spunte e iscrizioni alle specialità "
                         "restano: il file viene riletto prima di essere "
                         "riscritto."),
+    "number_on_classification": ("Quando i risultati di una fase e la "
+                                 "classifica escono sullo stesso comunicato "
+                                 "il numero si stampa solo sulla classifica, "
+                                 "e i risultati non ne portano: un numero, un "
+                                 "foglio. Spenta, lo portano entrambi."),
+    "recount": ("Rifà i numeri dal programma, nell'ordine in cui i fogli "
+                "possono uscire, girando intorno a quelli già emessi, scritti "
+                "a mano o annullati. Prima ti mostra che cosa cambia."),
+    "recount_regroup": ("Rilegge anche quali fogli viaggiano insieme, secondo "
+                        "le regole in Manifestazione: due fogli che avevi "
+                        "separato tornano su un comunicato solo. Spento, gli "
+                        "accorpamenti restano come sono e cambiano solo i "
+                        "numeri."),
+    "rides_alone_go": ("Dà a questo foglio un comunicato suo, con il primo "
+                       "numero libero. È l'operazione inversa di «esce "
+                       "insieme a…»."),
+    "rides_with": ("Manda questo foglio sul comunicato di un altro: un numero, "
+                   "due documenti. È quello che fa una velocità ogni turno - "
+                   "risultati e partenti dei recuperi sullo stesso foglio."),
     "assign_docs": ("Riscrive i documenti di ogni fase del programma secondo il "
                     "regolamento. È il modo di non spuntarli a mano trenta "
                     "volte."),
@@ -1228,18 +1576,6 @@ HELP = {
     "docs_keep_edited": ("Lascia stare le fasi che dichiarano documenti "
                          "diversi da quelli del regolamento: sono scelte che "
                          "qualcuno ha già fatto."),
-    "register_entry_lists": ("Un elenco iscritti per ogni categoria che corre "
-                             "quel giorno, in testa alla giornata: escono "
-                             "prima che si corra qualsiasi cosa."),
-    "register_ahead": ("Quanti ordini di partenza escono prima che si corra: "
-                       "sono le fasi che aprono la giornata, quelle che "
-                       "nessun risultato compone. A CITA26 sono 5."),
-    "register_classification": ("Altrimenti le classifiche non entrano nel "
-                                "registro: si numerano a mano."),
-    "register_follow": ("Una giornata che guadagna o perde fogli sposta tutto "
-                        "quello che viene dopo. Spento, le giornate successive "
-                        "restano dove sono - e due fogli possono finire con lo "
-                        "stesso numero."),
     "running_order": ("Il posto della fase nella giornata: scrivi il numero e "
                       "la scaletta si riordina intorno, rinumerata da 1. Se ne "
                       "possono scrivere più d'uno prima di applicare: la "
@@ -1274,11 +1610,6 @@ HELP = {
                           "due documenti sullo stesso foglio."),
     "communique_doc": "Quale foglio della fase.",
     "ret": "Comunicato annullato: il numero resta occupato e stampa «N RET».",
-    "propose_register": ("Propone un comunicato per ogni documento previsto "
-                         "dalle gare di oggi. È una proposta da riordinare: "
-                         "l'ordine vero intreccia le specialità."),
-    "renumber_all": ("Rinumera 1..N tutti i comunicati, nell'ordine in cui "
-                     "stanno. Attenzione se ne hai già emessi."),
 
     # -- settings ------------------------------------------------------------
     "competition_folder": ("Cartella dati sotto `competitions/`. Si sceglie una "
@@ -1294,11 +1625,82 @@ HELP = {
                         "sempre cambiarla sul singolo foglio."),
     "header_img": "Banner in cima al comunicato: manifestazione, sede e date.",
     "footer_img": "Striscia in fondo al foglio: sponsor, loghi federali.",
+    "image_fit": ("*Adatta alla pagina* stampa l'immagine larga quanto il "
+                  "foglio, da bordo a bordo: è quello che vuole una testata "
+                  "disegnata apposta. Un logo ha proporzioni sue e stirato su "
+                  "un A4 non si guarda: dagli una dimensione e un lato."),
+    "image_width": ("Quanto è larga l'immagine, in percentuale della larghezza "
+                    "del foglio. Vale su A4 verticale e orizzontale."),
+    "image_align": "Su quale lato del foglio sta l'immagine.",
+    "letterhead_title": ("Il titolo in testa al foglio, come su una classifica. "
+                         "Vuoto: il nome della manifestazione."),
+    "letterhead_subtitle": ("La riga sotto il titolo, più piccola: a che cosa "
+                            "si riferisce il foglio."),
+    "letterhead_text": ("Il testo del foglio. Si scrive in markdown: **grassetto**, "
+                        "*corsivo*, `# titolo`, elenchi con «- ». Una riga vuota "
+                        "separa i paragrafi. Tutto il resto è testo: quello che si "
+                        "scrive qui non diventa mai codice sul foglio."),
+    "sheet_slots": ("Che cosa stampare sulla riga sotto la testata e su "
+                    "quella sopra il piè di pagina: un elemento per ogni "
+                    "posizione, o niente. Vale per tutti i comunicati della "
+                    "manifestazione."),
+    "head_gap": ("Quanta aria lasciare fra il bordo superiore del foglio - o "
+                 "la testata, se c'è - e la prima riga stampata."),
+    "foot_gap": ("Quanta aria lasciare fra l'ultima riga stampata e il bordo "
+                 "inferiore del foglio, o il piè di pagina se c'è. Il margine "
+                 "che il foglio riserva al piè cresce di altrettanto."),
+    "communique_align": ("Dove sta il riquadro «Comunicato n.» in testa al "
+                         "foglio: a destra come sui quaderni di giuria, "
+                         "centrato sotto la testata o a sinistra."),
+    "header_top": ("Quanta carta bianca resta sopra la testata. Zero la manda "
+                   "a filo del bordo, come è disegnata una testata; un logo di "
+                   "solito vuole un po' d'aria sopra."),
+    "footer_bottom": ("Quanta carta bianca resta sotto il piè di pagina. Il "
+                      "margine che il foglio gli riserva cresce di altrettanto, "
+                      "quindi la tabella non ci finisce mai sopra."),
     "language": ("In che lingua sono scritti l'app, i comunicati e i fogli "
                  "stampati. È un'impostazione di questa manifestazione: "
                  "programma, elenco iscritti e gare non vengono toccati - i "
                  "nomi di categorie, specialità e fasi stanno nel programma e "
                  "si stampano come sono scritti lì."),
+
+    "derny_call": "Un pulsante per partente: premilo quando il numero taglia "
+                  "il traguardo e il passaggio è registrato con l'orario. "
+                  "\"?\" è il passaggio visto senza leggere il numero. Solo "
+                  "chi è tra i partenti ha un pulsante; un passaggio da "
+                  "aggiungere a mano si inserisce dal Cronologico.",
+    "derny_start": "Segna l'istante del via: da lì si misura il primo giro. "
+                   "Senza, il primo tempo è quello del secondo passaggio.",
+    "derny_board": "Una colonna per giro, nell'ordine in cui i numeri sono "
+                   "stati chiamati. In grigio chiaro il giro che un attardato "
+                   "non ha fatto, dove sarebbe passato; in rosso il numero "
+                   "nella colonna in cui rientra, che è dove il giro si è "
+                   "perso; in giallo il giro il cui tempo esce dalla soglia.",
+    "laps_down_column": "Stampa sulla classifica la colonna dei giri persi. "
+                        "Di norma spenta: se nessuno è stato doppiato è una "
+                        "colonna di zeri.",
+    "derny_log": "Tutti i passaggi nell'ordine in cui sono stati chiamati, il "
+                 "primo per primo. È l'unica cosa salvata: correggi qui "
+                 "dorsali e orari, aggiungi righe in fondo o eliminale con il "
+                 "cestino, e tutto il resto viene ridisegnato.",
+    "derny_bib_cell": "Il dorsale chiamato. \"?\" se il giudice d'arrivo ha "
+                      "visto passare qualcuno senza leggere il numero.",
+    "derny_insert": "Rimette un passaggio dove è avvenuto: il dorsale (anche "
+                    "\"?\") e il progressivo della riga dopo la quale entra.",
+    "derny_prev_lap": "Ripete il giro precedente per intero nel giro "
+                      "successivo: gli stessi numeri, nello stesso ordine, "
+                      "tutti alla stessa ora. Serve quando il gruppo passa "
+                      "compatto e non c'è il tempo di premere dieci pulsanti.",
+    "derny_unknown_call": "Passaggio visto senza leggere il numero: tiene il "
+                          "posto nella colonna e non è il giro di nessuno, "
+                          "finché non gli dai un dorsale nel Cronologico.",
+    "derny_insert_at": "L'ora del passaggio. Si apre su quella della riga "
+                       "scelta in «Dopo la riga n.» — o su quella di partenza "
+                       "se entra in testa — e si corregge a mano.",
+    "derny_sigma": "Quante deviazioni standard un tempo sul giro può stare "
+                   "dalla media dell'atleta prima di essere segnalato. "
+                   "Media e σ si calcolano dal terzo tempo disponibile.",
+
 }
 
 
@@ -1310,11 +1712,14 @@ HELP = {
 
 MSG = {
     # -- programme / configuration ------------------------------------------
+    # the default text of a pause in the running order: it is only a default,
+    # and what prints is whatever the giuria types over it
+    "pause": "Pausa",
+    "pause_added": "Pausa «{text}» di {minutes}′ aggiunta.",
     "no_programme": "'{name}' non contiene un programme.yaml.",
     "no_competitions": "Nessuna manifestazione in {path}",
     "cfg_no_categories": "Nessuna categoria definita.",
     "cfg_no_events": "Nessuna specialità definita.",
-    "cfg_no_columns": "Nessuna colonna dichiarata in `entries.columns`.",
     "cfg_bad_track_len": "track_len non valido.",
     "cfg_unknown_cat": "Programma: categoria sconosciuta '{cat}'.",
     "cfg_unknown_event": "Programma: specialità sconosciuta '{event}'.",
@@ -1332,7 +1737,7 @@ MSG = {
 
     # -- entry list: reading the workbook ------------------------------------
     "xls_sheet_missing": "Foglio '{sheet}' assente dal file iscritti.",
-    "xls_no_ksport": "Foglio 'KSPORT' assente: dati federali non integrati.",
+    "xls_no_ksport": "Foglio '_KSPORT' assente: dati federali non integrati.",
     "xls_column_missing": "[{cat}] colonna '{column}' assente in riga {row}.",
     "xls_unknown_event_column": "[{cat}] colonna specialità sconosciuta: {column}.",
     "xls_duplicate_rider": "[{cat}] atleta duplicato (riga {row}): {name} {key}.",
@@ -1346,6 +1751,9 @@ MSG = {
                        "KSPORT (iscrizione aggiunta a mano): {who}{more}"),
     "flat_column_missing": ("Colonna '{header}' ({field}) assente nel file "
                             "iscritti: il dato non è stato importato."),
+    "flat_field_unmapped": ("{field}: nessuna colonna del file è mappata su "
+                            "questo campo. «⇄ Mappa le colonne», in Programma "
+                            "→ Gara."),
 
     # -- entry list: teams and pairs -----------------------------------------
     "team_loose_x": ("{where}: {n} atleti con X fuori dalle squadre ({bibs}): "
@@ -1384,6 +1792,9 @@ MSG = {
     "quota_club_region": ("[{cat} {event}] {region}: {n} atleti della stessa "
                           "società {club} (max {max}) - dorsali {bibs}."),
     "quota_teams": "[{cat} {event}] {region}: {n} squadre/coppie (max {max}).",
+    "quota_cat": "[{cat} {event}] {n} atleti iscritti (max {max}).",
+    "quota_teams_cat": ("[{cat} {event}] {n} squadre/coppie iscritte "
+                        "(max {max})."),
     "over_event_limit": "Oltre il limite di specialità ({limits}): {who}",
     "limit_of": "{cat} max {n}",
 
@@ -1412,8 +1823,6 @@ MSG = {
 
     # -- races: what the page says while a race is being entered -------------
     "pages_need_entries": ("Verifica, Documenti, Gare, Decisioni e Statistiche si aprono quando c'è un elenco iscritti: si crea in Programma → Gara."),
-    "import_entries_in_settings": ("Nessun elenco iscritti: importalo in "
-                                   "Impostazioni → Elenco iscritti."),
     "entries_caption": ("Il file della federazione non viene mai modificato. "
                         "Ricaricalo quando ne arriva uno nuovo: le modifiche "
                         "fatte qui (dorsali, squadre, specialità) sono "
@@ -1425,6 +1834,9 @@ MSG = {
     "no_riders_for_filter": "Nessun atleta con questi filtri.",
     "no_riders_for_selection": "Nessun atleta per questa selezione.",
     "no_documents_for_selection": "Nessun documento per questa selezione.",
+    "teams_half_verified": ("Verifica iniziata ma non finita: {n} atleti di una "
+                            "{what} con altri già verificati non hanno ancora "
+                            "nessuna specialità.\n\n{list}"),
     "stale_patches": "Modifiche non più applicabili dopo il re-import:\n\n{list}",
     "overlay_off": ("La Verifica scrive direttamente nel file iscritti. Le {n} "
                     "modifiche già registrate restano da parte e non vengono "
@@ -1446,7 +1858,6 @@ MSG = {
     "no_edits_to_save": "Nessuna modifica da salvare.",
     "reason_required": "Indica il motivo della modifica.",
     "edits_saved": "{n} modifiche registrate.",
-    "riders_verified": "{n} atleti verificati.",
     "entries_imported": "Importati {n} atleti da {file}.",
     "file_not_found": "File non trovato",
     "source_changed": "Il file è cambiato dall'ultimo import",
@@ -1563,6 +1974,44 @@ MSG = {
     "entry_book_read_nothing": ("Il file non contiene atleti leggibili con "
                                 "questo formato. Controlla il formato scelto."),
     "entry_book_built": "Elenco creato: {n} atleti in `{path}`.",
+    "map_columns_caption": ("A sinistra i campi di Blue Band, a destra la "
+                            "colonna del file da cui leggerli. Serve quando il "
+                            "file chiama le cose a modo suo, o quando un dato "
+                            "sta in una colonna imprevista - la regione dentro "
+                            "«Note», per esempio. Vale per questa "
+                            "manifestazione e si salva nel suo programma."),
+    "map_columns_required": ("I campi con l'asterisco servono per forza: senza "
+                             "uno di quelli l'elenco non si può costruire."),
+    "map_columns_ok": "Tutte le colonne necessarie sono state trovate.",
+    "map_columns_missing": ("Colonne non trovate nel file: **{list}**. "
+                            "Mappale a mano."),
+    "map_columns_no_file": ("Carica prima il file: le colonne da scegliere "
+                            "sono le sue."),
+    "map_columns_saved": "Mappatura salvata: {n} colonne.",
+    "prog_check_caption": ("Che cosa è venuto fuori, prima di salvare: quanto "
+                           "è grande il programma, che cosa manca ancora, che "
+                           "cosa non torna, e il file come sarà su disco."),
+    "checks_caption": ("Che cosa il regolamento limita: una riga per frase "
+                       "dell'articolo sulle iscrizioni - quanti atleti, "
+                       "squadre o coppie, e per che cosa. Le regole sono "
+                       "contate sull'elenco iscritti e riportate in Verifica "
+                       "e alla verifica licenze: avvisano, non bloccano mai."),
+    "checks_none": ("Nessuna regola: le iscrizioni non vengono confrontate "
+                    "con nessun limite."),
+    "checks_count": "{n} regole attive su {tot}.",
+    "checks_legacy": ("{n} limiti sono ancora scritti nel vecchio blocco "
+                      "`quotas:` e valgono lo stesso. Convertirli li rende "
+                      "modificabili qui."),
+    "checks_migrated": "{n} limiti convertiti in regole.",
+    "prog_check_clean": ("Nessun rilievo: il programma è coerente e si può "
+                         "salvare."),
+    "entry_delta_none": ("Il file non cambia nulla: stessi atleti, stessi "
+                         "dati. Sostituire è innocuo ma inutile."),
+    "entry_delta_kept_checks": ("{n} atleti conservano l'NP già "
+                                "registrato."),
+    "entry_merge_unreadable": ("`{path}` non è leggibile come elenco della "
+                               "manifestazione: non posso dire che cosa "
+                               "cambierebbe. Spostalo altrove e reimporta."),
     "entry_book_needs_building": ("Non c'è ancora un elenco iscritti: si crea in **Programma → Gara**, dopo aver definito categorie e specialità."),
     "entry_book_synced": "`{path}` aggiornato al programma.",
     "entry_book_sync_caption": ("Da premere quando cambi categorie o "
@@ -1576,12 +2025,23 @@ MSG = {
                             "dei recuperi dove ci sono. Si scrive su **tutte "
                             "le fasi del programma** in un colpo solo."),
     "docs_assigned": "Documenti assegnati: {n} fasi cambiate.",
-    "propose_register_caption": ("I numeri della giornata {day}, nell'ordine in "
-                                 "cui i fogli escono davvero: gli elenchi "
-                                 "iscritti, poi gli ordini di partenza di chi "
-                                 "apre, poi fase per fase i risultati e subito "
-                                 "dopo l'ordine di partenza di ciò che "
-                                 "compongono."),
+    "communique_rules_caption": ("Quali fogli viaggiano sullo stesso "
+                                "comunicato. Valgono per tutta la "
+                                "manifestazione e si scrivono nel file: qui si "
+                                "dice solo dove questa gara fa diversamente "
+                                "dalla tabella dei formati."),
+    "recount_caption": ("I numeri seguono l'ordine in cui i fogli possono "
+                        "uscire. Qui sotto c'è che cosa cambierebbe: niente "
+                        "viene scritto finché non premi."),
+    "recount_counts": ("{moved} si spostano · {added} nuovi · {dropped} "
+                       "escono · {held} restano dove sono."),
+    "recount_nothing": "Niente da cambiare in questa vista.",
+    "recount_drops": ("{n} comunicati non sono più prodotti dal programma e "
+                      "verrebbero tolti. Quelli emessi, scritti a mano o "
+                      "annullati restano."),
+    "register_behind": "il registro è indietro di {n} righe sul programma",
+    "register_in_step": "il registro segue il programma",
+    "register_recounted": "Registro ricalcolato: {n} comunicati.",
     "sheet_lines_caption": ("Le righe con cui si aprono i comunicati: che cosa "
                             "qualifica una batteria, dove si schiera la prima "
                             "squadra. Vengono dal regolamento e sono uguali a "
@@ -1681,7 +2141,6 @@ MSG = {
     "decision_recap_line": "{code} dors. {bibs}",
     "decision_recap_note": "nota",
     # the line under a classifica that no longer lists them
-    "dns_note": "Non partiti: {bibs}.",
     # the speaker's banner over a race against the clock
     "provisional_time": "{n} tempo provvisorio",
 
@@ -1722,6 +2181,32 @@ MSG = {
     "letterhead_caption": ("Immagini stampate in cima e in fondo a ogni foglio "
                            "dei comunicati (SVG, PNG o JPEG). A schermo non "
                            "compaiono."),
+    "sheet_slots_caption": ("Le due righe che incorniciano la tabella: quella "
+                            "sotto la testata, sopra il titolo, e quella sopra "
+                            "il piè di pagina. Tre posizioni per riga - a "
+                            "sinistra, al centro, a destra - e un elemento in "
+                            "ognuna, o nessuno. La dicitura NON DEFINITIVO "
+                            "prende il posto del numero di comunicato."),
+    "communique_align_caption": ("Il riquadro «Comunicato n.» in testa al foglio: "
+                                 "dove sta, sopra il titolo. Vale per tutti i "
+                                 "comunicati della manifestazione, compresa la "
+                                 "dicitura NON DEFINITIVO che ne prende il posto."),
+    "fonts_caption": ("Con che carattere e in che colore è composto ogni "
+                      "elemento dei comunicati: la famiglia vale per tutto il "
+                      "foglio, il resto sono corpi (`12pt`, `1.2em`). Si "
+                      "sceglie l'elemento, si scrivono valore e colore e si "
+                      "preme Imposta."),
+    "font_default": "Predefinito: {value}",
+    "font_not_readable": ("«{value}» non è un carattere che si possa "
+                          "stampare: un corpo si scrive con la sua unità "
+                          "(`12pt`, `14px`, `1.2em`), una famiglia con i nomi "
+                          "separati da virgola."),
+    "restore_appearance_caption": ("Riporta **tutto l'aspetto dei comunicati** "
+                                   "- testata, righe, firma, nome, colori e "
+                                   "caratteri - a come esce dall'app. Non "
+                                   "tocca il programma né i comunicati già "
+                                   "salvati."),
+    "appearance_restored": "Aspetto dei comunicati ripristinato ({n} impostazioni).",
     "note_colors_caption": ("Come ogni decisione compare sul comunicato della "
                             "fase in cui è stata presa: il colore del "
                             "riquadro, e se aprirlo con il codice UCI. La "
@@ -1759,6 +2244,7 @@ MSG = {
     "yaml_categories": "categorie",
     "yaml_events": "specialità",
     "yaml_quotas": "quote di iscrizione (comunicato STP)",
+    "yaml_checks": "controlli sulle iscrizioni (regolamento)",
     "yaml_programme": "programma gare",
     "yaml_communiques": "registro comunicati",
     "communique_gaps": "Numeri non usati nel registro: {list}{more}",
@@ -1770,10 +2256,6 @@ MSG = {
     "category_without_event": "{cat}: nessuna specialità in programma.",
     "day_without_race": "Giornata {day}{date}: nessuna fase in programma.",
     "programme_count": "{races} gare  ·  {rounds} fasi  ·  {days} giornate",
-    "numbering_free": ("I numeri seguono l'ordine del programma: spostare una "
-                       "gara li rinumera. {n} fissati a mano restano dove "
-                       "sono."),
-    "numbering_frozen": "I numeri sono congelati: il programma non li tocca più.",
     "race_reproposed": "«{cat} {event}»: {n} fasi riproposte.",
     "setup_needed": ("«{name}» non ha ancora un programma. Il programma è quello "
                      "da cui esce tutto il resto: le categorie, le specialità, "
@@ -1799,7 +2281,6 @@ MSG = {
     "no_events_yet": "Nessuna specialità in programma: spuntane una sotto "
                      "una categoria.",
     "race_removed": "{cat} {event}: tolta dal programma con le sue {n} fasi.",
-    "register_proposed": "Giornata {day}: {n} comunicati proposti dalla scaletta; le giornate successive sono state rinumerate.",
     "rounds_still_loose": "{n} fasi non sono in nessuna giornata: {list}{more}",
     "declare_cats_and_events": ("Dichiara prima categorie e specialità nelle "
                                 "schede Gara e Specialità."),
@@ -1830,6 +2311,19 @@ MSG = {
                             "con il podio che risulta finora: il foglio è "
                             "provvisorio."),
     "medal_open_events": "Specialità non ancora concluse:  {list}",
+    "count_trofeo": "{events} {concluded}  ·  {teams} {team}  ·  {points} punti",
+    "trofeo_rule": ("Punti per prova: {table}.  Partecipazione: 1 punto per "
+                    "atleta, squadra o coppia madison partente.  A parità: "
+                    "più gare vinte, più punti partecipazione, miglior "
+                    "punteggio nell'ultima prova in programma."),
+    "trofeo_provisional_note": ("Le prove non ancora concluse sono contate con "
+                                "la classifica che risulta finora: il foglio è "
+                                "provvisorio."),
+    "trofeo_open_events": "Prove non ancora concluse:  {list}",
+    "trofeo_counting_unfinished": ("{n} prove non ancora concluse sono contate "
+                                   "nella classifica: è provvisoria."),
+    "trofeo_no_scores": ("Nessuna prova conclusa: la classifica del Trofeo non "
+                         "ha ancora niente da sommare."),
     "count_recap": "{riders} atleti  ·  {entries} iscrizioni",
     "recap_legend": ("Sigle specialità:  {list}.    {marks}"),
     # what the cells say - it is read whatever the columns are headed by, so
@@ -1842,4 +2336,20 @@ MSG = {
                  "società."),
     "heats_count": "{n} batterie",
     "heat_one": "1 batteria",
+
+    "derny_no_passages": "Nessun passaggio. Chiama i numeri: compaiono qui "
+                         "nell'ordine in cui li scrivi.",
+    "derny_passage_deleted": "Passaggio eliminato.",
+    "derny_unknown_bib": "Dorsale {bib} non è tra i partenti: non inserito.",
+    "derny_log_saved": "Cronologico aggiornato.",
+    "derny_passage_added": "Passaggio inserito.",
+    "derny_prev_lap_done": "Giro precedente riscritto: {n} passaggi.",
+    "derny_bad_bib": "«{bib}» non è un dorsale.",
+    "derny_bad_clock": "«{at}» non è un'ora: scrivila come 10:41:07.3.",
+    "derny_no_starters": ("Nessun partente in questa specialità: iscrivi gli "
+                          "atleti alla verifica, poi chiama i numeri."),
+    "derny_laps_mismatch": ("Giri effettivamente percorsi dal primo: {done}. "
+                            "Il programma ne prevede {planned}."),
+    "derny_needs_times": "Servono almeno {n} tempi sul giro per media e σ.",
+
 }

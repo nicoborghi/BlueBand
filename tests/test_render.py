@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from core.entries import import_master
+from core.i18n import label, ui
 from render import documents as D
 from render.render import (Column, Document, Table, archive, slugify,
                            suffix_titles, to_html)
@@ -30,6 +31,70 @@ def test_minimal_document_renders(comp):
     assert "PROVA" in html
     assert '<td class="c">2</td>' in html.replace("\n", "")
     assert "@media print" in html  # stylesheet is inlined
+
+
+def _slot_row(html: str, cls: str) -> list[str]:
+    """The three cells of one line of slots, as text, left to right."""
+    marker = f'<div class="slot-row {cls}">'
+    assert marker in html, f"no {cls} row in the sheet"
+    rest = html.split(marker, 1)[1]
+    cells = re.findall(r'<div class="slot">(.*?)</div>', rest, re.S)[:3]
+    return [_text(cell).strip() for cell in cells]
+
+
+def test_the_communique_number_sits_where_impostazioni_puts_it(comp):
+    """Right on the jury workbooks, and anywhere else the letterhead needs.
+
+    Three slots per line and the item in the one it was given: the preview
+    inside the app never reads print.css, so the cells travel on the tag.
+    """
+    import dataclasses
+
+    doc = Document(title="PROVA", communique="7", tables=[])
+    assert _slot_row(to_html(doc, comp), "head-slots") == ["", "", "Comunicato n. 7"]
+
+    centred = dataclasses.replace(
+        comp, branding=dataclasses.replace(comp.branding, head_left="none",
+                                           head_center="communique",
+                                           head_right="none"))
+    assert _slot_row(to_html(doc, centred), "head-slots") \
+        == ["", "Comunicato n. 7", ""]
+    # and the NON DEFINITIVO mark takes its place, in the same slot
+    draft = Document(title="PROVA", draft=True, tables=[])
+    assert _slot_row(to_html(draft, centred), "head-slots") \
+        == ["", "NON DEFINITIVO", ""]
+
+
+def test_a_settings_file_written_before_the_slots_keeps_its_sheet(comp):
+    """`communique_align` is what an old settings.json says; it still places it."""
+    import dataclasses
+
+    from core.config import Branding
+
+    b = Branding(communique_align="left")
+    assert b.slots("head") == ["communique", "none", "none"]
+    assert b.slots("foot") == ["none", "none", "printed_at"]
+
+    doc = Document(title="PROVA", communique="7", tables=[])
+    html = to_html(doc, dataclasses.replace(comp, branding=b))
+    assert _slot_row(html, "head-slots") == ["Comunicato n. 7", "", ""]
+
+
+def test_emesso_il_can_be_moved_like_the_communique_number(comp):
+    """The timestamp is a slot like any other - head or foot, any of the three."""
+    import dataclasses
+
+    b = dataclasses.replace(comp.branding, head_left="printed_at",
+                            head_center="none", head_right="communique",
+                            foot_left="none", foot_center="none",
+                            foot_right="none")
+    doc = Document(title="PROVA", communique="7", tables=[])
+    html = to_html(doc, dataclasses.replace(comp, branding=b))
+    left, centre, right = _slot_row(html, "head-slots")
+    assert left.startswith("Emesso il") and centre == ""
+    assert right == "Comunicato n. 7"
+    # nothing left for the foot: the line is not printed at all
+    assert 'class="foot-slots"' not in html
 
 
 def test_standalone_page_is_self_contained(comp):
@@ -105,7 +170,7 @@ def test_entry_list_hides_np_by_default(entries, comp):
         assert partenti.info == "98 partenti"
 
         # with the NP printed it is the entry list, and both counts show
-        doc = D.entry_list(entries, comp, "AL", include_np=True)
+        doc = D.entry_list(entries, comp, "AL", include_ns=True)
         assert len(doc.tables[0].rows) == 99
         assert doc.title.endswith("ELENCO ISCRITTI")
         assert doc.info == "99 iscritti / 98 partenti"
@@ -179,7 +244,7 @@ def test_document_names_follow_the_jury_convention(entries, comp):
     from core.models import RaceState
     from core.formats.base import Result
 
-    assert D.entry_list(entries, comp, "ES", include_np=True).slug == "ES_iscritti"
+    assert D.entry_list(entries, comp, "ES", include_ns=True).slug == "ES_iscritti"
     assert D.entry_list(entries, comp, "ES").slug == "ES_partenti"
     assert D.event_entry_list(entries, comp, "AL", "ins_squadre").slug \
         == "AL_ins_squadre"  # the event code keeps its own underscore
@@ -208,6 +273,80 @@ def test_footer_image_is_rendered(entries, comp):
     assert 'class="doc-footer"' in html
     assert 'class="page-footer"' in html
     assert not re.search(r'src="(?!data:)', html)
+
+
+def test_a_logo_keeps_the_width_and_the_side_it_was_given(comp):
+    """The two fits: edge to edge by default, a width and a side when asked.
+
+    A federation logo is not a letterhead drawn to A4 - stretched across the
+    sheet it is unreadable - so the size travels on the tag itself, and the
+    strip at the foot reserves only the millimetres it now takes.
+    """
+    from dataclasses import replace
+
+    from render.render import image_style
+
+    assert image_style(comp.branding, "header") == ""      # fit to the page
+    sized = replace(comp.branding, header_fit="size", header_width=40,
+                    header_align="right", footer_fit="size", footer_width=30,
+                    footer_align="left")
+    assert image_style(sized, "header") == "width:40%;margin:0 0 0 auto;"
+    assert image_style(sized, "footer") == "width:30%;margin:0 auto 0 0;"
+
+    doc = Document(title="PROVA", tables=[])
+    html = to_html(doc, replace(comp, branding=sized), page_numbers=True,
+                   standalone=True)
+    assert 'style="width:40%;margin:0 0 0 auto;"' in html
+    # the page-margin box paints the strip as a background: same width, same
+    # side, or the numbered sheets would print it differently from the others
+    assert "background-size: 30% auto" in html
+    assert "background-position: left bottom 0mm" in html
+    # and the band reserved for it follows the width it is actually printed at
+    full = to_html(doc, comp, page_numbers=True, standalone=True)
+    assert _foot_mm(html) < _foot_mm(full)
+
+
+def _foot_mm(html: str) -> int:
+    """The band the numbered sheet reserves at the foot, from its @page rule."""
+    return int(re.search(r"@page \{ margin-bottom: (\d+)mm", html).group(1))
+
+
+def test_an_image_is_held_off_its_own_edge_of_the_paper(comp):
+    """The testata from the top, the piè from the bottom - either fit.
+
+    A full-width banner may want air above it just as a logo does, so the
+    distance is asked for on its own; and the band the sheet reserves at the
+    foot grows by it, or the table would print over the strip.
+    """
+    from dataclasses import replace
+
+    from render.render import image_style
+
+    off = replace(comp.branding, header_top=12, footer_bottom=8)
+    assert image_style(off, "header") == "margin:12mm auto 0 auto;"
+    assert image_style(off, "footer") == "margin:0 auto 8mm auto;"
+
+    doc = Document(title="PROVA", tables=[])
+    html = to_html(doc, replace(comp, branding=off), page_numbers=True,
+                   standalone=True)
+    assert "background-position: center bottom 8mm" in html
+    assert _foot_mm(html) == _foot_mm(to_html(doc, comp, page_numbers=True,
+                                              standalone=True)) + 8
+
+
+def test_a_width_that_is_not_one_is_brought_back_onto_the_paper(comp):
+    """settings.json is written by anything: the bounds are held in Branding."""
+    from dataclasses import replace
+
+    from core.config import (DEFAULT_IMAGE_WIDTH, FIT_PAGE,
+                             IMAGE_OFFSET_MAX)
+
+    b = replace(comp.branding, header_fit="stretched", header_width=400,
+                header_top=-3, footer_fit="size", footer_width="x",
+                footer_align="sideways", footer_bottom=999)
+    assert b.header_fit == FIT_PAGE and b.header_width == 100.0
+    assert (b.header_top, b.footer_bottom) == (0.0, IMAGE_OFFSET_MAX)
+    assert b.image_box("footer") == (DEFAULT_IMAGE_WIDTH / 100, "center")
 
 
 def test_each_comunicato_is_a_sheet_with_its_own_letterhead(entries, comp):
@@ -672,6 +811,82 @@ def test_the_tints_are_the_competitions_to_change(comp):
     assert "--note-warning: #fef08a" in html
 
 
+def test_the_characters_are_the_competitions_to_change(comp):
+    """Set in Impostazioni: print.css states the shape, never the font."""
+    from dataclasses import replace
+
+    recoloured = replace(comp, branding=replace(
+        comp.branding, fonts={"title": "18pt", "family": "Georgia, serif"}))
+    html = to_html(Document(title="PROVA", tables=[]), recoloured)
+    assert "--font-title: 18pt" in html
+    assert "--font-family: Georgia, serif" in html
+    # what was not set keeps the default rather than printing unset
+    assert "--font-subtitle: 12pt" in html
+
+
+def test_the_colour_of_an_element_is_the_competitions_to_change(comp):
+    """Only what was changed is written: the rest keeps the fallback of the
+    stylesheet, and the titolo goes on following the letterhead."""
+    from dataclasses import replace
+
+    c = replace(comp, branding=replace(
+        comp.branding, text_colors={"title": "#ff0000", "legend": "#123456"}))
+    html = to_html(Document(title="PROVA", tables=[]), c)
+    wrapper = html.split('<div class="cmsr"')[1].split(">")[0]
+    assert "--color-title: #ff0000" in wrapper
+    assert "--color-legend: #123456" in wrapper
+    # an element nobody touched is not written onto the page at all: it keeps
+    # the fallback print.css states for it
+    assert "--color-info" not in wrapper
+    # and one set to the colour it already had is not a colour of its own
+    kept = replace(comp.branding, text_colors={"info": "#444444",
+                                               "title": "#0a5688"})
+    assert kept.text_colors == {}
+
+
+def test_a_colour_that_is_not_one_never_reaches_the_sheet(comp):
+    """The picker writes `#rrggbb`; a settings file may hold anything."""
+    from dataclasses import replace
+
+    b = replace(comp.branding, text_colors={"title": "red; } body {",
+                                            "nonsense": "#ffffff"})
+    assert b.text_colors == {}
+    html = to_html(Document(title="PROVA", tables=[]), replace(comp, branding=b))
+    wrapper = html.split('<div class="cmsr"')[1].split(">")[0]
+    assert "--color-" not in wrapper
+
+
+def test_a_font_that_would_break_the_sheet_never_reaches_it(comp):
+    """A settings file may hold anything; the style of the page may not."""
+    from dataclasses import replace
+
+    from core.config import FONTS
+
+    b = replace(comp.branding, fonts={"title": "18pt;} body{display:none",
+                                      "subtitle": "", "nonsense": "9pt"})
+    assert b.fonts["title"] == FONTS["title"]     # refused, so the default
+    assert "nonsense" not in b.fonts
+    html = to_html(Document(title="PROVA", tables=[]), replace(comp, branding=b))
+    assert "display:none" not in html
+
+
+def test_the_numbered_sheet_carries_the_typeface_into_its_margin_box(comp):
+    """The page number sits outside `.cmsr`, where a custom property does not
+    reach - and an entity does not decode inside a <style>."""
+    from dataclasses import replace
+
+    c = replace(comp, branding=replace(
+        comp.branding, fonts={"family": "Georgia, 'Times New Roman', serif",
+                              "footline": "7pt"}))
+    html = to_html(Document(title="PROVA", tables=[]), c,
+                   standalone=True, page_numbers=True)
+    # the <style> that holds the margin box, and not print.css above it
+    box = html.split("counter(page)")[1].split("</style>")[0]
+    assert "font-family: Georgia, 'Times New Roman', serif" in box
+    assert "&#39;" not in box and "&#34;" not in box
+    assert "font-size: 7pt;" in box
+
+
 def test_the_rule_of_a_box_keeps_the_hue_of_its_tint():
     """A pink box gets a red rule, not a brown one; grey stays grey."""
     from render.render import darken
@@ -691,3 +906,201 @@ def test_the_printed_register_carries_the_compact_code(comp):
         [Decision(n=1, day=2, cat="AL", event="velocita", round_key="Quarti",
                   bibs="7", penalty="C", reason="3", text="retrocesso")], comp)
     assert doc.tables[0].rows[0]["code"] == "C3"
+
+
+# ── the foglio programma: the orario is computed, the durata is stated ──────
+
+def test_the_programme_sheet_prints_the_hour_the_giornata_arrives_at(comp):
+    """Start of the day plus the durate above: nobody types thirty times."""
+    import dataclasses
+
+    comp = dataclasses.replace(comp, day_start={1: "14:30"})
+    day = comp.days()[0]
+    for _item, rnd in comp.rounds_on(day)[:2]:
+        rnd.duration = 20
+
+    doc = D.programme_sheet(comp)
+    heads = [c.label for c in doc.tables[0].columns]
+    assert heads[:2] == [label("programme_start"), ui("round_duration")]
+    times = [r["start"] for r in doc.tables[0].rows][:3]
+    assert times == ["14:30", "14:50", "15:10"]
+    assert doc.tables[0].rows[0]["duration"] == ui("n_minutes", n=20)
+
+
+def test_a_pause_prints_in_the_column_of_the_speciality(comp):
+    """The one line of a foglio programma that is not a race.
+
+    It says when it starts, how long it lasts and what it is called - in the
+    column the sheet is read down - and nothing else: no categoria, no fase,
+    no comunicato. It is set in italic by the class the row carries.
+    """
+    import dataclasses
+
+    from core import programme as P
+
+    comp = dataclasses.replace(comp, programme=list(comp.programme),
+                               day_start={1: "14:30"})
+    day = comp.days()[0]
+    P.add_pause(comp, day, 30, "Premiazioni")
+
+    rows = D.programme_sheet(comp).tables[0].rows
+    pause = [r for r in rows if "pause" in r.get("_class", "")]
+    assert len(pause) == 1
+    row = pause[0]
+    assert row["event"] == "Premiazioni"
+    assert row["duration"] == ui("n_minutes", n=30)
+    assert row["start"] and not any(row[k] for k in
+                                    ("cat", "round", "startlist", "results"))
+
+
+def test_the_two_columns_can_each_be_left_off(comp):
+    """One sheet read two ways: a day being planned, a day on a noticeboard."""
+    plain = D.programme_sheet(comp, times=False, durations=False)
+    assert label("programme_start") not in [c.label
+                                            for c in plain.tables[0].columns]
+    assert ui("round_duration") not in [c.label
+                                        for c in plain.tables[0].columns]
+
+
+def test_the_programme_marks_the_comunicati_already_issued(comp):
+    """A cell whose numbers are on paper is laid on the tint, and no other."""
+    rows = D.programme_sheet(comp).tables[0].rows
+    out = {int("".join(ch for ch in str(rows[0]["startlist"]) if ch.isdigit()))}
+    assert out != {0}, "the fixture must plan a numbered ordine di partenza"
+
+    doc = D.programme_sheet(comp, issued=out, issued_tint="#d9f2de")
+    first, *rest = doc.tables[0].rows
+    assert first["_tint"] == {"startlist": "#d9f2de"}
+    assert not any(r.get("_tint") for r in rest
+                   if not _numbers_in(r, out)), "tinted what is not issued"
+    # off is the plain sheet, and so is a number the register has not seen
+    assert not any(r.get("_tint") for r in D.programme_sheet(comp).tables[0].rows)
+
+
+def _numbers_in(row: dict, issued: set) -> bool:
+    return any(str(n) in str(row.get(k, ""))
+               for k in ("startlist", "results", "classification")
+               for n in issued)
+
+
+def test_the_merged_column_goes_green_when_both_its_sheets_are_out(comp):
+    """Risultati and classifica share one cell: half of it out is not out."""
+    plain = D.programme_sheet(comp, merge_results=True).tables[0].rows
+    both = next(r for r in plain
+                if len(str(r["results"]).split("·")) == 2)
+    ns = {int(n) for n in str(both["results"]).replace("·", " ").split()
+          if n.isdigit()}
+    half = D.programme_sheet(comp, merge_results=True,
+                             issued=list(ns)[:1]).tables[0].rows
+    full = D.programme_sheet(comp, merge_results=True,
+                             issued=ns).tables[0].rows
+    i = plain.index(next(r for r in plain if r is both))
+    assert "results" not in (half[i].get("_tint") or {})
+    assert "results" in (full[i].get("_tint") or {})
+
+
+def _omnium_rows(comp, **kw):
+    """The prove of an omnium, which is where both classifiche are printed."""
+    rows = D.programme_sheet(comp, **kw).tables[0].rows
+    out = [r for r in rows if "Omnium" in str(r.get("event"))]
+    assert out, "the fixture must run an omnium"
+    return out
+
+
+def test_a_classifica_parziale_is_printed_in_the_column_of_the_classifica(comp):
+    """The standings after a prova are a classifica and are read as one.
+
+    They are also the ordine di partenza of the prova after them - one
+    comunicato, printed on the row of the prova that files it as well as under
+    the start order it opens. Read only in the start order column, the number
+    of every parziale of an omnium was missing from the sheet.
+    """
+    rows = _omnium_rows(comp)
+    partials = [r["classification"] for r in rows if not r.get("_bold")]
+    assert [n for n in partials if n], "no parziale printed"
+
+
+def test_the_classifica_finale_is_the_one_in_bold(comp):
+    """Bold is what the classifica finale is told apart by - and it is a choice.
+
+    A parziale closes nothing and stays plain; the sheet that closes the
+    specialità is the one anybody scans the column for.
+    """
+    rows = _omnium_rows(comp)
+    final = [r for r in rows if r.get("_bold")]
+    assert final, "no classifica finale printed"
+    assert all(r["_bold"] == {"classification"} and r["classification"]
+               for r in final)
+    # one per categoria that rides an omnium, and it is the last prova of it
+    assert len(final) == len({r["cat"] for r in final})
+    assert all(rows[rows.index(r) + 1:rows.index(r) + 2] == []
+               or rows[rows.index(r) + 1]["cat"] != r["cat"] for r in final)
+    # merged, the bold is on the cell the two columns became
+    merged = [r for r in _omnium_rows(comp, merge_results=True)
+              if r.get("_bold")]
+    assert merged and all(r["_bold"] == {"results"} for r in merged)
+    # and off, nothing is bold at all
+    assert not any(r.get("_bold")
+                   for r in _omnium_rows(comp, bold_final=False))
+
+
+def test_a_sheet_with_no_number_is_filed_and_printed_without_one(entries, comp):
+    """Not every sheet has a comunicato of its own, and none is invented.
+
+    The risultati carried on the classifica's number go out with nothing at
+    the head of the sheet and nothing in front of the file name - the same
+    answer as a register that wrote `-1` there, which reads back as no number.
+    """
+    from render.render import out_name, to_html
+
+    for value in ("", "-1", -1):
+        doc = D.entry_list(entries, comp, "ED", communique=value)
+        assert doc.communique == ""
+        assert out_name([doc], number=value) == "ED_partenti.pdf"
+        assert "Comunicato n." not in to_html([doc], comp)
+
+
+# ── the little markdown of the foglio intestato ─────────────────────────────
+
+def test_markdown_subset_reads_the_four_constructs():
+    from render import markup
+
+    html = markup.to_html("# Convocazione\n\n"
+                          "Il **direttore** di *riunione* convoca:\n"
+                          "- i commissari\n- i giudici\n\n"
+                          "1. alle 9\n2. in cabina")
+    assert "<h3>Convocazione</h3>" in html
+    assert "<strong>direttore</strong>" in html and "<em>riunione</em>" in html
+    assert "<ul><li>i commissari</li><li>i giudici</li></ul>" in html
+    assert "<ol><li>alle 9</li><li>in cabina</li></ol>" in html
+
+
+def test_markdown_subset_never_lets_markup_through():
+    """What the jury types is text: a sheet must not print what it pasted in."""
+    from render import markup
+
+    html = markup.to_html('<img src=x onerror="alert(1)"> & **grassetto**')
+    assert "<img" not in html and "&lt;img" in html   # printed, not run
+    assert "&amp;" in html
+    assert "<strong>grassetto</strong>" in html   # the marks are still read
+
+
+def test_markdown_subset_is_empty_for_an_empty_box():
+    from render import markup
+
+    assert markup.to_html("") == "" and markup.to_html("   \n  ") == ""
+
+
+def test_the_letterhead_sheet_is_the_paper_with_the_text_on_it(comp):
+    doc = D.letterhead_sheet(comp, title="CONVOCAZIONE", subtitle="Prima giornata",
+                             text="Testo **in grassetto**.", communique="12")
+    html = to_html(doc, comp)
+    assert "CONVOCAZIONE" in html and "Prima giornata" in html
+    assert "<strong>in grassetto</strong>" in html
+    assert "Comunicato n. 12" in _text(html)
+    assert doc.slug == "convocazione"
+
+
+def test_a_letterhead_sheet_without_a_title_takes_the_competition_name(comp):
+    doc = D.letterhead_sheet(comp, text="qualcosa")
+    assert doc.title == comp.name

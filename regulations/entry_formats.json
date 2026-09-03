@@ -1,16 +1,14 @@
 {
-  "_last_updated_": "13 August 2026",
-  "_about_": "How an entry file is read: one entry per format the federation sends. `ksport` is the flat export of the federal system - one row per rider - and its `columns` are what the sheets this app writes per categoria are headed with. A competition that says nothing about its own layout (`entries:` in programme.yaml) is read with the default one; one that says something wins. Read by core/entry_formats.py.",
+  "_last_updated_": "29 August 2026",
+  "_about_": "How an entry file is read: one entry per shape the elenco arrives in. `ksport` is the flat federal export - one row per rider, whether the system is called Fattore K or ksport - and its `columns` are what the sheets this app writes per categoria are headed with. `master` is the workbook this app itself writes (`entry_list.xlsx`). A competition that says nothing about its own layout (`entries:` in programme.yaml) is read with the default one; one that says something wins. Read by core/entry_formats.py.",
   "default": "ksport",
   "formats": {
     "ksport": {
       "name": {
-        "it": "Export ksport (federale)",
-        "en": "ksport export (federal)"
+        "it": "Export federale (Fattore K)",
+        "en": "Federal export (Fattore K)"
       },
       "flat": true,
-      "header_row": 6,
-      "first_data_row": 7,
       "ksport": {
         "DorsaleNumero": "bib",
         "NomeTesserato": "full_name",
@@ -44,7 +42,8 @@
       "check_in": {
         "Verificato": "checked_in",
         "NP": "not_starting"
-      }
+      },
+      "_about_": "The export of the federal system - one flat sheet, one row per rider. It arrives under two names (`Iscritti_NNNNNN.xls` from Fattore K, `Iscritti_NNNNNN_KSPORT.xlsx`) and they are the same file: the columns are these, whichever it is called, and the header row is found rather than declared. `Regione` and `DorsaleNumero` are the two the export does not always carry - the squadra then comes from the \"Iscrizione CR. ...\" note, and the dorsali are dealt out at import."
     },
     "master": {
       "name": {
@@ -65,11 +64,30 @@
         "Squadra\n(Regione)": "region",
         "Cat.": "cat"
       },
+      "ksport": {
+        "DorsaleNumero": "bib",
+        "NomeTesserato": "full_name",
+        "Cognome": "last_name",
+        "Nome": "first_name",
+        "CodiceFCI": "fci_code",
+        "Categoria": "cat",
+        "CodiceUci": "uci_id",
+        "Nazionalità": "nation",
+        "DataNascita": "birth_date",
+        "NomeSocieta": "club",
+        "CodiceSocieta": "club_code",
+        "Regione": "region",
+        "Provincia": "province",
+        "Sesso": "sex",
+        "Note": "note",
+        "Riserva": "reserve_entry",
+        "Scadenza Certificato": "certificate_date"
+      },
       "check_in": {
         "Verificato": "checked_in",
         "NP": "not_starting"
       },
-      "_about_": "The workbook this app writes: the header is the first row. The federation's own template carries five empty rows above it - a letterhead nobody reads back - and there is no reason to write them into a file we produce."
+      "_about_": "The workbook this app writes: the header is the first row. The federation's own template carries five empty rows above it - a letterhead nobody reads back - and there is no reason to write them into a file we produce. Its `ksport` mapping is the one the archive sheet (`_KSPORT`) is headed with: the workbook keeps the federal export whole, and without that mapping the file this app writes could not read its own archive back."
     }
   }
 }

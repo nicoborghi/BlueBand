@@ -13,6 +13,7 @@ from .config import (DOC_RESULTS, DOC_RESULTS_58, DOC_RESULTS_B,
                      DOC_RESULTS_REP, MIN_ELIMINATED, PREFIX_FINALS,
                      PREFIX_QUALIFYING, ROUND_SETUP, Competition,
                      madison_track_teams)
+from .formats import derny as DY
 from .formats import group as G
 from .formats import keirin as K
 from .formats import omnium as O
@@ -32,6 +33,7 @@ ELIMINATION = "elimination"
 TIMED = "timed"
 TIMED_TEAM = "timed_team"
 BRACKET = "bracket"  # sprint / keirin rounds (see formats.sprint)
+DERNY = "derny"  # called live, lap by lap (see formats.derny)
 SETUP = "setup"  # composed, not ridden: the madison pairing (see § pairing)
 
 #: The prove di gruppo: everybody on the track at once, ranked on what happens
@@ -65,12 +67,19 @@ def round_format(comp: Competition, cat: str, event: str, round_key: str) -> str
         return POINTS  # batterie di qualificazione
     if fmt == "madison":
         return MADISON
+    # an eliminazione ridden as its own event is scored the way the prova
+    # of an omnium is - by the order the riders went out - and not on volate:
+    # without this it fell through to POINTS and every sheet of it was wrong
+    if fmt == "elimination":
+        return ELIMINATION
     if fmt in ("timed", "time_trial"):
         return TIMED
     if fmt == "timed_team":
         return TIMED_TEAM
     if fmt in ("sprint", "keirin"):
         return TIMED if is_qualifying(round_key) else BRACKET
+    if fmt == "derny":
+        return DERNY
     return POINTS
 
 
@@ -165,21 +174,32 @@ SOLO_STARTS = "solo_starts"
 
 
 def can_choose_starts(comp: Competition, event: str, kind: str,
-                      round_key: str) -> bool:
+                      round_key: str, cat: str = "") -> bool:
     """Whether this round can be ridden one start at a time at all.
 
     Only a round against the clock: a bracket is ridden man against man
-    whatever anybody chooses, and so is a finals round - it is two teams
-    seeded from a qualification, one per straight.
+    whatever anybody chooses, and so is a finals round *that something seeded*
+    - two squadre come out of a qualificazione and ride one per straight.
 
-    A chilometro is the exception, and not really one: its single fase is
-    called *Finale* because it is the whole event, but nobody is seeded into
-    it and it is ridden exactly as the qualification of an inseguimento is -
-    two at a time or one at a time, as the jury decides.
+    **A finale nothing seeded is not that** (`is_seeded_round`). A velocità a
+    squadre run as a finale diretta, an inseguimento a squadre with one fase,
+    a chilometro: the fase is called *Finale* because it is the whole race, and
+    it is ridden against the clock like any qualificazione - one at a time or
+    two, as the regulation for the event says (`starts_per_race`) and as
+    the jury may decide at the track. Reading the name alone forced them all
+    into batterie of two and threw away a programme that said *uno alla
+    volta* - on a velocità a squadre, whose own regulation says one.
+
+    Without a categoria the question cannot be asked of the programme, and the
+    name is all there is to go on.
     """
+    if kind not in (TIMED, TIMED_TEAM):
+        return False
     if comp.event(event).fmt == "time_trial":
-        return kind in (TIMED, TIMED_TEAM)
-    return kind in (TIMED, TIMED_TEAM) and not is_finals(round_key)
+        return True
+    if not cat:
+        return not is_finals(round_key)
+    return not is_seeded_round(comp, cat, event, round_key, kind)
 
 
 def solo_starts(comp: Competition, state) -> bool:
@@ -188,16 +208,17 @@ def solo_starts(comp: Competition, state) -> bool:
     Three answers, in this order: what the jury decided on the race itself -
     an inseguimento individuale with a thin field is often ridden one atleta at
     a time - then what the programme says about *this* race, then what the
-    specialità says in general (a velocità a squadre starts one squadra at a
+    event says in general (a velocità a squadre starts one squadra at a
     time, an inseguimento two).
 
     The middle one exists because the shape is not a property of the
-    specialità: the same chilometro is ridden two at a time by a categoria with
+    event: the same chilometro is ridden two at a time by a categoria with
     thirty entered and one at a time by the eight of another.
     """
     kind = state.fmt or round_format(comp, state.cat, state.event,
                                      state.round_key)
-    if not can_choose_starts(comp, state.event, kind, state.round_key):
+    if not can_choose_starts(comp, state.event, kind, state.round_key,
+                             state.cat):
         return False
     choice = (state.payload or {}).get(SOLO_STARTS)
     if choice is not None:
@@ -235,19 +256,74 @@ def is_seeded_round(comp: Competition, cat: str, event: str, round_key: str,
     the first is seeded from the one before (`load_sprint_round`). The first
     round of a keirin is not: the batterie come off the entry list by the UCI
     table, like the 200 m of a velocità.
+
+    **A round can only be seeded by a round before it.** The name is not the
+    answer on its own: a scratch, una corsa a punti, un'eliminazione, il
+    chilometro are one race and `core.rounds` calls that race *Finale* - there
+    is no qualification under it and nothing composed it, so it starts whoever
+    is entered, like any other fase the whole elenco rides. Reading the name
+    alone froze the startlist of every one of those events at the moment the
+    race was first opened: an atleta iscritta alla verifica afterwards never
+    reached the ordine di partenza, and the sheet went out without her.
+
+    The composizione of a madison or of an omnium is not a fase that is ridden
+    (`ROUND_SETUP`), so it does not count as the round before either.
     """
-    if is_finals(round_key):
-        return True
-    kind = kind or round_format(comp, cat, event, round_key)
-    if kind != BRACKET:
+    if not (is_finals(round_key)
+            or (kind or round_format(comp, cat, event, round_key)) == BRACKET):
         return False
-    rounds = [r.key for r in comp.rounds(cat, event)]
-    return bool(rounds) and rounds[0] != round_key
+    ridden = [r.key for r in comp.rounds(cat, event) if r.kind != ROUND_SETUP]
+    return bool(ridden) and ridden[0] != round_key
+
+
+#: The four decisions that end a rider's event. What she did is filed on
+#: the sheet of the fase she did it in - that sheet prints the sigla - and
+#: everything ridden afterwards is ridden without her: she is not on the ordine
+#: di partenza of the next fase, not a dorsale the jury is asked for, and not a
+#: line the app expects a result on. A declassamento is not among them: it
+#: settles one fase and the rider carries on.
+OUT_OF_EVENT = (Status.DNS, Status.DNF, Status.ABD, Status.DSQ)
+
+
+def left_event(store, comp: Competition, cat: str, event: str,
+               before: str = "") -> dict[str, Status]:
+    """Who is out of this event before `before` is ridden, and under what.
+
+    Read off the fasi already ridden, in the order the programme has them: a
+    rider who took a DNS, a DNF, an ABD or a DSQ in one of them does not start
+    what comes after (`OUT_OF_EVENT`). It is the *event* this answers for, not
+    one sheet - the classifica of the event still names her, with the
+    sigla, because that is what a classification is for.
+
+    Only the fasi a whole entry list rides are read this way. A velocità is the
+    exception the UCI writes itself - a DNS in a turno is losing that turno,
+    not abandoning the event (`sprint_statuses`) - and its rounds are
+    composed from the round before in any case, so their startlists never come
+    through here.
+    """
+    out: dict[str, Status] = {}
+    for rnd in comp.rounds(cat, event):
+        if rnd.key == before:
+            break
+        st = store.load_race(race_key(cat, event, rnd.key))
+        if st is None:
+            continue
+        for key, status in all_statuses(st).items():
+            if status in OUT_OF_EVENT:
+                out[key] = status
+    return out
 
 
 def ensure_state(store, comp: Competition, cat: str, event: str, round_key: str,
                  el: EntryList) -> RaceState:
-    """Load the race, creating it with the programme's entrants and distances."""
+    """Load the race, creating it with the programme's entrants and distances.
+
+    A fase ridden by the whole entry list starts whoever is still in the
+    event: whoever left it in a fase already ridden is dropped from the
+    startlist here, once, so that every sheet and every field of the fase -
+    ordine di partenza, arrivi, classifica - is made of the same riders
+    (`left_event`).
+    """
     kind = round_format(comp, cat, event, round_key)
     st = store.get_race(cat, event, round_key, fmt=kind)
     st.fmt = kind
@@ -257,8 +333,16 @@ def ensure_state(store, comp: Competition, cat: str, event: str, round_key: str,
     # the programme schedules a qualification for it
     composed = kind in (MADISON, SETUP) or is_composed(comp, cat, event)
     if composed:
-        _resync_entrants(st, composed_entrants(store, comp, cat, event,
-                                               round_key, el, state=st))
+        field = composed_entrants(store, comp, cat, event, round_key, el,
+                                  state=st)
+        if not heat_number(round_key) and kind != SETUP:
+            # what the batterie qualified, less whoever has left the event
+            # since: the prove of an omnium are ridden one after the other, and
+            # a DNF in the first is not on the ordine di partenza of the second
+            # (`left_event`). A batteria is not read this way - it is the
+            # composition itself - and neither is the setup round.
+            field = _still_in(store, comp, cat, event, round_key, field)
+        _resync_entrants(st, field)
         if heat_number(round_key):
             # the cut in force when this batteria is ridden, kept on the race
             # itself: it is what its own sheets say, and what they said stays
@@ -270,7 +354,8 @@ def ensure_state(store, comp: Competition, cat: str, event: str, round_key: str,
         # of their own. Older versions seeded them into this one.
         (st.payload or {}).pop("final_heats", None)
     if not st.entrants:
-        st.entrants = entrants(el, comp, cat, event, round_key)
+        st.entrants = _still_in(store, comp, cat, event, round_key,
+                                entrants(el, comp, cat, event, round_key))
     elif composed:
         pass  # already resynced above, against the composition
     elif is_team_format(kind) or pursuit:
@@ -279,14 +364,24 @@ def ensure_state(store, comp: Competition, cat: str, event: str, round_key: str,
             # everybody on the entry list: its own startlist
             _resync_entrants(st, entrants(el, comp, cat, event, round_key))
     elif not is_seeded_round(comp, cat, event, round_key, kind):
-        # an individual round nobody composed starts whoever is entered: the
-        # verifica is allowed to go on after the race was first opened
-        _resync_entrants(st, entrants(el, comp, cat, event, round_key))
+        # an individual round nobody composed starts whoever is entered and is
+        # still in the event: the verifica is allowed to go on after the
+        # race was first opened, and so is a fase already ridden
+        _resync_entrants(st, _still_in(store, comp, cat, event, round_key,
+                                       entrants(el, comp, cat, event,
+                                                round_key)))
     if pursuit and (st.payload or {}).get("final_heats"):
         _sync_qual_out(store, comp, el, cat, event, st)
     d, laps, sprints = comp.distances(cat, event, round_key)
     st.distance, st.n_laps, st.n_sprint = d, laps, sprints
     return st
+
+
+def _still_in(store, comp: Competition, cat: str, event: str, round_key: str,
+              current: list[str]) -> list[str]:
+    """`current` less whoever left the event in a fase already ridden."""
+    gone = left_event(store, comp, cat, event, round_key)
+    return [k for k in current if k not in gone] if gone else current
 
 
 def qualifying_round(comp: Competition, cat: str, event: str) -> str:
@@ -300,7 +395,7 @@ def _sync_qual_out(store, comp: Competition, el: EntryList, cat: str,
     """Re-read the qualification from the finals race, below the cut.
 
     A squadra DNS or DSQ in the qualification never reaches the finals, but the
-    classification of the specialità has to say so: it is the sheet that files
+    classification of the event has to say so: it is the sheet that files
     the decision. The four that ride the finals are frozen - they are on the
     track - while everything under them is read here instead of at the moment
     *Carica finali* was pressed: a decision taken, corrected or withdrawn
@@ -396,7 +491,7 @@ def statuses_of(state: RaceState, scope: str = "") -> dict[str, Status]:
 
 def all_statuses(state: RaceState) -> dict[str, Status]:
     """Every decision taken in this round, whichever of its races it was taken
-    in - what the classification of the specialità has to read."""
+    in - what the classification of the event has to read."""
     out: dict[str, Status] = {}
     for scope in ALL_SCOPES:
         out.update(statuses_of(state, scope))
@@ -442,7 +537,7 @@ def warnings_carried(store, comp: Competition, cat: str, event: str,
     """dorsale -> the fase its ammonizione was taken in, up to `round_key`.
 
     What prints as a W beside the name. Empty when the log holds nothing for
-    this specialità, which is what a sheet without the column means.
+    this event, which is what a sheet without the column means.
     """
     from . import decisions as DEC
 
@@ -478,6 +573,21 @@ def classify(state: RaceState, el: EntryList, comp: Competition) -> Result:
                 eliminated=parse_bibs(p.get("eliminated", "")),
                 statuses=statuses)
 
+        if kind == DERNY:
+            # nothing but the call the judge made: the chart, the laps lost and
+            # the standings all come out of it (`formats.derny`)
+            return DY.derny_classification(
+                startlist=[int(x) for x in state.entrants],
+                log=DY.passages(p), start=p.get(DY.START),
+                statuses=statuses,
+                # the giri persi are a column the jury turns on, on the race
+                # itself, so Gare and Stampa print the same classifica
+                show_laps_down=bool(p.get(DY.SHOW_DOWN)),
+                # the distance the fase runs: it is what tells the chart the
+                # race is over, and after that the arrival is what places the
+                # riders still out (`formats.derny.board`)
+                laps=state.n_laps)
+
         if kind == BRACKET:
             return _bracket_result(state, comp)
 
@@ -493,8 +603,12 @@ def classify(state: RaceState, el: EntryList, comp: Competition) -> Result:
                     qualification=p.get("qual_ranking") or [], qual_times=qual,
                     qual_out=out, tied=p.get("finals_tied") or (),
                     on_qual=p.get("finals_on_qual") or ())
+            # the ones still to be timed are listed in start order and not in
+            # entry order: while the fase is being ridden the sheet is half a
+            # classifica and half the list of who is still to go
             return T.timed_classification(state.entrants, times,
-                                          statuses=statuses, qualification=qual)
+                                          statuses=statuses, qualification=qual,
+                                          order=start_order(state))
 
         # bunch races, individual or by pair
         startlist = bunch_startlist(state, el, kind)
@@ -618,6 +732,29 @@ def team_lineup(state: RaceState, key: str, el: EntryList) -> list[tuple]:
     return out + [(by_bib[b], True) for b in replaced]
 
 
+def start_order(state) -> list[str]:
+    """The entrants in the order they start, once the grid has been composed.
+
+    A race against the clock is ridden one start at a time, in the order the
+    grid says, and that order is what everything reading a half-ridden race
+    has to follow: the fields the times are typed into, and the sheet those
+    times land on. Reading down a list still in entry order while the track
+    runs in start order is how a time ends up on the wrong squadra.
+
+    Whatever the grid does not place - a squadra not yet inserted, batterie
+    still loose notation - keeps its entry order at the bottom: nothing
+    disappears because the composition is unfinished.
+    """
+    order: list[str] = []
+    seen: set[str] = set()
+    for row in (state.payload or {}).get("heat_sides") or []:
+        for key in row:
+            if key and key not in seen and key in state.entrants:
+                seen.add(key)
+                order.append(key)
+    return order + [k for k in state.entrants if k not in seen]
+
+
 # ── brackets (velocità / keirin) ────────────────────────────────────────────
 
 def heats_text(heats: list[list[str]]) -> str:
@@ -707,7 +844,7 @@ def heat_result(state: RaceState, heats: list[list[str]],
 
     The statuses are the ones of this very sheet (`scope`, see § statuses),
     printed as the jury typed them: this sheet files this race. Reading them
-    across the whole specialità is the classification's job (`sprint_statuses`).
+    across the whole event is the classification's job (`sprint_statuses`).
     """
     from .formats.base import Placing
 
@@ -787,7 +924,7 @@ def sprint_started(store, comp: Competition, cat: str, event: str) -> set[str]:
     """Who took the start of the velocità: the riders with a 200 m time.
 
     The 200 m is the one race everybody rides, so it is what says whether a
-    rider was in the specialità at all.
+    rider was in the event at all.
     """
     qual = sprint_qualifying(comp, cat, event)
     st = store.load_race(race_key(cat, event, qual)) if qual else None
@@ -797,7 +934,7 @@ def sprint_started(store, comp: Competition, cat: str, event: str) -> set[str]:
 
 def sprint_statuses(store, comp: Competition, cat: str, event: str,
                     statuses: dict[str, Status]) -> dict[str, Status]:
-    """The statuses of a velocità *as a specialità*.
+    """The statuses of a velocità *as an event*.
 
     Two things happen on the way from the sheets of the rounds to the sheet
     that closes the event.
@@ -805,11 +942,11 @@ def sprint_statuses(store, comp: Competition, cat: str, event: str,
     **A relegation does not travel.** REL is a decision about one prova: it
     settles who won that batteria, and that is the whole of its effect - the
     rider carries on in the event, and is classified by how far she got, like
-    everybody else. Only what took her *out* of the specialità follows her onto
+    everybody else. Only what took her *out* of the event follows her onto
     its classification: DNF, DNS, DSQ.
 
     **A DNS after the start does not travel either.** A rider who has ridden
-    the 200 m has taken the start of the specialità. Missing a round afterwards
+    the 200 m has taken the start of the event. Missing a round afterwards
     - a turno, a recupero, a semifinale - is losing that round, not abandoning
     the event: the sheet of that round files the DNS, and on the classification
     she is ranked like everybody else who went out there, on her 200 m time.
@@ -873,7 +1010,7 @@ def sprint_has_58(store, comp: Competition, cat: str, event: str) -> bool:
 
     The programme says what was planned and the jury can still turn it round on
     the day, on the qualifying round where it picks the scheme too. It is one
-    decision for the whole specialità: the four beaten in the quarti either
+    decision for the whole event: the four beaten in the quarti either
     have a race left or they are classified 5°-8° on how they got there.
 
     Same three answers as `sprint_scheme`: the day, then the programme
@@ -1154,7 +1291,7 @@ def sprint_standings(store, comp: Competition, el: EntryList, cat: str,
         st = store.load_race(race_key(cat, event, name))
         if st is not None:
             # every race of the round, the recuperi and the 5°-8° included:
-            # the classification of the specialità owes a line to all of them
+            # the classification of the event owes a line to all of them
             statuses.update(all_statuses(st))
     return S.scheme_classification(
         finals=finals, final_5_8=f58[0] if f58 else [],
@@ -1496,26 +1633,44 @@ def keirin_standings(store, comp: Competition, el: EntryList, cat: str,
 
 # ── multi-round_key standings ───────────────────────────────────────────────────
 
+def omnium_prove(comp: Competition, cat: str, event: str = "omnium") -> list[str]:
+    """The prove this omnium actually rides, in the order it rides them.
+
+    The four of the UCI omnium are what `formats.omnium` scores, and they are
+    not what every omnium is made of: a categoria may ride three of them, and a
+    programme that schedules two is two prove and not «two out of four». What
+    the sheets are made of is what the programme declares, so the prove are
+    read from there and the four names are only the vocabulary they are
+    written in.
+    """
+    from .formats import omnium as O
+
+    return [r.key for r in comp.rounds(cat, event) if r.key in O.ROUNDS]
+
+
 def omnium_standings(store, comp: Competition, el: EntryList, cat: str,
                      event: str = "omnium", upto: str = "") -> Result:
-    """Running omnium classification across the four rounds ("prove").
+    """Running omnium classification across the prove of the event.
 
     `upto` stops at that prova included - what a *classifica parziale* is: the
     standings as they stand when one prova has been ridden and the next has not,
     which is also the ordine di partenza of the next one.
     """
-    from .formats import omnium as O
-
-    names = O.ROUNDS
+    names = omnium_prove(comp, cat, event)
     if upto in names:
         names = names[:names.index(upto) + 1]
     done = {}
     for name in names:
         state = store.load_race(_rid(cat, event, name))
-        if state and (state.payload or {}):
+        # a prova the jury has filed anything in at all: the arrivals, or - on
+        # a race not yet scored - the decision that took a rider out of it. A
+        # DNS filed before the race is typed is still what the standings say
+        # about that rider
+        if state and ((state.payload or {}) or state.statuses):
             done[name] = classify(state, el, comp)
-    return O.omnium_classification(done, entrants=omnium_field(store, comp, el,
-                                                               cat, event))
+    return O.omnium_classification(done, expected=names,
+                                   entrants=omnium_field(store, comp, el,
+                                                         cat, event))
 
 
 def omnium_field(store, comp: Competition, el: EntryList, cat: str,
@@ -1577,13 +1732,15 @@ def omnium_points_race(result: Result, carried: dict[str, int]) -> Result:
 
     And the sheet is read in that order. The corsa a punti is the last prova,
     so its risultati *are* the classifica of the omnium: the riders print by
-    total, and two on the same total are separated by their placing in this
-    race - the tiebreak of 3.2.109, the same one the classifica finale applies
-    (`formats.omnium.omnium_classification`). Printed in the order the race
-    was called, the sheet said the winner of the corsa a punti had won the
-    omnium.
+    total, and two on the same total are separated by their passage at the
+    last volata - the tiebreak of 3.2.109, the same one the classifica finale
+    applies (`formats.omnium.omnium_classification`), and not the placing in
+    this race, which its own classification had already decided on points.
+    Printed in the order the race was called, the sheet said the winner of the
+    corsa a punti had won the omnium.
     """
-    own = {p.key: p.position or 10 ** 6 for p in result.placings}
+    own = {p.key: int((p.data or {}).get("_tiebreak", 10 ** 6))
+           for p in result.placings}
     for p in result.placings:
         p.data = dict(p.data or {})
         start = int(carried.get(p.key) or 0)
@@ -1911,7 +2068,7 @@ def load_qualified(store, comp: Competition, el: EntryList, cat: str,
 
     A madison has one of them, its finale. An omnium has four: the qualified
     field rides all of the prove, so the four are loaded together and the
-    classifica of the specialità is over them alone.
+    classifica of the event is over them alone.
 
     `current` is the heat open in front of the jury, whose latest entry may not
     be on disk yet. Returns what happened, for the page to report.

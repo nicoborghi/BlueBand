@@ -16,12 +16,20 @@
    footline sits on a single sheet. #}
 {% if page_numbers %}
 {% set foot_box %}
-  content: "{% if printed_at %}{{ printed_at }} · {% endif %}pag. " counter(page) "/" counter(pages);
-  font: 8pt "Helvetica Neue", Arial, sans-serif; color: #777;
-  width: 100%; text-align: right; padding-right: 8mm; vertical-align: top;
+  content: "{% if foot_box_text %}{{ foot_box_text }} · {% endif %}pag. " counter(page) "/" counter(pages);
+  {# the margin box is outside .cmsr, where the custom properties do not
+     reach: the typeface has to be written into it #}
+  {# `safe`: nothing decodes an entity inside a <style>, and a font stack that
+     arrives as &#34;Helvetica Neue&#34; is a stack the printer cannot read.
+     What is written here has been through `config.font_value`, which lets
+     through neither a tag nor a brace nor a semicolon. #}
+  font-size: {{ footline_size|safe }}; font-family: {{ font_family|safe }};
+  color: {{ footline_color|safe }};
+  width: 100%; text-align: {{ foot_box_align }};
+  padding: 0 8mm; vertical-align: top;
 {% if footer_img %}
   background-image: url("{{ footer_img }}"); background-repeat: no-repeat;
-  background-position: bottom center; background-size: 100% auto;
+  background-position: {{ foot_pos }}; background-size: {{ foot_size }};
 {% endif %}
 {% endset %}
 <style>
@@ -44,14 +52,24 @@
    it once per run: st.html throws away the <style> of what it is given). #}
 {% if css %}<style>{{ css|safe }}</style>{% endif %}
 {% endif %}
-<div class="cmsr" style="--header-color: {{ header_color }};{{ note_vars }}">
+<div class="cmsr" style="--header-color: {{ header_color }};{{ note_vars }}{{ font_vars }}">
 {{ body|safe }}
 {# Printed at the bottom of every sheet (position: fixed); the copy inside each
-   document's tfoot only reserves the space. #}
+   document's tfoot only reserves the space. It is the page's foot and not one
+   document's, so the comunicato slot is left to the tfoot copy - a page may
+   carry two documents and only one of them has that number. #}
 {% if footer %}
 <div class="page-footer">
-  {% if printed_at %}<div class="footline">{{ printed_at }}</div>{% endif %}
-  {% if footer_img %}<div class="footer-strip"><img src="{{ footer_img }}"></div>
+  {% if foot_line %}<div class="footline"
+       {%- if foot_gap %} style="padding-bottom: {{ '%g'|format(foot_gap) }}mm"{% endif %}>
+    <div class="slot-row foot-slots">
+      {%- for item in foot_slots %}<div class="slot">
+        {%- if item == "printed_at" and printed_at %}<span class="printed-at">{{ printed_at }}</span>{% endif -%}
+      </div>{% endfor -%}
+    </div>
+  </div>{% endif %}
+  {% if footer_img %}<div class="footer-strip"><img src="{{ footer_img }}"
+       style="{{ footer_style }}"></div>
   {% endif %}
 </div>
 {% endif %}

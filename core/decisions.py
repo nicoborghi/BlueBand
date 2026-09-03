@@ -8,14 +8,14 @@ competition, appended to and never rewritten by anything else:
     <competition>/decisions.json
 
 Each entry is numbered from 1, in the order the jury took it, and is a *row of
-a register*, not a note: the day, the categoria, la specialità, la fase, the
+a register*, not a note: the day, the categoria, the event, la fase, the
 dorsale, and the provvedimento with the UCI article it was taken under - `A1`,
 `C3` - which together are the compact code the jury quotes. On top of those
 columns sits the free text, which is the sentence that goes out to the teams:
 `compose` proposes it from the columns, the jury edits it.
 
 Filled in that way the log is readable both ways round: `by_round` gives what
-was decided in each fase of a specialità - the recap the panel wants in front
+was decided in each fase of an event - the recap the panel wants in front
 of it before filing the next one - and the sheet of a race prints its own
 decisions, tinted by `KINDS`, without anybody retyping them.
 
@@ -79,10 +79,10 @@ _META = "_last_updated_"
 class Decision:
     """One decision of the panel, as it will be read back weeks later.
 
-    Every field but `text` is a *column*: the categoria, the specialità, the
+    Every field but `text` is a *column*: the categoria, the event, the
     fase, the dorsale, the provvedimento and the UCI article it was taken
     under. They are what makes the log a register rather than a pile of notes -
-    filtered, summarised per specialità, and printed on the sheet of the race
+    filtered, summarised per event, and printed on the sheet of the race
     they belong to without anybody retyping them.
 
     `text` is the sentence that goes out to the teams. The app proposes it
@@ -191,7 +191,7 @@ def remove(store: Store, n: int, *, actor: str = "") -> None:
 # ── ammonizioni: the decision that travels ──────────────────────────────────
 #
 # Every other penalty is spent on the race it was given in. An ammonizione is
-# not: it stays on the rider for the whole specialità, is read again on the
+# not: it stays on the rider for the whole event, is read again on the
 # sheet of every fase that follows, and a second one taken in the same fase is
 # a squalifica. So it is the one decision the sheets have to ask the log about,
 # and this is where they ask.
@@ -209,7 +209,7 @@ def bibs_of(decision: Decision) -> list[int]:
 
 def warnings_of(decisions: list[Decision], cat: str, event: str
                 ) -> list[Decision]:
-    """The ammonizioni given in one specialità of one categoria, in order."""
+    """The ammonizioni given in one event of one categoria, in order."""
     return [d for d in decisions
             if str(d.penalty).upper() == WARNING
             and (not d.cat or not cat or d.cat == cat)
@@ -218,7 +218,7 @@ def warnings_of(decisions: list[Decision], cat: str, event: str
 
 def warned_bibs(decisions: list[Decision], cat: str, event: str, *,
                 rounds: list[str] = (), upto: str = "") -> dict[int, str]:
-    """dorsale -> the fase the warning was taken in, for one specialità.
+    """dorsale -> the fase the warning was taken in, for one event.
 
     What the sheets print the W from. `rounds` is the fasi in the order they
     are ridden and `upto` the one being printed: a warning shows on the fasi
@@ -230,7 +230,7 @@ def warned_bibs(decisions: list[Decision], cat: str, event: str, *,
 
     Without an order to read (a warning filed against no fase, a round that is
     not in the programme) it counts everywhere: the jury wrote it down about
-    this specialità, and losing it would be worse than showing it early.
+    this event, and losing it would be worse than showing it early.
     """
     order = {key: i for i, key in enumerate(rounds)}
     limit = order.get(upto)
@@ -263,18 +263,18 @@ def double_warned(decisions: list[Decision], cat: str, event: str,
 # ── reading the log back, per race ──────────────────────────────────────────
 #
 # The register is one file for the whole competition, but it is *read* one
-# specialità at a time: what was decided in this categoria, in this evento, in
+# event at a time: what was decided in this categoria, in this evento, in
 # each of its fasi. That is the summary the jury wants above the button before
 # it files the next one, and it is what the sheet of a race prints.
 
 
 def for_race(decisions: list[Decision], cat: str, event: str,
              round_key: str | None = None) -> list[Decision]:
-    """The decisions taken in one race - or in one whole specialità.
+    """The decisions taken in one race - or in one whole event.
 
-    `round_key=None` is the specialità (every fase of it); a string, including
+    `round_key=None` is the event (every fase of it); a string, including
     `""`, is that fase and only that one. The difference matters: `""` is a
-    real fase key - a specialità ridden in one go - and must not silently
+    real fase key - an event ridden in one go - and must not silently
     widen to everything the categoria did in that evento.
     """
     return [d for d in decisions
@@ -284,7 +284,7 @@ def for_race(decisions: list[Decision], cat: str, event: str,
 
 def by_round(decisions: list[Decision], cat: str, event: str,
              rounds: list[str] = ()) -> list[tuple[str, list[Decision]]]:
-    """(fase, decisions taken in it) for one specialità, in programme order.
+    """(fase, decisions taken in it) for one event, in programme order.
 
     `rounds` is the fasi as the programme runs them: they come out in that
     order, and a fase nobody was penalised in does not appear at all. Anything

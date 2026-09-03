@@ -7,9 +7,13 @@ the sidebar was drawn, so Impostazioni, the only place a competition is picked,
 could not be reached. Getting out of it meant editing files by hand.
 
 This page is what happens instead: the same three things a jury would write at
-the top of the file - the manifestazione, the pista, the categorie - asked for
+the top of the file - the competition, the pista, the categorie - asked for
 once, written, and then the app opens normally on Programma, where the races
 are added day by day and every one of these fields can be corrected.
+
+In that order, and the elenco iscritti after them: the workbook has a sheet per
+categoria and a column per event, so there is nothing to build one out of
+until the categorie are there.
 
 Nothing here is a form of its own: the widgets *are* the ones of the Programma
 page (`ui.pages.programme._competition_tab`), called on a blank programme. A
@@ -41,10 +45,12 @@ def render(competition: str, store: Store) -> None:
 
     # the widgets of the Programma page, on a blank programme: what is filled
     # in here is editable there afterwards, in the same fields - the
-    # manifestazione, the pista and the categorie, in that order
+    # competition and the pista, then the categorie with what each of them
+    # rides, and only under those the elenco iscritti, which is built out of
+    # both and cannot be asked for before them (`programme._categories_tab`)
     PROG._competition_tab(draft)
     st.divider()
-    PROG._categories_tab(draft)
+    PROG._categories_tab(draft, store)
 
     st.divider()
     if st.button(ui("setup_create"), type="primary",

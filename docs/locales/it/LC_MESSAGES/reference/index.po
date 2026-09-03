@@ -1,0 +1,327 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:10+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: it\n"
+"Language-Team: it <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../reference/index.rst:4 98244a18a7f54ca7a6f54502dc5f2d66
+msgid "Architecture"
+msgstr "Architettura"
+
+#: ../../reference/index.rst:8 4876b7c1b0ca4d2286bb89040d2c518b
+msgid ""
+"The technical reference is maintained in English, like the code it "
+"describes: the vocabulary here — ``competition``, ``event``, ``round`` — "
+"is the vocabulary of the source. The jury-facing pages are translated. "
+"See the :ref:`glossary` for the terms."
+msgstr ""
+
+#: ../../reference/index.rst:13 570c1d0f7c4c4f2eb4a4c6ccfa25dea6
+msgid "Three layers, in one direction only."
+msgstr ""
+
+#: ../../reference/index.rst:26 95ad72bf786441edbc7015a3393d1ec6
+msgid ""
+"``core.store`` is the only module in ``core/`` that touches the "
+"filesystem; ``core.paths`` is the only one that knows whether the app is "
+"a checkout or an installed program."
+msgstr ""
+
+#: ../../reference/index.rst:32 51f919f8e5e6489098ae0d31f0654854
+msgid "Ground rules"
+msgstr "Le regole di fondo"
+
+#: ../../reference/index.rst:34 4607087d5179484694c967460f8d4eab
+msgid ""
+"These hold everywhere in the codebase, and most of this reference is a "
+"consequence of one of them."
+msgstr ""
+
+#: ../../reference/index.rst:37 5eea898cc5514172a5d9adc2738ff944
+msgid ""
+"**Nothing under** ``core/`` **imports Streamlit.** The domain — scoring, "
+"composition tables, the register, the medal count — is plain Python and "
+"is tested headless."
+msgstr ""
+
+#: ../../reference/index.rst:41 1978770aa81f49e081424de11f957d61
+msgid ""
+"**Nothing outside** ``core/i18n/`` **writes prose.** Every word that "
+"reaches a screen or a sheet is a catalogue lookup. ``tests/test_i18n.py``"
+" enforces it."
+msgstr ""
+
+#: ../../reference/index.rst:44 1077cbb2160c4118a15c0e0b9eb72ad6
+msgid ""
+"**Nothing is ever lost.** Every write is atomic, keeps the previous "
+"content as a snapshot, and is recorded in an append-only journal. The "
+"federation's entry workbook is not written to at all unless the "
+"competition explicitly asks for it."
+msgstr ""
+
+#: ../../reference/index.rst:48 f3fcc54794524979a77b45116c4be3d5
+msgid ""
+"**The regulation is data.** Distances, event definitions, category codes,"
+" sheet notes, communiqué merge rules and penalty tables are JSON files "
+"under ``regulations/``, not code. A rule that changes next year is a file"
+" edit."
+msgstr ""
+
+#: ../../reference/index.rst:52 e92c3d80e77b4d83829b48cdcb73ea0d
+msgid ""
+"**A proposal is not a decision.** What the regulation suggests — a "
+"round's distance, a communiqué number, the wording of a decision — is "
+"filled in and stays editable. Nothing the app proposes is more true than "
+"what the jury types over it."
+msgstr ""
+
+#: ../../reference/index.rst:59 19d3ba03897e41578face89d9364b1ca
+msgid "``core/`` — the domain"
+msgstr "``core/`` — il dominio"
+
+#: ../../reference/index.rst:65 65370ca9e3034c3ba4d4c139ba7a09c9
+msgid "Module"
+msgstr "Modulo"
+
+#: ../../reference/index.rst:66 a295a81bbf084df0b831a4850e1a2323
+msgid "What it owns"
+msgstr "Di che cosa risponde"
+
+#: ../../reference/index.rst:67 524842ca03954cb18a7c3abe5f422262
+msgid "``config.py``"
+msgstr ""
+
+#: ../../reference/index.rst:68 d6bd41b4208742fdb7afcaed0279f2af
+msgid ""
+"``programme.yaml`` → dataclasses: ``Competition``, ``Category``, "
+"``Event``, ``Round``, ``ProgrammeItem``, ``CommuniqueSpec``, "
+"``Branding``, ``EntrySheet``, ``Check``. The vocabulary of everything "
+"else."
+msgstr ""
+
+#: ../../reference/index.rst:72 14cee6eb2ff544b0b8cfccd95f996d3e
+msgid "``programme.py``"
+msgstr ""
+
+#: ../../reference/index.rst:73 fff57d3d147f466899f984be6968244c
+msgid ""
+"The other direction: ``Competition`` → text, in a stable layout, plus the"
+" validation that runs before a save."
+msgstr ""
+
+#: ../../reference/index.rst:75 082937c72eae44e6b8c3e067611b9874
+msgid "``models.py``"
+msgstr ""
+
+#: ../../reference/index.rst:76 cb5e5ba4144b4e48b4fe6c463b107b71
+msgid ""
+"``Rider``, ``Team``, ``Pair``, ``RaceState``, ``Status``, ``EntryList``. "
+"Plain data, ``to_dict`` / ``from_dict``."
+msgstr ""
+
+#: ../../reference/index.rst:78 f0af1e58e0e14c63b6dfb89c5ed17e63
+msgid "``store.py``"
+msgstr ""
+
+#: ../../reference/index.rst:79 8ffeca2a48944ff297b580f6a694e337
+msgid "Atomic JSON, snapshots, the journal, backup, the race files."
+msgstr ""
+
+#: ../../reference/index.rst:80 c453ac5a778049b2aa59b49aeeb30c74
+msgid "``paths.py``"
+msgstr ""
+
+#: ../../reference/index.rst:81 34e7ebb8e79446e38ee291ce010e69fc
+msgid "Checkout or installed program: where the data and read-only files are."
+msgstr ""
+
+#: ../../reference/index.rst:82 7b2dde7c1c884d1ab84acf30e03fb0dc
+msgid "``race.py``"
+msgstr ""
+
+#: ../../reference/index.rst:83 41559587160047d9a79c90984913a564
+msgid ""
+"The service layer between the UI and the formats: who is entered, which "
+"format applies, how a round ranks, how a bracket composes the next one."
+msgstr ""
+
+#: ../../reference/index.rst:85 ec7788499a2c401a80dd31e7fde600b2
+msgid "``formats/``"
+msgstr ""
+
+#: ../../reference/index.rst:86 dc37980aea2845cda5f59dbe63ff8783
+msgid ""
+"``base``, ``group``, ``timed``, ``sprint``, ``keirin``, ``omnium``, "
+"``derny``. One module per family of race."
+msgstr ""
+
+#: ../../reference/index.rst:88 0456f04b50304c6c8e23bf04795eb0f4
+msgid "``rounds.py``"
+msgstr ""
+
+#: ../../reference/index.rst:89 0ec372e8da4a4b1399312122960d7788
+msgid ""
+"What a format runs: the rounds proposed from the regulation, with "
+"distance, laps, sprints and the documents each files."
+msgstr ""
+
+#: ../../reference/index.rst:91 2324fbc63b6a46e9b3fb69a7bcfe6f4c
+msgid "``distances.py``"
+msgstr ""
+
+#: ../../reference/index.rst:92 ae8a64988bee47ffaca5d457289e80cf
+msgid "How long a race is, and how often it sprints."
+msgstr ""
+
+#: ../../reference/index.rst:93 d96b501a69ba48518cc559ed36d93d40
+msgid "``catalogue.py``"
+msgstr ""
+
+#: ../../reference/index.rst:94 877b4c9614db457898fe61a4c59d3dda
+msgid "The event definitions and category codes, ready to add to a programme."
+msgstr ""
+
+#: ../../reference/index.rst:95 71d19ca2e103403b973e98325845c97f
+msgid "``entries.py`` / ``entry_book.py`` / ``entry_formats.py``"
+msgstr ""
+
+#: ../../reference/index.rst:96 7d34ffdba9b24c0aad3eda2cbb678ec0
+msgid ""
+"Excel import, the overlay of jury edits, validation, write-back, and the "
+"competition's own workbook."
+msgstr ""
+
+#: ../../reference/index.rst:98 28a92a9f0beb48b099c451cee531c2dc
+msgid "``checks.py``"
+msgstr ""
+
+#: ../../reference/index.rst:99 6621d0873d6e463bbec6c2298ae71e6b
+msgid ""
+"The one implementation of the inline bib flags, and the ``Issue`` shape "
+"every validation reports in."
+msgstr ""
+
+#: ../../reference/index.rst:101 7477fe865ed64c7bb6530462b98c6eab
+msgid "``parse.py``"
+msgstr ""
+
+#: ../../reference/index.rst:102 68349cad0c9a4e888b45daf3f28fc8b6
+msgid "The jury's shorthand: sprints, heats, bibs, times."
+msgstr ""
+
+#: ../../reference/index.rst:103 203a0e3e8afc4800982dc371d1583a0c
+msgid "``communiques.py``"
+msgstr ""
+
+#: ../../reference/index.rst:104 70ce7a046eaf44e5837243c029554047
+msgid "Planning, merge rules, autonumbering, the issued register."
+msgstr ""
+
+#: ../../reference/index.rst:105 74e58d37c5e744f9bd88a2e0d1c503c7
+msgid "``decisions.py``"
+msgstr ""
+
+#: ../../reference/index.rst:106 7a5d6402a79c460e89d383459b1e9134
+msgid "The jury's decision log, and the read-only UCI and federal tables."
+msgstr ""
+
+#: ../../reference/index.rst:107 485676d359144ce19bcb63073851dc76
+msgid "``notes.py``"
+msgstr ""
+
+#: ../../reference/index.rst:108 289cbfe539a14e4099211891643da9a4
+msgid "Which regulation line opens which sheet."
+msgstr ""
+
+#: ../../reference/index.rst:109 a62826f765f4417f87a4ca1472ab7948
+msgid "``medals.py`` / ``trofeo.py`` / ``recap.py``"
+msgstr ""
+
+#: ../../reference/index.rst:110 0f92959d4a63413495dd701e0ca55fdb
+msgid "The medal table, the team points classification, and the per-team recaps."
+msgstr ""
+
+#: ../../reference/index.rst:112 d49313f1986746cf8ac9f7e634b3b20f
+msgid "``i18n/``"
+msgstr ""
+
+#: ../../reference/index.rst:113 23456879ec15436db88daa9897ab6853
+msgid "One catalogue per language. The only place with prose in it."
+msgstr ""
+
+#: ../../reference/index.rst:117 92d5e3da192841769f333a54313524c1
+msgid "``render/`` — the printed sheet"
+msgstr "``render/`` — il foglio stampato"
+
+#: ../../reference/index.rst:119 0d7905e5a8c74aeeb9d40e36ec33a75e
+msgid ""
+"``documents.py`` turns entry lists, race states and survey results into "
+"``Document``\\ s; ``render.py`` turns a ``Document`` into HTML, either a "
+"fragment to embed in the app or a self-contained page for the archive; "
+"``pdf.py`` runs a headless Chromium over it. ``markup.py`` is the four-"
+"construct markdown the letterhead sheet accepts. See :ref:`printing`."
+msgstr ""
+
+#: ../../reference/index.rst:127 ce43817e435d4606982fc4fa7e5202d9
+msgid "``ui/`` — the app"
+msgstr "``ui/`` — l'applicazione"
+
+#: ../../reference/index.rst:129 ae8d9a9d4e3e4dccae484b2b42a87b20
+msgid ""
+"Seven pages under ``ui/pages/``, plus shared pieces that exist because "
+"the same thing was being done four different ways: ``state.py`` (the only"
+" place that knows about ``st.session_state``), ``notify.py`` (the only "
+"way the app says anything), ``savebar.py``, ``publish.py``, "
+"``download.py``, ``style.py``, ``icons.py`` (SVG paths — nothing is "
+"fetched from a CDN, because the app runs at a velodrome, often off the "
+"network) and ``scroll.py``."
+msgstr ""
+
+#: ../../reference/index.rst:136 71254b75ecbc4545915f499e63848191
+msgid ""
+"**The savebar records; it does not save.** The strip is drawn at the "
+"*top* of the run, before the page body has read a single field, so a race"
+" saved there would be the race as it was when the run started. "
+"``savebar.render()`` leaves a request behind and the page picks it up "
+"after everything has been built:"
+msgstr ""
+
+#: ../../reference/index.rst:148 05383ada659848a9b00bc252557db24e
+msgid ""
+"``app.py`` is the Streamlit entry point. ``launcher.py`` is what the "
+"desktop icon starts: pick a free port, run Streamlit **in this process** "
+"through ``bootstrap.run`` (the packaged program has no ``streamlit`` on "
+"any ``PATH`` to re-exec), open the browser once the server answers. A "
+"competition folder with no ``programme.yaml`` opens on "
+"``ui/pages/setup.py``, which uses the *same widgets* as the Programme "
+"page rather than a second form that would drift from the first."
+msgstr ""
+
+#: ../../reference/index.rst:157 f02682adb1a944d0928adfdd66a16148
+msgid "Testing"
+msgstr "I test"
+
+#: ../../reference/index.rst:159 7d37b605031d4a7da3b195281db1df28
+msgid ""
+"``tests/`` runs against ``competitions/example/``, a fictional meeting "
+"that ships with the repository. UI tests drive the real pages through "
+"Streamlit's ``AppTest``, which is why input widgets that cannot be driven"
+" headless are not used: an input this app cannot test is an input it does"
+" not keep."
+msgstr ""
+

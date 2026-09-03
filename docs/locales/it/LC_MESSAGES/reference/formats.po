@@ -1,0 +1,459 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:07+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: it <LL@li.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../reference/formats.rst:4 6d27c8d3d96b44baab7efb5289b8f9ba
+msgid "Race formats"
+msgstr "Formati di gara"
+
+#: ../../reference/formats.rst:6 b1e2fb513a514b69ba8280a98906a4ab
+msgid ""
+"A format takes the start list plus whatever the jury typed and returns an "
+"ordered list of ``Placing``. Sorting is the same everywhere: classified "
+"entrants by their own result, then ``REL``, ``DNF``, ``DNS``, ``NS``, "
+"``DSQ`` — one convention (``core/formats/base.py``), not a sentinel scheme "
+"per format."
+msgstr ""
+
+#: ../../reference/formats.rst:11 5d252045d93d4964a1922ad9bcd773b5
+msgid ""
+"Everything a format needs lives in the persisted ``RaceState.payload``, so a"
+" browser reload or a crash loses nothing. ``core.race`` is the service layer"
+" above them: who is entered, which format applies, how a bracket composes "
+"the round after it."
+msgstr ""
+
+#: ../../reference/formats.rst:20 ea6473a3f82b4f5f9abf9efa25284b19
+msgid "``fmt``"
+msgstr ""
+
+#: ../../reference/formats.rst:21 cd0b0df17d3e40a08196d181e860c649
+msgid "Events"
+msgstr "Specialità"
+
+#: ../../reference/formats.rst:22 1eb210b8f2264a12a09e33fa6d15966b
+msgid "What the jury types"
+msgstr "Che cosa scrive la giuria"
+
+#: ../../reference/formats.rst:23 6dfc367315c94279af27cb0d1fa1b931
+msgid "Module"
+msgstr "Modulo"
+
+#: ../../reference/formats.rst:24 9353ecb67f244a57808c4a329975e970
+msgid "``points`` / ``tempo`` / ``scratch``"
+msgstr ""
+
+#: ../../reference/formats.rst:25 ff247c90cb7045caae35f702480505c3
+msgid "points race, tempo race, scratch, omnium races"
+msgstr ""
+
+#: ../../reference/formats.rst:26 4da6b51221994b6f9f1244432786e80a
+msgid "sprint order: ``3,7,1,9-7,3,9,1``"
+msgstr ""
+
+#: ../../reference/formats.rst:27 ../../reference/formats.rst:31
+#: ../../reference/formats.rst:35 61adeb87dd534a08a1f049bb25a8eb4b
+#: a947b978a92840ddbeecb81fe6e38397 f66d5cd8a52945e3a58158718592b4c7
+msgid "``formats/group.py``"
+msgstr ""
+
+#: ../../reference/formats.rst:28 cb06555e2c1146e6b4e0e49d9b43e8d8
+msgid "``madison``"
+msgstr ""
+
+#: ../../reference/formats.rst:29 5ea929935adb473e965faa93f9b3d21b
+msgid "madison"
+msgstr ""
+
+#: ../../reference/formats.rst:30 42a99ed226754f99af891c8bb3f35ecb
+msgid "as a points race, scored by pair"
+msgstr ""
+
+#: ../../reference/formats.rst:32 ca5e2fb6ee624b07a7b3cec24d7702de
+msgid "``elimination``"
+msgstr ""
+
+#: ../../reference/formats.rst:33 ../../reference/formats.rst:89
+#: a59e6e9297e5458bab90f1828aaa0ef6 df4e7acc7d11416d8eae0103c4785898
+msgid "elimination"
+msgstr ""
+
+#: ../../reference/formats.rst:34 643756d180bb4ccfb87e16e5f973fe16
+msgid "bibs in the order they went out"
+msgstr ""
+
+#: ../../reference/formats.rst:36 fd1e65012cd14adeb451cb05cb8834c2
+msgid "``timed`` / ``timed_team``"
+msgstr ""
+
+#: ../../reference/formats.rst:37 0e8e85ede34c4a578dd651defa882c93
+msgid "individual and team pursuit, km, 500 m, team sprint"
+msgstr ""
+
+#: ../../reference/formats.rst:38 e7dfa5da33f64699b7d38c65ae7adf96
+msgid "heats ``1,2,3,4-5,6,7,8/…`` and the times"
+msgstr ""
+
+#: ../../reference/formats.rst:39 d8b2aae0d2ce4b7086584b1298559756
+msgid "``formats/timed.py``"
+msgstr ""
+
+#: ../../reference/formats.rst:40 74ac01b43a764ecba253181be47d3697
+msgid "``bracket`` (sprint)"
+msgstr ""
+
+#: ../../reference/formats.rst:41 bc87b789143a4fa4b549c0249b6aed01
+msgid "sprint"
+msgstr ""
+
+#: ../../reference/formats.rst:42 1bedf3f64a284550974772e8c2d5d366
+msgid "scheme picked on the 200 m, then who won each run"
+msgstr ""
+
+#: ../../reference/formats.rst:43 2da9216350c242ec8d0467d82cf95024
+msgid "``formats/sprint.py``"
+msgstr ""
+
+#: ../../reference/formats.rst:44 bf6fe0fad926474cb1954228069dd1fd
+msgid "``bracket`` (keirin)"
+msgstr ""
+
+#: ../../reference/formats.rst:45 ea32de8511b14366a3b893393b82dbe5
+msgid "keirin"
+msgstr ""
+
+#: ../../reference/formats.rst:46 bbe9bf9a332c404182ed1dfe405d961c
+msgid "heats composed by the jury, then each finish"
+msgstr ""
+
+#: ../../reference/formats.rst:47 8a7e4123ea7542499c80885a364611f4
+msgid "``formats/keirin.py``"
+msgstr ""
+
+#: ../../reference/formats.rst:48 df12c41bdfd54619b8e462a4b03e722d
+msgid "``omnium``"
+msgstr ""
+
+#: ../../reference/formats.rst:49 0299b4ddf03c4f04920dd6baef897d60
+msgid "omnium"
+msgstr ""
+
+#: ../../reference/formats.rst:50 a51145fd243a4232a4e6706c22e4f0fa
+msgid "the four races, summed"
+msgstr ""
+
+#: ../../reference/formats.rst:51 3c9611bac0484c8580379084b98fba80
+msgid "``formats/omnium.py``"
+msgstr ""
+
+#: ../../reference/formats.rst:52 3f09c36dea684f5896bc94abf7c1fea6
+msgid "``derny``"
+msgstr ""
+
+#: ../../reference/formats.rst:53 9c4a174452d8405d87077320973df133
+msgid "derny"
+msgstr ""
+
+#: ../../reference/formats.rst:54 9c53a76e6c3a409cab27475a5b574430
+msgid "called live, one button per passage"
+msgstr ""
+
+#: ../../reference/formats.rst:55 dee4330bade2405db5ec8dac8ac505e4
+msgid "``formats/derny.py``"
+msgstr ""
+
+#: ../../reference/formats.rst:59 27929ebb7ff54b9cbe1e5bfac38f609c
+msgid "The jury's shorthand"
+msgstr "La grafia della giuria"
+
+#: ../../reference/formats.rst:61 77e1aa1848034f06b04d4be90db12b5b
+msgid "Three separators, everywhere (``core/parse.py``):"
+msgstr ""
+
+#: ../../reference/formats.rst:69 9a3af7c5a62446f8a70b6ab1b55b1484
+msgid ""
+"Errors raise ``ParseError`` rather than blanking the page. Whatever is typed"
+" is checked inline by ``core.checks.bib_line``, which produces the ``?7`` / "
+"``!3`` / ``-2`` / ``<4`` flags — one implementation, so one notation holds "
+"in every field."
+msgstr ""
+
+#: ../../reference/formats.rst:76 3ef0e4e832404133b8dd07b946ff4141
+msgid "Bunch races"
+msgstr "Prove di gruppo"
+
+#: ../../reference/formats.rst:78 ab8918118af24cf2bbbb5a488606e738
+msgid "points race / madison"
+msgstr ""
+
+#: ../../reference/formats.rst:79 a9dce8905c0f4a34adf43010ea832887
+msgid ""
+"5-3-2-1 to the first four of each sprint, 10-6-4-2 in the final sprint. A "
+"lap gained is +20, a lap lost −20. Ties broken by the placing in the last "
+"sprint."
+msgstr ""
+
+#: ../../reference/formats.rst:83 b135bc8b814a445ba6fd823465f59718
+msgid "tempo race"
+msgstr ""
+
+#: ../../reference/formats.rst:84 ac4b178bcee340688e31e3e3dd5691d4
+msgid "1 point to the winner of each sprint. The ±20 lap rule applies."
+msgstr ""
+
+#: ../../reference/formats.rst:86 cddfded9c0c14d2dbd3af8ae4c064a63
+msgid "scratch"
+msgstr ""
+
+#: ../../reference/formats.rst:87 20de7ca6bfcc4517864ae74c46dd1998
+msgid "No points: the finishing order is the classification."
+msgstr ""
+
+#: ../../reference/formats.rst:90 a1add5a8368f4a76bbd991ad0c541ce3
+msgid ""
+"Riders are entered in the order they are eliminated; the first one out is "
+"last, the winner is the last number typed."
+msgstr ""
+
+#: ../../reference/formats.rst:93 e142fb598f34411d999fd6bd1eaa6b45
+msgid ""
+"A ``DNF`` keeps the points it scored; an ``ABD`` does not. Riders still in "
+"an elimination print with a **blank position**, so the same sheet works as a"
+" live provisional. A rider is never placed by the app for not having been "
+"typed."
+msgstr ""
+
+#: ../../reference/formats.rst:99 16fdffde3c094e438f1162a78a51f382
+msgid "Timed races"
+msgstr "Prove a cronometro"
+
+#: ../../reference/formats.rst:101 13978739c08048b0ac8c8cbddd71a962
+msgid ""
+"Entrants are individual riders or whole teams, and a team has **one** time —"
+" not a time typed on an arbitrary rider row."
+msgstr ""
+
+#: ../../reference/formats.rst:104 e6f45d97b0004edeb679a3358df249d1
+msgid ""
+"Finals are loaded from qualifying: the first four qualified ride two finals,"
+" 3rd against 4th first and 1st against 2nd last. Each final assigns the "
+"places it rides for; whoever did not qualify keeps the order — and the time "
+"— of qualifying. A final that is not ridden is closed from the sidebar, "
+"either as a dead heat (the two share the lower place, no champion named, no "
+"time) or on the qualifying times."
+msgstr ""
+
+#: ../../reference/formats.rst:111 8061c47c745b433fa1ed0b7aaf278588
+msgid ""
+"**Two at a time or one at a time** is a jury choice on *this* event, saved "
+"with it: pursuits normally run two per heat, but a category may be sent off "
+"one at a time like a team sprint. The sheets follow, counting starts instead"
+" of heats."
+msgstr ""
+
+#: ../../reference/formats.rst:117 340a5d8ba72d45b4b58d7d06926dbbdc
+msgid "Sprint"
+msgstr "Velocità"
+
+#: ../../reference/formats.rst:119 a99d983cc1b14e0c855f94654cc0c2a2
+msgid "Composition follows the UCI tables in Part 3."
+msgstr ""
+
+#: ../../reference/formats.rst:121 2c8136edfd4845c5b77827656e427d5a
+msgid ""
+"Heats are seeded **serpentine** on the current ranking. With two riders per "
+"heat that is the familiar mirror pairing ``N1-N24, N2-N23, …``; with seven "
+"it reproduces the keirin table ``A: R1 R8 R9 R16 R17 R24 R25``."
+msgstr ""
+
+#: ../../reference/formats.rst:124 9a28f92ddafa4aa580d62bb622093c22
+msgid ""
+"The riders who do not qualify go to the repechages, composed the same way "
+"over the losers in order."
+msgstr ""
+
+#: ../../reference/formats.rst:126 dcbf2fd893a7460481e57cb7c182f4c5
+msgid ""
+"Riders knocked out in a round rank below those knocked out later, and among "
+"themselves by the 200 m qualifying time."
+msgstr ""
+
+#: ../../reference/formats.rst:129 c88586d315a34b05ac3dad1e23e5dfe5
+msgid ""
+"Two schemes ship, picked on the 200 m: ``12`` (the default — 12 qualify, "
+"four rounds, with repechages) and ``8`` (8 qualify, three rounds, none). "
+"Nothing is hard-coded to a bracket: the number of heats and how many advance"
+" come from the programme, so a category with fewer entries runs a shorter "
+"bracket without a code change."
+msgstr ""
+
+#: ../../reference/formats.rst:137 614c9066cb7c475ab57b9a6bc1bea744
+msgid "Keirin"
+msgstr "Keirin"
+
+#: ../../reference/formats.rst:139 cf7d316b75b64b849268827845bf6842
+msgid ""
+"A keirin is not seeded off a qualifying race: there is no time to rank "
+"anybody on, so the jury composes the first round itself. What the app "
+"supplies is the **shape** of the tournament, from the number of entries, off"
+" UCI table 3.2.135."
+msgstr ""
+
+#: ../../reference/formats.rst:143 0285f0b6d5884db7ac746e212356a02a
+msgid "Two matrices do the composing, and neither is guessed:"
+msgstr ""
+
+#: ../../reference/formats.rst:145 111c7ed5c7f64d37b0b1049398e880f6
+msgid ""
+"the **repechages** take the riders each heat did not qualify and spread them"
+" so that as few as possible meet again — firsts left behind in heat order, "
+"seconds backwards, thirds backwards from one place further round. With four "
+"heats of seven that reproduces the UCI 28-rider table line for line."
+msgstr ""
+
+#: ../../reference/formats.rst:149 0ea26040a6844b4fb3746c28dc3340c2
+msgid ""
+"the **round that follows** deals the qualifiers one *place* at a time — all "
+"the winners, then all the seconds, then the repêchés — snaking each block "
+"and turning it round between blocks, so a heat winner and the rider it beat "
+"do not line up together again."
+msgstr ""
+
+#: ../../reference/formats.rst:156 1aadd0ff8afc4c9caa42e7eb77d8aa19
+msgid "Omnium"
+msgstr "Omnium"
+
+#: ../../reference/formats.rst:158 563c307bc3a34b5785b6a47cdee68c5c
+msgid ""
+"Four races, one classification: **scratch, tempo race, elimination, points "
+"race**, in that order."
+msgstr ""
+
+#: ../../reference/formats.rst:163 06b3ec6cfa154d4fb38ed42080d96859
+msgid ""
+"The four keys those races are scheduled under in ``programme.yaml`` and "
+"saved under in ``races/<id>.json`` are programme vocabulary, not labels. "
+"Translating them would stop the app finding a race. What the jury *reads* "
+"comes from ``core.i18n``."
+msgstr ""
+
+#: ../../reference/formats.rst:168 cdd132169b354366833c3883dbafbc03
+msgid ""
+"The first three are scored on the UCI placing scale — **40 for the win, then"
+" −2 per place down to 2 for 20th, 1 from 21st on**. The points race is "
+"different: the points actually scored in it are **added** to the running "
+"total, so the standings can still be overturned in the last race."
+msgstr ""
+
+#: ../../reference/formats.rst:173 2c92020a48f240128fa2a893c6d6f0b4
+msgid ""
+"Ties are broken by the passage at the last sprint of the points race; where "
+"that race has not been ridden, by the placing in the last race ridden."
+msgstr ""
+
+#: ../../reference/formats.rst:176 baa7624a503b465b98e5504ffdb8217d
+msgid ""
+"An omnium's partial standings *are* the next race's start order, which is "
+"why a rider taking ``DNS`` / ``DNF`` / ``ABD`` / ``DSQ`` in one race drops "
+"out of every later partial and out of the final classification. They stay on"
+" the sheet of the race where the status was written, which is where the "
+"decision is published."
+msgstr ""
+
+#: ../../reference/formats.rst:184 e785cbe7516b4b9facf1edd7b77189d0
+msgid "Derny"
+msgstr "Derny"
+
+#: ../../reference/formats.rst:186 ae84b73a74ea4a6dbb9b0db9d038c7f9
+msgid "Called, not written up. The only thing stored is the call itself:"
+msgstr ""
+
+#: ../../reference/formats.rst:192 65c6dcf8c8fa42979a65d5e058b8a44c
+msgid ""
+"The lap chart, who has lost a lap, the standings, the lap times and the "
+"outliers are all derived from that list, every time it is drawn. Nothing is "
+"cached and nothing is written twice, so a number typed by mistake is undone "
+"by dropping its line."
+msgstr ""
+
+#: ../../reference/formats.rst:197 06801be62bf947fcb081c9981981f3bc
+msgid ""
+"**How the laps are cut.** The head makes the lap: a new column opens the "
+"moment a number is called that has already been called in the column now "
+"open. It needs no button pressed at the right instant."
+msgstr ""
+
+#: ../../reference/formats.rst:201 bc8bfdd24bc3492eb6bee09939e44b29
+msgid ""
+"**How a lap is lost.** A lapped rider does not pass in the column where the "
+"leader passed twice — the number simply is not in it — and shows up again in"
+" the column after. So a bib missing from the columns between two of its own "
+"passages lost a lap there: the chart prints it back in grey where it should "
+"have been and marks the reappearance in red."
+msgstr ""
+
+#: ../../reference/formats.rst:207 2e41ea67b51c4b79b7721d6f2e356997
+msgid ""
+"``?`` is the passage nobody read: it fills its place in the chart, never "
+"cuts a lap (two ``?`` in one column are two different riders), is nobody's "
+"lap and is in no classification, until the jury turns it into a bib."
+msgstr ""
+
+#: ../../reference/formats.rst:211 d468382d16aa494db5be929cbe97ed61
+msgid ""
+"Outliers: from the third lap time onward, mean and σ per rider; a lap "
+"outside the jury's threshold (default 3σ) is flagged on the chart and on the"
+" passage table."
+msgstr ""
+
+#: ../../reference/formats.rst:217 8cec614b8654465fa739ada3439d8f01
+msgid "Composed rounds (``kind: setup``)"
+msgstr "Fasi composte (``kind: setup``)"
+
+#: ../../reference/formats.rst:219 b965eb264fb94807b808f15ed355502b
+msgid ""
+"A madison and an omnium ridden in qualifying heats are composed by the jury,"
+" not by a result. The programme declares a round with ``kind: setup`` — pair"
+" composition for a madison (which also holds the pair numbers), heat "
+"composition for an omnium — with ``eliminate: N`` on it. It is not on any "
+"day and it produces no communiqué. The load control then deals the "
+"qualifiers across what follows — in an omnium, across all four races, "
+"interleaved by heat: 1st of heat 1, 1st of heat 2, 2nd of heat 1, …"
+msgstr ""
+
+#: ../../reference/formats.rst:229 cfe1c06234a144d39d965c0562d130c5
+msgid "What a round files"
+msgstr "Che cosa produce una fase"
+
+#: ../../reference/formats.rst:231 4807d2b958e6448cb6a917a94788e37a
+msgid ""
+"``core.rounds`` proposes, for each round of a format: its distance, its laps"
+" (from the track length), its sprints, how many qualify, how many are "
+"eliminated (UCI 3.2.157), and the documents it may file (``docs_for``)."
+msgstr ""
+
+#: ../../reference/formats.rst:235 a4757d48835940fc824bbd26e83c9f13
+msgid ""
+"Everything it returns is a **proposal**. ``propose_round`` re-proposes one "
+"round, which is what the ↩ control on the Programme page restores; a value "
+"that differs from the proposal is simply a value the jury chose. What it "
+"cannot know it leaves empty — a keirin states its laps and no distance, "
+"because no table here says how long a keirin is."
+msgstr ""

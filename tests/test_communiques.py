@@ -143,3 +143,70 @@ def test_a_sheet_the_register_does_not_plan_opens_unnumbered(comp):
     # planned for the specialità, whatever fase is open
     assert n("Finale", DOC_CLASSIFICATION) == "18"
     assert n("Finale", DOC_RESULTS) == UNNUMBERED
+
+
+@pytest.fixture
+def rebuilt():
+    """The register as the rules would write it, on a competition of its own.
+
+    A copy, not the session fixture: rebuilding rewrites every entry, and the
+    rest of the suite reads the authored CITA 26 register.
+    """
+    from conftest import programme_path
+    from core.config import load_competition
+
+    comp = load_competition(programme_path())
+    comp.communiques = C.autonumber(comp, [], rebuild=True)
+    return comp
+
+
+def test_the_number_of_a_merged_sheet_goes_on_the_classification(rebuilt):
+    """One comunicato, one number, and it is printed once.
+
+    A madison is one finale and its classifica *is* that ordine d'arrivo: the
+    two are one sheet on one number. Printed under both columns of the
+    programme it read as two comunicati, so the number goes where people look
+    it up - on the classifica - and the risultati under it carry none.
+    """
+    comp = rebuilt
+    spec = next(c for c in comp.communiques
+                if [s.doc for s in c.sheets] == [DOC_RESULTS,
+                                                 DOC_CLASSIFICATION]
+                and c.event == "madison")
+
+    def n(doc, round_key=""):
+        return C.number_for(comp, spec.cat, "madison", round_key, doc)
+
+    assert n(DOC_CLASSIFICATION) == str(spec.n)
+    assert n(DOC_RESULTS, spec.round_key) == C.UNNUMBERED
+
+    # off, the sheets of the comunicato both print it - same number, twice
+    comp.number_on_classification = False
+    assert n(DOC_RESULTS, spec.round_key) == str(spec.n)
+
+
+def test_the_start_order_carried_by_results_keeps_its_own_answer(rebuilt):
+    """Only the classifica takes the number off another sheet.
+
+    A velocità publishes the risultati of a turno with the ordine di partenza
+    of the next: two sheets, one number, and the number is the risultati' -
+    there is no classifica in it to move it onto.
+    """
+    comp = rebuilt
+    spec = next(c for c in comp.communiques
+                if c.event == "velocita" and c.doc == DOC_RESULTS
+                and any(s.doc == DOC_STARTLIST for s in c.sheets[1:]))
+    assert C.number_for(comp, spec.cat, "velocita", spec.round_key,
+                        DOC_RESULTS) == str(spec.n)
+
+
+@pytest.mark.parametrize("value, text", [
+    ("7", "7"), (7, "7"), ("  12  ", "12"), ("92 RET", "92 RET"),
+    # what a register written before this said for "no number", and what an
+    # empty field says now
+    ("-1", ""), (-1, ""), ("0", ""), ("", ""), (None, ""),
+])
+def test_no_number_reads_the_same_however_it_was_written(value, text):
+    from core.models import number_text
+
+    assert number_text(value) == text

@@ -86,8 +86,8 @@ def test_every_categoria_comes_out_named_and_sexed(code):
 
 
 def test_the_usual_sigle_are_the_ones_a_programme_is_written_in():
-    assert set(CAT.category_codes()) >= {"ES", "ED", "AL", "DA",
-                                         "JU", "DJ", "UN", "DU"}
+    assert set(CAT.category_codes()) >= {"ES", "ED", "AL", "DA", "JU", "DJ",
+                                         "UN", "DU", "EL", "DE"}
     assert CAT.category("DA", order=4) \
         == type(CAT.category("DA"))(code="DA", name="ALLIEVE FEMMINE",
                                     sex="F", order=4)
@@ -144,3 +144,45 @@ def test_the_500_is_the_same_race_over_half_the_distance():
     rnd = RD.propose(comp, "DA", "500")[0]
     # half-lap resolution, because it is ridden against the clock
     assert (rnd.distance, rnd.laps) == (0.5, 1.5)
+
+
+def test_a_finale_diretta_is_ridden_as_the_programme_says_it_is():
+    """A *Finale* nothing seeded is a race against the clock, not batterie.
+
+    A velocità a squadre run as a finale diretta - no qualificazione under it -
+    is ridden one squadra at a time, which is what its own regulation says
+    (`teams_per_start: 1`) and what a jury that picks *uno alla volta* in
+    Programma asks for. Reading the name *Finale* alone answered "two teams
+    seeded from a qualification, nothing to choose" and composed the batterie
+    in pairs anyway, throwing the programme away.
+    """
+    from core import race as R
+    from core.config import ProgrammeItem, Round
+
+    comp = Competition(track_len=1 / 3)
+    comp.events["vel_squadre"] = CAT.event("vel_squadre")
+    comp.programme.append(ProgrammeItem(
+        cat="AL", event="vel_squadre", day=1,
+        rounds=[Round(key=RD.FINAL, docs=["partenti", "risultati"])]))
+
+    kind = R.round_format(comp, "AL", "vel_squadre", RD.FINAL)
+    assert R.can_choose_starts(comp, "vel_squadre", kind, RD.FINAL, "AL")
+
+    state = R.RaceState(race_id="AL_vel_squadre_finale", cat="AL",
+                        event="vel_squadre", round_key=RD.FINAL, fmt=kind)
+    assert R.solo_starts(comp, state)
+
+
+def test_a_finale_seeded_by_a_qualification_is_still_two_at_a_time():
+    """The other half of it: two squadre, one per straight, whatever is picked."""
+    from core import race as R
+    from core.config import ProgrammeItem, Round
+
+    comp = Competition(track_len=1 / 3)
+    comp.events["vel_squadre"] = CAT.event("vel_squadre")
+    comp.programme.append(ProgrammeItem(
+        cat="AL", event="vel_squadre", day=1,
+        rounds=[Round(key="Qualificazioni"), Round(key="Finali")]))
+
+    kind = R.round_format(comp, "AL", "vel_squadre", "Finali")
+    assert not R.can_choose_starts(comp, "vel_squadre", kind, "Finali", "AL")

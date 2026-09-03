@@ -1,0 +1,64 @@
+/* Blue Band documentation - the few things the theme gets wrong for us. */
+
+/* The left menu had a scrollbar on every page, with nine links in it.
+   `.bd-sidebar-primary` is a flex column capped at the viewport height, and
+   its last child (`sidebar-primary-items__end`, empty here) carries
+   `margin-top: auto` - which stretches the column to the full height on its
+   own, so the 1rem of bottom padding then overflowed it by exactly that much.
+   Nothing is below the nav, so the stretch buys nothing: drop it, and the
+   sidebar is as tall as its content. `overflow-y: auto` then shows a
+   scrollbar only on a window genuinely too short for the menu. */
+.bd-sidebar-primary .sidebar-primary-items__end {
+  margin-top: 0;
+}
+
+.bd-sidebar-primary {
+  overflow-y: auto;
+}
+
+/* The wordmark is 2000x512; left to itself it lays out far too tall for a
+   sidebar. Cap it and let the width follow the aspect ratio. */
+.bd-sidebar-primary .navbar-brand img,
+.bd-sidebar-primary .logo__image {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 3rem;
+}
+
+/* ── EN | IT switcher (see _templates/language-switcher.html) ────────────── */
+
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.25rem;
+  overflow: hidden;
+  margin-right: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.language-switcher .lang-btn {
+  padding: 0.35rem 0.5rem;
+  color: var(--pst-color-text-muted);
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.language-switcher .lang-btn + .lang-btn {
+  border-left: 1px solid var(--pst-color-border);
+}
+
+.language-switcher .lang-btn:hover {
+  background: var(--pst-color-surface);
+  color: var(--pst-color-text-base);
+  text-decoration: none;
+}
+
+/* the language being read is the one that looks pressed */
+.language-switcher .lang-btn.active {
+  background: var(--pst-color-primary);
+  color: var(--pst-color-background);
+}

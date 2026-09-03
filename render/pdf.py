@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 
 from core.i18n import msg
@@ -27,8 +28,18 @@ class PdfError(RuntimeError):
     """Chromium is missing or failed to produce the file."""
 
 
+@lru_cache(maxsize=1)
 def browser() -> str | None:
-    """Path of a usable Chromium/Chrome binary, or None."""
+    """Path of a usable Chromium/Chrome binary, or None.
+
+    Looked up once per process. `shutil.which` walks the whole PATH for each of
+    six names, and on a Windows-mounted PATH - which is what WSL gives every
+    session - that is a quarter of a second of stat calls over a 9p mount. It
+    is asked on every rerun of the app (`ui.download.save_button`), which put
+    it among the slowest things the derny page did between one passage and the
+    next. Installing a browser while the app is running needs a restart, or
+    `browser.cache_clear()`.
+    """
     for name in CANDIDATES:
         found = shutil.which(name)
         if found:

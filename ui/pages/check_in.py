@@ -1,11 +1,13 @@
 """CHECK-IN ("Verifica") - licence check and entry-list editing.
 
-The licence check runs before the racing starts, so the tick marks who *is*
-there (`Ver.`), not who is missing: what is left unticked is the work still to
-do. A rider who will not start at all is flagged separately (`NP`).
+The licence check runs before the racing starts, and it ends with the giuria
+writing down what each rider rides: a rider with at least one event on
+the grid counts as verified, one with none is the work still to do. There is
+no tick of its own to forget. A rider who will not start at all is flagged
+separately (`NP`).
 
 The page reads, in this order: the four counters (atleti, verificati, squadre,
-coppie), the tabella specialità, the findings, then the grid the jury edits.
+coppie), the event-entry table, the findings, then the grid the jury edits.
 
 Importing is *not* here - it is a setting (Impostazioni → Elenco iscritti).
 The entry file is never written to: edits are appended to the overlay as
@@ -29,19 +31,19 @@ from core.store import Store
 from ui import notify
 
 # Grid columns, in order: the code names, shown with their Italian labels.
-GRID = ["checked_in", "not_starting", "bib", "last_name", "first_name",
+GRID = ["not_starting", "bib", "last_name", "first_name",
         "uci_id", "cat", "region", "club", "club_code"]
 EDITABLE = ["bib", "last_name", "first_name", "region", "club", "club_code"]
 #: The four states the grid filters on, by catalogue key: the widget holds the
 #: key, the word beside it is looked up when the picker is drawn.
-ALL, TODO, DONE, NP = "state_all", "state_todo", "state_done", "state_np"
-STATES = [ALL, TODO, DONE, NP]
+ALL, TODO, DONE, NS = "state_all", "state_todo", "state_done", "state_ns"
+STATES = [ALL, TODO, DONE, NS]
 
 
 def render(competition: str, comp: Competition, store: Store) -> None:
     el, stale = E.effective_entries(store, comp)
     if el is None:
-        notify.info("import_entries_in_settings")
+        notify.info("entry_book_needs_building")
         return
     if stale:
         notify.warn("stale_patches",
@@ -62,6 +64,7 @@ def render(competition: str, comp: Competition, store: Store) -> None:
     _counters(el, comp)
     _speciality_table(el, comp)
     _issues(el, comp)
+    _teams_half_done(el, comp)
     _editor(el, comp, store)
     _history(store)
 
@@ -86,7 +89,7 @@ def _counters(el, comp: Competition) -> None:
 
 
 def _speciality_table(el, comp: Competition) -> None:
-    """The tabella specialità: each categoria across the programme.
+    """The tabella event: each categoria across the programme.
 
     The same table Documenti prints (`render.documents.speciality_table`), from
     the same `core.recap` rows - the screen and the sheet can only agree.
@@ -107,6 +110,39 @@ def _speciality_table(el, comp: Competition) -> None:
     table[-1][label("cat")] = ui("total")
     st.dataframe(pd.DataFrame(table), hide_index=True,
                  use_container_width=True)
+
+
+def _teams_half_done(el, comp: Competition) -> None:
+    """Squadre the verifica has started on, and who in them is still blank.
+
+    Verification is read from the event now, so a squadra with some
+    riders entered and others not is the one signal that the desk stopped
+    halfway: the giuria took that squadra's riders one by one and left some
+    without a single event. The ones already declared NP are not part of
+    it - they have been dealt with.
+    """
+    group = comp.team_group
+    left: dict[str, list] = {}
+    started = set()
+    for r in el.riders.values():
+        if r.not_starting:
+            continue
+        team = RC.group_of(r, group) or "-"
+        if r.checked_in:
+            started.add(team)
+        else:
+            left.setdefault(team, []).append(r)
+    half = {t: rs for t, rs in left.items() if t in started}
+    if not half:
+        return
+    notify.warn("teams_half_verified", what=label(group).lower(),
+                n=sum(len(rs) for rs in half.values()),
+                list="\n".join(
+                    f"- **{t}** ({len(rs)}): " + ", ".join(
+                        f"{r.cat} {r.bib or '-'} {r.full_name}"
+                        for r in sorted(rs, key=lambda r: (r.bib or 9999,
+                                                           r.last_name)))
+                    for t, rs in sorted(half.items())))
 
 
 def _issues(el, comp: Competition) -> None:
@@ -151,25 +187,31 @@ def _editor(el, comp: Competition, store: Store) -> None:
         riders = [r for r in riders if not r.checked_in and not r.not_starting]
     elif state == DONE:
         riders = [r for r in riders if r.checked_in]
-    elif state == NP:
+    elif state == NS:
         riders = [r for r in riders if r.not_starting]
-    riders.sort(key=lambda r: (comp.cat_order().index(r.cat)
-                               if r.cat in comp.cat_order() else 99,
-                               r.bib or 9999))
+    # by dorsale: at the desk the jury is handed a number, not a categoria,
+    # and the grid has to be searchable the way the queue arrives at it
+    riders.sort(key=lambda r: (r.bib or 9999, r.last_name, r.first_name))
     if not riders:
         notify.info("no_riders_for_filter")
         return
 
     event_codes = [s for s in comp.event_order() if s != EVENT_ENTRY_LIST]
     heads = comp.event_headers(event_codes)
-    lim = comp.quotas.max_events_per_rider
-    count_reserves = comp.quotas.max_events_count_reserves
+    # the event-count limit, per categoria: one of the rules of the Controlli
+    # tab (`config.Check`), asked for by name because this grid prints the
+    # number beside the count rather than waiting for Verifica to report it
+    rules = {cat: comp.max_events(cat) for cat in comp.cat_order()}
+    lim = {cat: c.max for cat, c in rules.items() if c}
+    count_reserves = any(c.count_reserves for c in rules.values() if c)
     df = pd.DataFrame([{
         "key": r.key,
         **{label(f): getattr(r, f) for f in GRID},
         **{heads[s]: (r.events[s].flag if s in r.events else "")
            for s in event_codes},
-        label("n_events"): r.n_events(include_reserves=count_reserves),
+        label("n_events"): r.n_events(
+            include_reserves=bool(rules.get(r.cat)
+                                  and rules[r.cat].count_reserves)),
         "Max": lim.get(r.cat) or None,
     } for r in riders])
 
@@ -188,12 +230,10 @@ def _editor(el, comp: Competition, store: Store) -> None:
         column_config={
             "key": None, "Max": None,
             # Off the grid: at the licence desk the jury reads a dorsale and a
-            # name, and two long society columns pushed the specialità - the
+            # name, and two long society columns pushed the event - the
             # ones being ticked - off the right edge. The data is still there
             # (the elenco iscritti prints it), just not in the way here.
             label("club"): None, label("club_code"): None,
-            label("checked_in"): st.column_config.CheckboxColumn(
-                width="small", help=help_text("checked_in")),
             label("not_starting"): st.column_config.CheckboxColumn(
                 width="small", help=help_text("not_starting")),
             label("bib"): st.column_config.NumberColumn(width="small"),
@@ -232,20 +272,6 @@ def _editor(el, comp: Competition, store: Store) -> None:
         current = E.load_overlay(store)
         E.save_overlay(store, current + patches)
         notify.ok("edits_saved", n=len(patches))
-        st.rerun()
-
-    # ticking the lot at once goes wherever the single ticks go: the overlay,
-    # or the file when it has the column
-    todo = [r for r in riders if not r.checked_in and not r.not_starting]
-    if todo and (not to_file or "checked_in" in writable) \
-            and st.button(ui("mark_verified", n=len(todo))):
-        patches = [E.Patch(target=r.key, op="set_checked_in", value=True,
-                           reason=ui("check_in_reason")) for r in todo]
-        if to_file:
-            _write_to_file(el, comp, store, patches)
-            return
-        E.save_overlay(store, E.load_overlay(store) + patches)
-        notify.ok("riders_verified", n=len(todo))
         st.rerun()
 
 
@@ -336,13 +362,10 @@ def _diff(before: pd.DataFrame, after: pd.DataFrame, heads: dict[str, str],
                 val = int(val)
             out.append(E.Patch(target=key, op="set_field", field=name,
                                value=val, reason=reason))
-        for name, op in (("checked_in", "set_checked_in"),
-                         ("not_starting", "set_not_starting")):
-            col = label(name)
-            if bool(before.at[i, col]) != bool(after.at[i, col]):
-                out.append(E.Patch(target=key, op=op, value=bool(after.at[i, col]),
-                                   reason=reason or (ui("check_in_reason")
-                                                     if name == "checked_in" else "")))
+        col = label("not_starting")
+        if bool(before.at[i, col]) != bool(after.at[i, col]):
+            out.append(E.Patch(target=key, op="set_not_starting",
+                               value=bool(after.at[i, col]), reason=reason))
         for short, code in short_to_code.items():
             old, new = str(before.at[i, short] or ""), str(after.at[i, short] or "")
             if old.strip() == new.strip():

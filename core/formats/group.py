@@ -9,8 +9,11 @@ Scoring follows the UCI regulations as applied in the jury workbooks:
   applies as well).
 * **scratch** - no points, the finishing order is the classification.
 * **eliminazione** - riders are entered in the order they are eliminated; the
-  first one out is last. While the race is running the riders still in it print
-  with a blank position, so the same sheet works as a live provisional.
+  first one out is last, the winner is the last number typed. While the race is
+  running the riders still in it print with a blank position, so the same sheet
+  works as a live provisional - and the winner is one of them until the jury
+  writes the number down: a rider is never placed by the app for not having
+  been typed.
 """
 
 from __future__ import annotations
@@ -53,7 +56,6 @@ def group_classification(startlist: list[int], sprints: list[list[int]], *,
     known = set(startlist)
     points: dict[int, int] = {b: 0 for b in startlist}
     per_sprint: dict[int, list[int]] = {b: [0] * len(sprints) for b in startlist}
-    last_sprint_rank: dict[int, int] = {b: 10 ** 6 for b in startlist}
 
     for i, sprint in enumerate(sprints):
         for dup in duplicates(sprint):
@@ -76,8 +78,15 @@ def group_classification(startlist: list[int], sprints: list[list[int]], *,
                 points[valid[0]] += 1
                 per_sprint[valid[0]][i] = 1
 
-        for rank, bib in enumerate(valid):
-            last_sprint_rank[bib] = rank
+    # A pari punti decide il passaggio all'ultima volata, e *solo* quello: chi
+    # in quell'ordine non c'e' non ha un passaggio da far valere. Tenere il
+    # piazzamento dell'ultima volata in cui il corridore compariva metteva a
+    # confronto una volata con un'altra, e faceva precedere chi all'ultima non
+    # era passato davanti a chi ci era passato quarto.
+    final = [b for b in (sprints[-1] if sprints else []) if b in known]
+    last_sprint_rank: dict[int, int] = {b: 10 ** 6 for b in startlist}
+    for rank, bib in enumerate(final):
+        last_sprint_rank[bib] = rank
 
     # laps gained / lost
     lap_net: dict[int, int] = {b: 0 for b in startlist}
@@ -159,8 +168,12 @@ def elimination_classification(startlist: list[int], eliminated: list[int], *,
     for i, bib in enumerate(order):
         position[bib] = n - i
     for bib in still:
-        # exactly one rider left is the winner; more than one = race in progress
-        position[bib] = 1 if len(still) == 1 else None
+        # nobody is placed by not being typed. A dorsale missing from the field
+        # is a dorsale the segreteria has still to write down, and the last one
+        # left is the winner of the race - the one line of the sheet that must
+        # never be filled in by the app on its own. It stays pending, above the
+        # blank line, until it is typed.
+        position[bib] = None
 
     placings = [Placing(key=str(b), status=status_of_bib(b),
                         position=position.get(b))
@@ -171,5 +184,4 @@ def elimination_classification(startlist: list[int], eliminated: list[int], *,
                                  int(p.key)))
     placings = sort_by_status(placings, leaving_order(statuses))
 
-    return Result(placings=placings, warnings=warnings,
-                  pending=len(still) if len(still) > 1 else 0)
+    return Result(placings=placings, warnings=warnings, pending=len(still))

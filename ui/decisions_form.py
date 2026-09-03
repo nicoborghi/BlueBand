@@ -7,14 +7,14 @@ one way in the box and another way on the page is how a register stops being
 one.
 
 The form is the *columns* of `core.decisions.Decision`, in the order they are
-answered: which race (categoria, specialità, fase), which dorsale - chosen
+answered: which race (categoria, event, fase), which dorsale - chosen
 among the partenti, not typed from memory - and under which code (`A1`, `C3`).
 Out of those the app composes the sentence, in the wording of the decisions
 already taken, and hands it to the jury to correct. It is a proposal and it
 says so: what the panel decided is the panel's to write.
 
-Above the button, the recap: what has already been decided in this specialità,
-fase by fase. A specialità ridden in more than one fase is one the jury cannot
+Above the button, the recap: what has already been decided in this event,
+fase by fase. An event ridden in more than one fase is one the jury cannot
 hold in its head - the ammonizione given in the turno 1 is what decides whether
 the next one is a squalifica - so it is on the screen before the button that
 files the next decision, and not a page away.
@@ -38,14 +38,14 @@ from ui import notify
 OTHER = "\x00other"
 
 
-# ── the recap of a specialità ───────────────────────────────────────────────
+# ── the recap of an event ───────────────────────────────────────────────
 
 def recap(comp: Competition, store: Store, cat: str, event: str, *,
           decisions: list[D.Decision] | None = None,
           always: bool = False) -> None:
-    """What was decided in this specialità, fase by fase, in a few lines.
+    """What was decided in this event, fase by fase, in a few lines.
 
-    Only where the specialità is ridden in more than one fase: on a scratch,
+    Only where the event is ridden in more than one fase: on a scratch,
     which is one race, the recap would be the decisions of that race listed
     twice - once here and once under the panel. `always` overrides that, for
     the page that has no race under it.
@@ -157,7 +157,7 @@ def _starters(comp: Competition, el: EntryList | None, cat: str,
               event: str, round_key: str) -> list[str]:
     """The dorsali that took the start in this race, in numerical order.
 
-    The entry list of the specialità, not the startlist of the fase: a decision
+    The entry list of the event, not the startlist of the fase: a decision
     is often taken on somebody who did not start the fase it is filed against
     (a rider penalised in the recuperi, a coppia that never lined up), and a
     picker that would not offer them is a picker the jury has to work around.
@@ -166,7 +166,7 @@ def _starters(comp: Competition, el: EntryList | None, cat: str,
         return []
     try:
         keys = R.entrants(el, comp, cat, event, round_key)
-    except Exception:  # a specialità whose format the programme cannot resolve
+    except Exception:  # an event whose format the programme cannot resolve
         keys = []
     return [k for k in keys if str(k).isdigit()]
 

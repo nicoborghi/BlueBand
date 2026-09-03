@@ -1,0 +1,341 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:20+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: it\n"
+"Language-Team: it <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../reference/programme.rst:4 6da3b4e3632847e09a3add58986c81fb
+msgid "``programme.yaml``"
+msgstr "``programme.yaml``"
+
+#: ../../reference/programme.rst:6 bf8e11cf648646e98f11ba9c52a1eda2
+msgid ""
+"One file per competition, and everything the app does comes out of it: "
+"the track, the categories, the events each contests, the rounds of every "
+"event with their distances, the running order of each day, the entry-file"
+" layout and the communiqué register."
+msgstr ""
+
+#: ../../reference/programme.rst:11 f4d639d1d6a34435a1f3fce52605ddd8
+msgid ""
+"It is edited from the Programme page and written by an emitter of our own"
+" (``core/programme.py``) with a **stable layout**: saving the same "
+"programme twice gives the same bytes, and read → write → read returns the"
+" same ``Competition``."
+msgstr ""
+
+#: ../../reference/programme.rst:18 7f37ae9532374508afe25baddb1a819c
+msgid ""
+"A hand-written ``#`` comment is lost on the next write. Notes belong in "
+"the ``note:`` fields — on a programme item, on a round — which round-trip"
+" like everything else."
+msgstr ""
+
+#: ../../reference/programme.rst:24 97dee7e3269f4b128f68922a598c4560
+msgid "Top level"
+msgstr "Livello principale"
+
+#: ../../reference/programme.rst:47 1de9efa5bc7f47c0852630600abacb54
+msgid ""
+"``kind`` decides what a classification prints under the winner: a "
+"*championship* names a champion, an *ordinary* meeting does not, and a "
+"*trofeo_regioni* adds the team points classification to the statistics "
+"page."
+msgstr ""
+
+#: ../../reference/programme.rst:53 41f7778d50fa473cbcecb3b51e68c4c9
+msgid "``categories``"
+msgstr ""
+
+#: ../../reference/programme.rst:61 6645ff76988d4486af53b45a3ac7ff31
+msgid ""
+"``accepts`` is what makes a category *open*: the licence codes admitted "
+"into it, ``M*`` taking every master code. Riders keep their own licence "
+"code beside the name. Standard codes come from "
+"``regulations/categories.json``; anything else is declared here."
+msgstr ""
+
+#: ../../reference/programme.rst:68 2722aaf4130d476185ab8bd49b942b26
+msgid "``events``"
+msgstr ""
+
+#: ../../reference/programme.rst:85 a804cf91a4fe4d9b972bf15438591337
+msgid ""
+"**What an event *is*** — code, abbreviation, format, riders per team, how"
+" many start together — is the same at every meeting and lives in "
+"``regulations/events.json``. The programme writes back only what it does "
+"*differently*. The ``name`` always stays here, because it is what gets "
+"printed."
+msgstr ""
+
+#: ../../reference/programme.rst:90 572e475533de40d1b01ca0bed95e2758
+msgid ""
+"``fmt`` is one of ``group``, ``points``, ``tempo``, ``scratch``, "
+"``madison``, ``elimination``, ``timed``, ``timed_team``, ``bracket``, "
+"``derny``. See :ref:`formats`."
+msgstr ""
+
+#: ../../reference/programme.rst:96 32f3aef369c64533893be0ab63226be0
+msgid "``programme``"
+msgstr ""
+
+#: ../../reference/programme.rst:98 777de282b65549ee8449a30639ad32a4
+msgid ""
+"One entry per **(category, event)** pair — one event, whatever number of "
+"days it spans:"
+msgstr ""
+
+#: ../../reference/programme.rst:118 a7f9ac6f5e974099ab0fdd3083af75d7
+msgid ""
+"The document kinds — ``partenti``, ``risultati``, ``classifica`` and the "
+"rest — and the round keys are **stored values**, not labels: they are "
+"what is written in this file and what race files are named after, so they"
+" are reproduced here exactly as they must be typed. Translating one would"
+" stop the app finding its own race. What the jury reads instead comes "
+"from ``core.i18n``; see :ref:`i18n`."
+msgstr ""
+
+#: ../../reference/programme.rst:126 4ec690b245b14eb6a0be5cafbcfcd38d
+msgid "Round fields"
+msgstr "I campi di un round"
+
+#: ../../reference/programme.rst:132 06e3e669dcf24ad9b2d914d1e80135f9
+msgid "Field"
+msgstr "Campo"
+
+#: ../../reference/programme.rst:133 4974df453e384649ba6184c017c3ee5a
+msgid "Meaning"
+msgstr "Significato"
+
+#: ../../reference/programme.rst:134 77c2b51374544a67a3093f05a6069fd7
+msgid "``key``"
+msgstr ""
+
+#: ../../reference/programme.rst:135 464dfddab53742ab9a90b408d31b2c10
+msgid "The round's name. Written as it prints."
+msgstr ""
+
+#: ../../reference/programme.rst:136 c0d5e80b0d1141da9e747830fd35ede6
+msgid "``label``"
+msgstr ""
+
+#: ../../reference/programme.rst:137 35fa13d76df14c7183d0bea665b79d7e
+msgid "Display override, where the key is a technical one."
+msgstr ""
+
+#: ../../reference/programme.rst:138 0473e071033f436a8da338bd28ba9fc3
+msgid "``seq``"
+msgstr ""
+
+#: ../../reference/programme.rst:139 b33f263b9d264707ab5bbc0d6eb493ab
+msgid "Position in the day's running order."
+msgstr ""
+
+#: ../../reference/programme.rst:140 d69d860d85d74b41aacaa6d3f3d8e8a5
+msgid "``day``"
+msgstr ""
+
+#: ../../reference/programme.rst:141 d5c987ac3c76442ca38da4329f0c7e86
+msgid ""
+"Which day this round is on. An event split across days is one entry with "
+"rounds on different days."
+msgstr ""
+
+#: ../../reference/programme.rst:143 45ad65b3a16d494aa227015fd5c2b684
+msgid "``duration``"
+msgstr ""
+
+#: ../../reference/programme.rst:144 297540ac3e3e42ffb6de400a3cc65fe4
+msgid ""
+"Minutes. **Start times are computed** from ``day_start`` plus the "
+"durations before it, not typed."
+msgstr ""
+
+#: ../../reference/programme.rst:146 218e6d86177044a49d0bf6346ca3014d
+msgid "``distance`` / ``laps`` / ``sprints``"
+msgstr ""
+
+#: ../../reference/programme.rst:147 b66a5af475ec4208bb2b52c968f9a0fd
+msgid ""
+"km, laps and number of sprints. An explicit value wins over the one "
+"derived from ``regulations/distances.json`` and the track length: some "
+"races do not follow the formula."
+msgstr ""
+
+#: ../../reference/programme.rst:150 16739d35663444bf9ae7d8f77884767a
+msgid "``docs``"
+msgstr ""
+
+#: ../../reference/programme.rst:151 c3cfd6ad59dc449ba1c332409f3cf0ea
+msgid "Which sheets this round files. See :ref:`communiques`."
+msgstr ""
+
+#: ../../reference/programme.rst:152 a15be850e44143688afbb09c05f6c9da
+msgid "``heat_size``, ``qualify``"
+msgstr ""
+
+#: ../../reference/programme.rst:153 624cdbca9a4946eea42a3d4aba494220
+msgid "Sprint and keirin: riders per heat, how many advance."
+msgstr ""
+
+#: ../../reference/programme.rst:154 65813b7edaf5493c9248e0cfb59bf829
+msgid "``eliminate``"
+msgstr ""
+
+#: ../../reference/programme.rst:155 cd93536aac6c4e93a0387e91564e3512
+msgid ""
+"Madison and omnium qualifying heats: how many go out of each. UCI 3.2.157"
+" puts the floor at 2."
+msgstr ""
+
+#: ../../reference/programme.rst:157 bc23cb1f8f27464da6dba9593af1c2e6
+msgid "``kind``"
+msgstr ""
+
+#: ../../reference/programme.rst:158 de5fa795c0a24bb6aac5def2d79651b3
+msgid ""
+"``setup`` for a round that is composed rather than ridden; ``pause`` for "
+"a break in the running order."
+msgstr ""
+
+#: ../../reference/programme.rst:160 1b0f42ec6629462c94252a431dd06713
+msgid "``note`` / ``sheet_note`` / ``results_note``"
+msgstr ""
+
+#: ../../reference/programme.rst:161 64f38e7c668d40c896015a50ce3c0470
+msgid ""
+"A service note (not printed), and the lines the start order and the "
+"results sheet open on (printed)."
+msgstr ""
+
+#: ../../reference/programme.rst:164 94d938140b3f45f09c308d143b3b8a20
+msgid ""
+"A **pause** is a round with ``kind: pause`` — no category, no event, no "
+"communiqués. It exists because an hour the programme does not count is an"
+" hour every time below it is wrong about."
+msgstr ""
+
+#: ../../reference/programme.rst:170 bb5156e148d445eea7d4014170b5856c
+msgid "``communiques``"
+msgstr ""
+
+#: ../../reference/programme.rst:172 39bb839061c04928bac5d12f90c2f7a7
+msgid "The register. One entry per numbered sheet:"
+msgstr ""
+
+#: ../../reference/programme.rst:185 a2dd444839bc402da705a55bd29568df
+msgid ""
+"``with:`` is how one number carries more than one sheet — a bare document"
+" kind inherits the entry's own category, event and round; a mapping "
+"overrides what it names. An empty ``round: \"\"`` means the sheet belongs"
+" to the *event*, not to any round of it, which is what a classification "
+"is. ``pinned: true`` freezes a number against recalculation. See "
+":ref:`communiques`."
+msgstr ""
+
+#: ../../reference/programme.rst:193 f146fadc8492466ba9efc63a69499852
+msgid "``checks``"
+msgstr ""
+
+#: ../../reference/programme.rst:195 de27642a80dd4eb2b74bb85ea6cf501c
+msgid "One row per sentence of the regulation's article on entries."
+msgstr ""
+
+#: ../../reference/programme.rst:204 3aa1e7d79f3c48229f64f01320b2572a
+msgid ""
+"``cat`` and ``event`` take a code or ``*``; ``unit`` is ``riders``, "
+"``teams``, ``pairs`` or ``events``; ``per`` is ``region``, ``club``, "
+"``club_in_region``, ``cat`` or ``rider`` (the last only with ``unit: "
+"events``); ``max: 0`` switches the row off; ``level`` is ``error``, "
+"``warn`` or ``off``; ``count_reserves`` says whether reserve entries "
+"count; ``note`` is the article, printed at the foot of every finding the "
+"rule raises."
+msgstr ""
+
+#: ../../reference/programme.rst:211 d8db5f014f934285a0b5bcbc8262a29d
+msgid ""
+"**Nothing here blocks.** A rule set to ``error`` is red at the licence "
+"desk and counts in the summary; the meeting saves, prints and runs "
+"regardless. A derogation is the jury's to grant, not the file's to "
+"refuse."
+msgstr ""
+
+#: ../../reference/programme.rst:217 e12d05df24e04d79bf91ce4cdf17a2ad
+msgid "``entries``"
+msgstr ""
+
+#: ../../reference/programme.rst:219 ec024b1e478b41efa05a5c28d56cefd3
+msgid "How the entry file is read and what a team is at this meeting."
+msgstr ""
+
+#: ../../reference/programme.rst:235 d3c922f5d0c549fea74e3b3b807907d4
+msgid ""
+"Column headings are matched **by name, never by position**, so a shifted "
+"column does not silently import garbage and a differently-worded export "
+"is a config change rather than a code change. What a competition states "
+"here wins over the format's own table."
+msgstr ""
+
+#: ../../reference/programme.rst:242 445726f977f94bbb8035af23b054bcb0
+msgid ""
+"The ``check_in`` keys are the literal column headings of the federation's"
+" workbook, which is why ``NP`` appears there: it is a heading in a file, "
+"not a result code. The code for a rider who will not start is ``NS`` — "
+"see the :ref:`glossary`."
+msgstr ""
+
+#: ../../reference/programme.rst:247 e38498d12d224fcca9cd5bd7c7b54d0a
+msgid ""
+"``team_merge`` is the derogation where two regions field one team: it "
+"changes how the teams of those events are composed and the name they race"
+" under, and nothing else — every rider stays in their own region for "
+"individual events, quotas and the per-team recap. See :ref:`entries`."
+msgstr ""
+
+#: ../../reference/programme.rst:254 bfb0bf13f1884b6e9755a094f68faee7
+msgid "``branding`` and ``merge``"
+msgstr "``branding`` e ``merge``"
+
+#: ../../reference/programme.rst:256 fb4e55a241754d9d832fe7fd9cd1ec90
+msgid ""
+"``branding`` is how a sheet looks: header and footer images and their "
+"fit, the header-line and footer-line slots, the signature, the name "
+"style, the decision colours, the fonts and the text colours. All of it is"
+" edited from the settings page; see :ref:`printing`."
+msgstr ""
+
+#: ../../reference/programme.rst:261 f88a63ccf0d7495aaa9224a504fcb2f6
+msgid ""
+"``merge`` names which of the five communiqué merge rules are in force for"
+" this competition, **by exception only**: what is not named here follows "
+"``regulations/communiques.json``."
+msgstr ""
+
+#: ../../reference/programme.rst:272 a30d422a47fc435e87f278507ca28854
+msgid "Validation"
+msgstr "Validazione"
+
+#: ../../reference/programme.rst:274 e524738131a049aba84bc84d61971be3
+msgid ""
+"``core.programme.validate`` runs before every save. The Programme page's "
+"save control stays disabled while any finding is at ``error`` level: a "
+"duplicate communiqué number, a communiqué already issued that now points "
+"at a different sheet, a round on no day. Everything else is a warning and"
+" saves."
+msgstr ""
+

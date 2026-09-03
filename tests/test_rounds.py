@@ -11,8 +11,11 @@ back empty on purpose, and is listed here rather than papered over.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
+from conftest import programme_path
 from core import rounds as RD
 from core.config import (DOC_CLASSIFICATION, DOC_RESULTS, DOC_RESULTS_58,
                          DOC_RESULTS_B, DOC_RESULTS_REP, DOC_STARTLIST,
@@ -20,6 +23,17 @@ from core.config import (DOC_CLASSIFICATION, DOC_RESULTS, DOC_RESULTS_58,
 from core.formats import keirin as K
 from core.formats import omnium as O
 from core.formats import sprint as S
+
+
+@pytest.fixture
+def prog():
+    """A copy of the real programme this module may edit.
+
+    The `comp` fixture is shared: a race given another team size here would
+    still have it in the next test.
+    """
+    from core.config import load_competition
+    return load_competition(programme_path())
 
 
 def _comp(fmt: str, *, track_len: float = 1 / 3, **event) -> Competition:
@@ -215,6 +229,21 @@ DERIVABLE = ("key", "kind", "docs", "distance", "qualify", "eliminate",
              "heat_size")
 
 
+def _stated(field: str, rnd) -> object:
+    """The field as the file can be judged on it.
+
+    One exception, and it is deliberate: the classifica parziale after a prova
+    di omnium. The proposal files it as a sheet of the fase; CITA26 declares it
+    in the register and in no `docs:` list, which is the same document said in
+    the other of the two places - the file predates the sheet existing. Every
+    other document is compared as it is.
+    """
+    value = getattr(rnd, field)
+    if field == "docs":
+        return [d for d in (value or []) if d != "classifica_parziale"]
+    return value
+
+
 @pytest.mark.parametrize("field", DERIVABLE)
 def test_the_proposal_rebuilds_the_programme_that_was_ridden(comp, field):
     """Every race of CITA26, asked back from the format and the track length.
@@ -234,9 +263,10 @@ def test_the_proposal_rebuilds_the_programme_that_was_ridden(comp, field):
             fresh = proposed.get(rnd.key)
             if fresh is None:
                 wrong.append(f"{item.cat} {item.event}: {rnd.key} not proposed")
-            elif getattr(fresh, field) != getattr(rnd, field):
+            elif _stated(field, fresh) != _stated(field, rnd):
                 wrong.append(f"{item.cat} {item.event} {rnd.key}: {field} "
-                             f"{getattr(fresh, field)!r} != {getattr(rnd, field)!r}")
+                             f"{_stated(field, fresh)!r} != "
+                             f"{_stated(field, rnd)!r}")
         extra = [k for k in proposed if k not in [r.key for r in item.rounds]]
         if extra:
             wrong.append(f"{item.cat} {item.event}: {extra} not in the programme")
@@ -262,11 +292,11 @@ def test_reproposing_a_race_keeps_what_no_regulation_can_propose():
                           .ProgrammeItem(cat="AL", event="ev", day=1))
     item = comp.programme[0]
     item.rounds = RD.propose(comp, "AL", "ev")
-    item.rounds[0] = _replace(item.rounds[0], start="14:30", note="da confermare",
+    item.rounds[0] = _replace(item.rounds[0], duration=25, note="da confermare",
                               label="200 m", laps=99)
 
     back = RD.apply(comp, "AL", "ev", RD.Options())
-    assert back[0].start == "14:30"          # kept: no table proposes a time
+    assert back[0].duration == 25            # kept: no table proposes a durata
     assert back[0].note == "da confermare"   # kept: it is the jury's own line
     assert back[0].label == "200 m"          # kept: what the sheets call it
     assert back[0].laps != 99                # put back: it is a proposal
@@ -314,3 +344,56 @@ def test_the_direct_final_still_chooses_one_or_two_at_a_time():
     """The other question a race against the clock asks is not this one's."""
     assert "per_start" in RD.options_for("timed_team")
     assert "direct_final" in RD.options_for("timed_team")
+
+
+# ── how many ride in a squadra: the regulation's number, and this race's ────
+
+def test_the_team_size_is_the_regulation_one_until_the_race_says_another(prog):
+    """Four in an inseguimento a squadre, three in a velocità a squadre.
+
+    That is what the regulation says (`regulations/events.json`) and what a
+    programme saying nothing rides. A categoria authorised to field one fewer
+    says so on its own race, and everything downstream reads the same number.
+    """
+    assert prog.team_size("AL", "ins_squadre") == 4
+    assert prog.team_size("AL", "vel_squadre") == 3
+
+    item = prog.scheduled("AL", "ins_squadre")
+    item.team_size = 3
+    assert prog.team_size("AL", "ins_squadre") == 3
+    # and only for that race: the specialità has not changed
+    assert prog.team_size("DA", "ins_squadre") == 4
+
+
+def test_the_form_is_seeded_with_what_the_squadre_are_built_to(prog):
+    """The number offered is the effective one, not the override.
+
+    On nearly every programme the override is not in the file at all, and a
+    form seeded from it would offer a nought where the answer is four.
+    """
+    assert RD.options_of(prog, "AL", "ins_squadre").team_size == 4
+    prog.scheduled("AL", "ins_squadre").team_size = 3
+    assert RD.options_of(prog, "AL", "ins_squadre").team_size == 3
+    # it is a question the team formats ask, and only they
+    assert "team_size" in RD.options_for("timed_team")
+    assert "team_size" not in RD.options_for("group")
+
+
+def test_a_team_size_put_back_to_the_regulation_stops_being_stated(prog):
+    """`None` is «not stated», and it has to be able to go back to it.
+
+    Otherwise a jury that tried 3 and thought better of it would leave a
+    `team_size: 4` behind on a file that had always said nothing.
+    """
+    from ui.pages.programme import _remember_options
+
+    ev = prog.event("ins_squadre")
+    item = prog.scheduled("AL", "ins_squadre")
+    was = RD.options_of(prog, "AL", "ins_squadre")
+
+    _remember_options(item, dataclasses.replace(was, team_size=3), was, ev)
+    assert item.team_size == 3
+
+    was = RD.options_of(prog, "AL", "ins_squadre")
+    _remember_options(item, dataclasses.replace(was, team_size=4), was, ev)
+    assert item.team_size is None

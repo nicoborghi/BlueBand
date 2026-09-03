@@ -15,8 +15,8 @@ Three things live here, all pure and testable without the app:
 * **which batteria a rider is in**, where the jury has already composed one.
   Only what has been decided: an event whose rounds have not been composed
   contributes nothing rather than a guess.
-* **the tabella specialità**: how many riders each categoria fields in each
-  specialità, and how far its licence check has got.
+* **the tabella event**: how many riders each categoria fields in each
+  event, and how far its licence check has got.
 """
 
 from __future__ import annotations
@@ -57,12 +57,12 @@ def teams(el: EntryList, group: str = DEFAULT_GROUP) -> list[str]:
 
 def riders_of(el: EntryList, team: str, cat: str = "",
               group: str = DEFAULT_GROUP, *,
-              include_np: bool = True) -> list[Rider]:
+              include_ns: bool = True) -> list[Rider]:
     """The riders of one squadra, by bib - of one category when asked."""
     return sorted((r for r in el.riders.values()
                    if group_of(r, group) == team
                    and (not cat or r.cat == cat)
-                   and (include_np or not r.not_starting)),
+                   and (include_ns or not r.not_starting)),
                   key=lambda r: (r.bib is None, r.bib or 0, r.last_name))
 
 
@@ -73,7 +73,7 @@ NOT_CONTESTED = None
 
 @dataclass
 class SpecialityRow:
-    """One line of the tabella specialità: a category across the programme."""
+    """One line of the event-entry table: a category across the programme."""
 
     cat: str
     entries: int = 0          # on the list, NP excluded
@@ -89,10 +89,10 @@ def speciality_table(el: EntryList, comp: Competition
 
     The sheet the jury reads at the verifica and hands over at the briefing:
     how far the licence check has got, and how many riders each categoria
-    fields in each specialità. Built here, so the page and the printed sheet
+    fields in each event. Built here, so the page and the printed sheet
     can never disagree about it.
 
-    The count per specialità is the starters, the same as everywhere else in
+    The count per event is the starters, the same as everywhere else in
     the app (`EntryList.entered`): a riserva is on the elenco iscritti, not on
     the track. NP riders are out of every count but their own.
     """

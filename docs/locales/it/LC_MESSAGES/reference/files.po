@@ -1,0 +1,550 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:07+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: it <LL@li.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../reference/files.rst:2 fd3b7967bb874d57b65462c88411d2e3
+msgid "Files, printing and packaging"
+msgstr "File, stampa e pacchettizzazione"
+
+#: ../../reference/files.rst:7 95b5770cc0154d1daa085c1cef2c8dfd
+msgid "Storage"
+msgstr "Archiviazione"
+
+#: ../../reference/files.rst:9 02c27900858749c18dc405f07fdc87ff
+msgid ""
+"One folder per competition. Everything the jury makes is in it, and it "
+"copies to a memory stick at the end of the day."
+msgstr ""
+
+#: ../../reference/files.rst:27 2d2cc6df51b24c8b8707cb22f10b1577
+msgid ""
+"The root is ``competitions/`` in a checkout and ``Documents\\BlueBand`` when"
+" installed, overridden by ``COMMISSAIRE_TRACK_DATA`` either way. Competition"
+" folders are the jury's work and stay out of the repository — the one "
+"exception is ``competitions/example/``."
+msgstr ""
+
+#: ../../reference/files.rst:33 7ed9da95b9064be1aec85221c49e0389
+msgid "Nothing is lost"
+msgstr "Niente si perde"
+
+#: ../../reference/files.rst:35 d22ac70288a74f609e619dad4b4dc577
+msgid ""
+"Every write is atomic — temp file plus ``os.replace`` — and keeps the "
+"previous content as a snapshot. Nothing typed by the jury can be lost by a "
+"crash, a bad edit or a browser reload."
+msgstr ""
+
+#: ../../reference/files.rst:47 95a5831b498646b5b4b94af9115b5293
+msgid ""
+"``journal.jsonl`` is append-only and never rewritten: one line per write, "
+"with the action, the target and the time. It is what answers *what happened "
+"at 14:30* — including why a PDF came out as HTML."
+msgstr ""
+
+#: ../../reference/files.rst:51 4be7c2c2a8cb4549a6e8cf7a89bc5666
+msgid ""
+"``races/<race_id>.json`` is a ``RaceState``, and everything a format needs "
+"lives in its ``payload``. The race id is ``race.race_key(cat, event, "
+"round_key)``, and round keys are the strings written in ``programme.yaml`` —"
+" which is why translating a round name would orphan its race file."
+msgstr ""
+
+#: ../../reference/files.rst:56 9428023ab7494b36a22f4f51a8a96bb0
+msgid ""
+"``settings.json`` holds the choices of *this machine and this competition*: "
+"``language``, ``out_dir``, ``use_overlay``, the letterhead in progress, and "
+"various UI keys. Anything that is a statement about the **competition** — "
+"what a team is, the entry-file layout, the branding — lives in "
+"``programme.yaml``, not here."
+msgstr ""
+
+#: ../../reference/files.rst:63 0050f88422ac405f9d3e4fec011fc263
+msgid "``core.paths``"
+msgstr ""
+
+#: ../../reference/files.rst:65 0d7deafe68de41bd804f22ffb6787a19
+msgid ""
+"Run from the repository, every path answers with the repository. Installed, "
+"two different places, and conflating them is how a jury loses a "
+"championship."
+msgstr ""
+
+#: ../../reference/files.rst:68 fdb7087b4d424430803cfbede3b3b946
+msgid "``bundle()``"
+msgstr ""
+
+#: ../../reference/files.rst:69 7f5f2a0d630b4a7983caebf16e36ab82
+msgid ""
+"**What the program is** — regulations, templates, stylesheet. Read-only, "
+"replaced wholesale by the next version, and under PyInstaller it lives in "
+"``sys._MEIPASS``."
+msgstr ""
+
+#: ../../reference/files.rst:73 b246cfc9359b462495f5440906b777c7
+msgid "``data()``"
+msgstr ""
+
+#: ../../reference/files.rst:74 c34ac1d35fb74d39aa130bbcf0fc114b
+msgid ""
+"**What the jury made** — competitions, results, communiqués. It must outlive"
+" an uninstall, be findable without a file manager, and be easy to copy to a "
+"stick, so it goes in the user's Documents and never inside the installation."
+msgstr ""
+
+#: ../../reference/files.rst:78 564697ec2d7e4247b2d0aa675f34c181
+msgid "``served()``"
+msgstr ""
+
+#: ../../reference/files.rst:79 17a762d15e814e14a2394e2e226cf5df
+msgid ""
+"The copies of the last saved PDFs that Streamlit serves out of ``static/``."
+msgstr ""
+
+#: ../../reference/files.rst:81 352fd58a266d430eb7ffd6d3d078f084
+msgid ""
+"``core.paths`` is the only module that knows any of this, which is why "
+"nothing else in the codebase had to learn about ``sys._MEIPASS``."
+msgstr ""
+
+#: ../../reference/files.rst:88 bc7944874ec945c59d1f79753b02e036
+msgid "Regulation files"
+msgstr "I file del regolamento"
+
+#: ../../reference/files.rst:90 f19c30517a9848c59d21c8630b8d1c5a
+msgid ""
+"Eight JSON tables under ``regulations/``. **The regulation is data, not "
+"code**: a rule that changes next year is a file edit, and none of it needs a"
+" release."
+msgstr ""
+
+#: ../../reference/files.rst:93 f99255c81bb440dfbc8bc30ebe06980d
+msgid ""
+"Two kinds live here, maintained differently: **ours**, written by the app as"
+" well as read by it (``distances.json``, ``events.json``, "
+"``categories.json``, ``notes.json``, ``communiques.json``, "
+"``entry_formats.json``); and **theirs**, read-only and replaced wholesale by"
+" a newer version (``penalties.json`` from the UCI, ``PUIS.json`` from the "
+"federation)."
+msgstr ""
+
+#: ../../reference/files.rst:103 81db3231014946cca1d2975170476cae
+msgid "File"
+msgstr "File"
+
+#: ../../reference/files.rst:104 be2d619c6c664d83b4518e4356c14015
+msgid "Read by"
+msgstr "Letto da"
+
+#: ../../reference/files.rst:105 f3d5bfcce8d94aa49326bcb7c6c25c39
+msgid "What it holds"
+msgstr "Che cosa contiene"
+
+#: ../../reference/files.rst:106 0e1e8cb89c6d4f6eb00220a5b89d19b9
+msgid "``events.json``"
+msgstr ""
+
+#: ../../reference/files.rst:107 ../../reference/files.rst:111
+#: 0e4c3c7e21314aaf937e3e15f533dfb3 55798c6a3e4e4a55b512aaeb5b9beb92
+msgid "``core.catalogue``"
+msgstr ""
+
+#: ../../reference/files.rst:108 b14bd7bf288445858a9936050985e310
+msgid ""
+"What an event *is*: code, name per language, UCI abbreviation, format, "
+"riders per team, how many start together, the entry-column headings."
+msgstr ""
+
+#: ../../reference/files.rst:110 edb35c82069f46bea18c1b908fe3c10c
+msgid "``categories.json``"
+msgstr ""
+
+#: ../../reference/files.rst:112 ce072a11c5054c57854aecdbc83c3f28
+msgid "The standard category codes, with sex and name per language."
+msgstr ""
+
+#: ../../reference/files.rst:113 655dd72751d3481585fb27fef7296ab0
+msgid "``distances.json``"
+msgstr ""
+
+#: ../../reference/files.rst:114 d7cdbba0b53c452ea0387fbce243896f
+msgid "``core.distances``"
+msgstr ""
+
+#: ../../reference/files.rst:115 b0e8ef0339134c458401b9112270c283
+msgid "How long a race is, how often it sprints."
+msgstr ""
+
+#: ../../reference/files.rst:116 59f802c456bf4783b79235a2f92e7cad
+msgid "``entry_formats.json``"
+msgstr ""
+
+#: ../../reference/files.rst:117 8d2866d669d7487491bdfac6e980a7fe
+msgid "``core.entry_formats``"
+msgstr ""
+
+#: ../../reference/files.rst:118 4a3fbf9dcba140bb96237f4be7d06b91
+msgid "How each shape of entry file is read."
+msgstr ""
+
+#: ../../reference/files.rst:119 ce7d26ce1f4b4c568cc9dff7372a2df3
+msgid "``notes.json``"
+msgstr ""
+
+#: ../../reference/files.rst:120 55c27601549741e1b4e30c3b7f077ca3
+msgid "``core.notes``"
+msgstr ""
+
+#: ../../reference/files.rst:121 df806d0d2b984d788d6e2615fee2019c
+msgid "Which regulation line opens which sheet."
+msgstr ""
+
+#: ../../reference/files.rst:122 b3b98e9e335541ddac793bcae1f8d345
+msgid "``communiques.json``"
+msgstr ""
+
+#: ../../reference/files.rst:123 3c6d13e922794de8bbb6b7f6f6a676e3
+msgid "``core.communiques``"
+msgstr ""
+
+#: ../../reference/files.rst:124 7cef13b40838410b98571976bd38aab5
+msgid "Which sheets share a number, per format."
+msgstr ""
+
+#: ../../reference/files.rst:125 9847b734a7ac444c825cb0317fa35307
+msgid "``penalties.json``"
+msgstr ""
+
+#: ../../reference/files.rst:126 ../../reference/files.rst:130
+#: 3822e0bb78284510a13736b43989f242 69d90df4e5344e6fa351dd69ad3d8c9d
+msgid "``core.decisions``"
+msgstr ""
+
+#: ../../reference/files.rst:127 910255a3dcfb464097465e1e1d23541b
+msgid ""
+"The UCI wording of track offences, in four languages, numbered as the UCI "
+"numbers them."
+msgstr ""
+
+#: ../../reference/files.rst:129 8121d07ee53b4788a05e5b2fc16e7a23
+msgid "``PUIS.json``"
+msgstr ""
+
+#: ../../reference/files.rst:131 a5b507a8b9454cbc8ef376630094c153
+msgid "The federal table of what each infringement costs."
+msgstr ""
+
+#: ../../reference/files.rst:133 1ca9716450a7448095a89e86080210b8
+msgid ""
+"Every file carries ``_last_updated_``, and most carry ``_about_``. Neither "
+"is read by the code."
+msgstr ""
+
+#: ../../reference/files.rst:136 79446b1b30f1482680a7028efe628dc5
+msgid ""
+"The **name of an event is per language**, because it is not a label: it is "
+"written into ``programme.yaml`` and printed on the sheets exactly as it "
+"stands there. Adding an event to an English competition writes the English "
+"name, and it prints in English next year too, whoever opens the file. An "
+"event the table does not know is still declared by hand in the programme."
+msgstr ""
+
+#: ../../reference/files.rst:142 41da380120bd4193b7bc2a009eac10bb
+msgid ""
+"Distances are matched loosely on three levels — **event → category → "
+"round**. A round is looked up by its own name first, then by the family it "
+"belongs to, then by ``*``. Nothing here is invented: the file ships seeded "
+"from a programme that was actually run, and an event the table says nothing "
+"about proposes no distance at all — a blank field on the page rather than a "
+"wrong number on a sheet."
+msgstr ""
+
+#: ../../reference/files.rst:148 528e29711eac4eeab4eb9f229b4cc816
+msgid ""
+"``notes.json`` holds two things. **Which line goes on which sheet** is "
+"``rules``, and it ships filled in, because it is the regulation — one rule "
+"per sentence, naming the format, the round, the document and the condition. "
+"**The numbers are the programme's**: a rule names the field it reads, and "
+"the placeholder is filled from the round as the jury typed it. ``texts`` is "
+"the installation's own wording of any catalogue entry, and it ships empty."
+msgstr ""
+
+#: ../../reference/files.rst:159 277ca90bc65d434e921b109532055bc7
+msgid "Printing"
+msgstr "Stampa"
+
+#: ../../reference/files.rst:161 7eb603308cc34aa9b4d0bbd91e2caa0a
+msgid "One pipeline for every sheet the app produces."
+msgstr ""
+
+#: ../../reference/files.rst:179 3cbfd06cbe0a476782a0f413b34950cd
+msgid ""
+"**``w`` is a weight, not a width.** The table normalises its columns' "
+"weights to percentages summing to 100, so no sheet can starve a column into "
+"a two-character sliver."
+msgstr ""
+
+#: ../../reference/files.rst:183 efc04b7a5b16474089db3f9b50a1f8de
+msgid ""
+"**``min_mm`` is the one thing a weight cannot express**: how narrow a column"
+" may actually get *on paper*. A name that loses its last letters is still a "
+"name; ``DNF`` truncated to ``DN…`` and a UCI ID missing two digits are not "
+"the thing they are printed for. Those columns declare the millimetres they "
+"need and the table gives them, out of what the others were sharing."
+msgstr ""
+
+#: ../../reference/files.rst:189 899ae24941e544ae82d5374ab31e9186
+msgid ""
+"**Notes are tinted by kind.** A disqualification and \"the first two go "
+"through to the final\" are both prose in a box, and they are not the same "
+"thing: one is a sanction a team may appeal, the other is how the tournament "
+"is run. The plain note prints last and keeps its grey, because a colour on "
+"it would say somebody had been sanctioned."
+msgstr ""
+
+#: ../../reference/files.rst:195 b856778ab5564f919fb0cffa64038df6
+msgid ""
+"**Landscape is opt-in, never automatic.** Chrome does not repeat a table "
+"header group across the pages of a named page, so a landscape communiqué "
+"loses its letterhead on every continuation sheet — the one thing these "
+"documents must not lose."
+msgstr ""
+
+#: ../../reference/files.rst:200 dc7245a279474aff8375e692d3f42786
+msgid ""
+"The sheets carry a full-width letterhead and footer repeated on every page —"
+" they are the ``thead`` and ``tfoot`` of one table, which is how a browser "
+"repeats them. Around the table, six slots, each holding one of "
+"``communique``, ``printed_at`` or nothing; an element lives in one place, so"
+" putting it elsewhere removes it from where it was. A provisional sheet "
+"(``draft=True``) prints a \"not final\" box where the number goes."
+msgstr ""
+
+#: ../../reference/files.rst:207 85255eee78244c9597d6e51f5e4dd8b8
+msgid ""
+"``render/print.css`` is one file used in two places: inlined into the "
+"standalone page that Chromium prints, and injected into the Streamlit app so"
+" the previews look like the sheet. Everything in it is scoped to ``.cmsr`` "
+"except the ``@media print`` block, which hides the sidebar and the toolbar "
+"when the jury prints straight from the browser."
+msgstr ""
+
+#: ../../reference/files.rst:215 2da243bb79b3482a978a3842d78949b7
+msgid ""
+"The CSS goes in through ``st.markdown``, not ``st.html``: the latter "
+"sanitises what it is handed and throws away its ``<style>``. The same "
+"sanitiser drops the whole SVG namespace, which is why the derny charts are "
+"drawn with ``st.markdown`` too."
+msgstr ""
+
+#: ../../reference/files.rst:220 d0eacaea81ce4a1baf760432f6704590
+msgid ""
+"``render/pdf.py`` runs a headless Chromium — the same engine the jury would "
+"print with by hand, so the PDF is what the browser's own print produces "
+"minus its date and URL header. No extra Python dependency."
+msgstr ""
+
+#: ../../reference/files.rst:224 929d4c458fca44d38a5a4d3b3c1d15ba
+msgid ""
+"**Where Chromium works is not where the document ends up.** The browser has "
+"to *read* the page and *write* the PDF, and a sandboxed Chromium can do "
+"neither under ``/tmp`` nor on the network mount the communiqués folder "
+"usually is. So ``work_dirs`` tries the caller's directory first, then local "
+"candidates, and only the finished bytes are written to the destination. A "
+"directory that has worked once goes to the front — printing a whole day must"
+" not pay for the same failed attempt on every sheet."
+msgstr ""
+
+#: ../../reference/files.rst:232 299dd6e425ae47d2969b7f96f0a3b130
+msgid ""
+"``out_name`` produces ``018_classification_madison_final.pdf`` — the "
+"communiqué number, then a slug of the title."
+msgstr ""
+
+#: ../../reference/files.rst:235 78455922d3fa4a678f97540959c9d779
+msgid ""
+"``render/markup.py`` is four constructs of markdown — headings, bold, "
+"italic, code, bullets, numbers, a rule, paragraphs — for the one place in "
+"the app that takes prose rather than a field. **Everything is escaped before"
+" anything is read.** What the jury types is text, never markup: a sheet that"
+" renders an ``<img>`` somebody pasted into the box is a sheet that can be "
+"made to say anything."
+msgstr ""
+
+#: ../../reference/files.rst:246 462d588bc5cf45958276b901cf50abd3
+msgid "Translations"
+msgstr "Traduzioni"
+
+#: ../../reference/files.rst:248 e9e89f3e148e4dffbdf142fc7bac30c6
+msgid ""
+"The code speaks UCI English — competition, event, round, bib, club, region. "
+"What reaches a screen or a printed sheet is a **lookup, never a literal**."
+msgstr ""
+
+#: ../../reference/files.rst:260 86ae89c7d3bd455f8f2fac4d658d3e72
+msgid ""
+"Nothing under ``core/``, ``render/`` or ``ui/`` writes prose of its own. "
+"Adding a language is adding one module and listing it in ``CATALOGUES``; "
+"correcting a wording is editing one entry."
+msgstr ""
+
+#: ../../reference/files.rst:264 6c03540a6c5746c391c41575fa692a4c
+msgid ""
+"Each catalogue defines the same dictionaries, named by what they name: "
+"``FIELDS`` (a column of the entry list), ``RACE`` (a column or word of a "
+"race sheet), ``DOCS`` (a kind of document), ``STATUSES`` and "
+"``STATUS_NAMES`` (the result codes as printed and spelled out), "
+"``PENALTIES``, ``NOTE_KINDS``, ``CODES``, ``UI``, ``HELP`` and ``MSG``."
+msgstr ""
+
+#: ../../reference/files.rst:270 1b49388d31014aa4adce6eee52c53282
+msgid ""
+"``label(key)`` does **not** raise on an unknown key — it comes back "
+"capitalised, so a new column still shows up readable. ``ui``, ``msg`` and "
+"``help_text`` do: a missing control label is a bug to fix, not a word to "
+"invent. A key the language in force does not have is answered from the "
+"default catalogue, which is a good deal better than an empty widget or a "
+"``KeyError`` at the track."
+msgstr ""
+
+#: ../../reference/files.rst:276 209963c088924abcbf9993ddb615020b
+msgid ""
+"The language is **per competition**, chosen in the settings and set once per"
+" rerun before anything draws a word. It moves the **catalogue only**: what "
+"``programme.yaml`` spells out — the names of the categories, the events and "
+"the rounds — prints as it is written there, in any language. Those strings "
+"are also the keys races are stored under."
+msgstr ""
+
+#: ../../reference/files.rst:282 8bf1dda14728404c946e4f6e389b282b
+msgid ""
+"To add a language: copy an existing catalogue, translate the values keeping "
+"every key, set ``NAME``, and add it to ``CATALOGUES``. "
+"``tests/test_i18n.py`` then checks that every key the app asks for exists, "
+"that every language answers all of them **with the same placeholders**, and "
+"that no module outside ``core/i18n/`` writes prose of its own."
+msgstr ""
+
+#: ../../reference/files.rst:288 88d77fd9f63c426fa95ef916a93ff52e
+msgid ""
+"The abbreviations a printed sheet uses are the **UCI** ones — see the "
+":ref:`glossary`."
+msgstr ""
+
+#: ../../reference/files.rst:295 e974382fc0a54d829cd16de312af99c0
+msgid "Windows build"
+msgstr "La build per Windows"
+
+#: ../../reference/files.rst:297 7684509345d447528fcc19869db99606
+msgid "The console ships as an ``.exe`` a jury installs by double-clicking."
+msgstr ""
+
+#: ../../reference/files.rst:305 d9f64f4b4c2a49f1b2dd183eceac1dd7
+msgid ""
+"Out comes ``dist/BlueBand-<version>-setup.exe``. CI does the same on every "
+"``v*`` tag and attaches it to the release."
+msgstr ""
+
+#: ../../reference/files.rst:309 c52e66fe79044f6c984f85600ffa5287
+msgid "What it weighs, and why"
+msgstr "Quanto pesa, e perché"
+
+#: ../../reference/files.rst:311 84e58e6600884169bb23720107756a71
+msgid ""
+"The app installs at **about 435 MB**, and most of that is three packages the"
+" console never imports by name: pandas, numpy and pyarrow (~334 MB), "
+"Streamlit and its dependencies (~87 MB), CPython and the bootloader (~20 "
+"MB). The app itself, with its regulations and templates, is about 1 MB."
+msgstr ""
+
+#: ../../reference/files.rst:316 fca1ebb1daf14cf48b226a2e3dce2a08
+msgid ""
+"They are there because ``st.dataframe`` and ``st.data_editor`` are made of "
+"them. **This was measured, and the alternative was built and rejected**: "
+"hand-written HTML tables brought the installation down to 108 MB and were "
+"worse to use — rows twice as tall, a select too narrow to read, and none of "
+"the sorting, resizing, full screen, search and copy that come free. Keep "
+"that in mind before \"optimising\" the dependency list: the size is a "
+"decision that has already been taken, once, with numbers."
+msgstr ""
+
+#: ../../reference/files.rst:325 dcf97311cd604e3dab52b7b26edb55a8
+msgid "The three awkward things about freezing Streamlit"
+msgstr "Le tre scomodità del congelare Streamlit"
+
+#: ../../reference/files.rst:327 e89568430aee4fb09a3f260f1bc684b5
+msgid ""
+"All three are solved in ``packaging/blueband.spec``, and each was a build "
+"that succeeded and then failed at runtime:"
+msgstr ""
+
+#: ../../reference/files.rst:330 0f91e958524349c89966b18893d0123b
+msgid ""
+"**Streamlit reads its own version from its installed metadata.** Without the"
+" ``.dist-info`` in the bundle it raises at import — ``copy_metadata``."
+msgstr ""
+
+#: ../../reference/files.rst:332 1df8a5c6d7ae4e408ca1691b9408d6e4
+msgid ""
+"**Its frontend is data.** ``streamlit/static/`` is the compiled React app — "
+"``collect_data_files``."
+msgstr ""
+
+#: ../../reference/files.rst:334 edd0523bffbd4ac6a25702a9e05e9342
+msgid ""
+"**The app is never imported.** The analysis starts at ``launcher.py``, which"
+" hands Streamlit ``app.py`` as a *path*, so ``core``, ``ui`` and ``render`` "
+"are in no import graph: the bundle starts, serves a page, and dies on ``No "
+"module named 'core'`` at the first render. ``collect_submodules``, with the "
+"repository put on ``sys.path`` first — without that it finds nothing and "
+"returns an empty list **with only a warning**."
+msgstr ""
+
+#: ../../reference/files.rst:341 75b5711cc7ff48559fa6c4091fa35dd5
+msgid ""
+"``BlueBand.exe --check`` is the guard against all three: it imports every "
+"module and looks for every data file, and it fails at the door instead of on"
+" the jury's first click."
+msgstr ""
+
+#: ../../reference/files.rst:345 b5265ebc7e72437c943efe84afc80a2b
+msgid ""
+"The install is **per-user on purpose**, twice over: no administrator prompt "
+"on a laptop nobody has the password for, and the program's folder stays "
+"writable — Streamlit serves the last saved PDFs out of ``static/`` inside "
+"it."
+msgstr ""
+
+#: ../../reference/files.rst:350 8be6118789d143589905f5ac63f977e4
+msgid "Building on Linux"
+msgstr "Costruirlo su Linux"
+
+#: ../../reference/files.rst:352 5a48fdf81b904bf488965da4b4c45fde
+msgid ""
+"The whole recipe except the ``.ico`` and the installer works on Linux, and "
+"that is worth doing before pushing a tag:"
+msgstr ""
+
+#: ../../reference/files.rst:361 e3a9551c8f954936b7a031d6265109d0
+msgid ""
+"Build it in a **clean virtual environment**, never in a working scientific "
+"one: PyInstaller bundles what it finds, and the ``excludes`` in the spec are"
+" a safety net rather than a guarantee."
+msgstr ""

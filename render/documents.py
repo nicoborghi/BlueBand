@@ -8,18 +8,24 @@ from core import communiques as C
 from core import medals as M
 from core import race as R
 from core import recap as RC
-from core.config import (DOC_CLASSIFICATION, DOC_RESULTS, DOC_STARTLIST,
-                         Competition, EVENT_ENTRY_LIST)
+from core import trofeo as TR
+from core.config import (DOC_CLASSIFICATION, DOC_PARTIAL, DOC_RESULTS,
+                         DOC_STARTLIST, Competition, EVENT_ENTRY_LIST,
+                         is_pause)
 from core.formats import timed as T
 from core.formats.base import Result
-from core.models import EntryList, RaceState, Rider, Status, race_slug
+from core.models import (EntryList, RaceState, Rider, Status, number_text,
+                         race_slug)
 from core.i18n import label, msg, plural, ui
 from core.parse import format_time
 
-from .render import (COL_INDEX, W_GROUP, W_LANE, W_LAPS, W_POINTS, W_RANK,
-                     W_SPRINT, W_TIME, W_TOTAL, Column, Document, Note, Table,
-                     cols_rider, group_start, numbered, position_label,
-                     rider_row, side_start, slugify, zebra)
+from . import markup as MK
+
+from .render import (COL_INDEX, MIN_RANK_MM, MIN_UCI_MM, W_GROUP, W_LANE,
+                     W_LAPS, W_POINTS, W_RANK, W_SPRINT, W_TIME, W_TOTAL,
+                     Column, Document, Note, Table, cols_rider, group_start,
+                     hex_color, numbered, position_label, rider_row,
+                     section_start, side_start, slugify, zebra)
 
 
 def _sorted(riders: list[Rider]) -> list[Rider]:
@@ -47,7 +53,7 @@ def decision_notes(decisions=(), *, codes: bool = False) -> list[Note]:
 
 def entry_list(el: EntryList, comp: Competition, cat: str, *,
                matrix: bool = False, index: bool = True,
-               include_np: bool = False,
+               include_ns: bool = False,
                only_verified: bool = False, minimal: bool = False,
                communique: str = "", font_size: int = 9,
                decision: str = "") -> Document:
@@ -58,7 +64,7 @@ def entry_list(el: EntryList, comp: Competition, cat: str, *,
     the ELENCO PARTENTI: it lists only who takes the start.
     """
     riders = _sorted([r for r in el.by_cat(cat)
-                      if (include_np or not r.not_starting)
+                      if (include_ns or not r.not_starting)
                       and (not only_verified or r.checked_in)])
     # event columns in the workbook's order, not the running order
     contested = set(comp.events_for(cat))
@@ -86,17 +92,43 @@ def entry_list(el: EntryList, comp: Competition, cat: str, *,
     starters = sum(1 for r in riders if not r.not_starting)
     return Document(
         title=f"{comp.cat(cat).name} - "
-              + (label("entry_list") if include_np
+              + (label("entry_list") if include_ns
                  else label("startlist").upper()),
         info=(msg("count_entered_starters", entered=len(riders),
-                  starters=starters) if include_np
+                  starters=starters) if include_ns
               else msg("count_starters", n=starters)),
         legend=legend,
         communique=communique,
         tables=[Table(columns=cols, rows=zebra(rows), font_size=font_size)],
         decision=decision,
         slug=f"{cat}_"
-             f"{label('entry_list_slug' if include_np else 'startlist_slug')}",
+             f"{label('entry_list_slug' if include_ns else 'startlist_slug')}",
+    )
+
+
+def letterhead_sheet(comp: Competition, *, title: str = "",
+                     subtitle: str = "", text: str = "",
+                     communique: str = "", decision: str = "") -> Document:
+    """The letterhead with prose under it - the one sheet that is not a table.
+
+    A convocazione, a nota di servizio, the wording of a decision that goes out
+    on its own: things a jury has always written by hand on the paper of the
+    meeting, and had to leave the app to write. It carries the same testata,
+    the same piè, the same «Comunicato n.» and the same firma as every other
+    sheet, so what goes out is one set of documents and not one set plus a
+    Word file.
+
+    `text` is markdown, in the subset `render.markup` reads; the title and the
+    subtitle are set like a classifica's, which is what the jury already knows
+    how to read.
+    """
+    return Document(
+        title=(title or "").strip() or comp.name,
+        subtitle=(subtitle or "").strip(),
+        body=MK.to_html(text),
+        communique=communique,
+        decision=decision,
+        slug=slugify((title or "").strip() or label("letterhead_slug")),
     )
 
 
@@ -235,7 +267,7 @@ def _race_titles(comp: Competition, state: RaceState) -> tuple[str, str]:
     return title, state.round_key
 
 
-W_PAIR_NO = 7      # Coppia, when it holds a number instead of a region name
+W_PAIR_NO = 4      # Coppia, when it holds a number instead of a region name
 
 
 def mark_warned(rows: list[dict], warned) -> list[dict]:
@@ -414,7 +446,8 @@ def composition_tables(blocks, el: EntryList, cat: str = "", *,
             Column("bib", label("number"), "c", 7),
             Column("last_name", label("last_name"), "l", 20),
             Column("first_name", label("first_name"), "l", 15),
-            Column("uci_id", label("uci_id"), "c", 20),
+            Column("uci_id", label("uci_id"), "c", 20,
+                   min_mm=MIN_UCI_MM),
             Column("team", label("team_en"), "l", 17)]
     tables = []
     for block in blocks:
@@ -487,7 +520,17 @@ def race_startlist(state: RaceState, el: EntryList, comp: Competition, *,
         # on a finals round the column is not a batteria number: it is which
         # final that line rides. It says so even when the heats carry no label
         # of their own - a keirin final, a velocità printed from Stampa.
-        final = bool(finals) or R.is_finals(state.round_key)
+        #
+        # A fase called *Finale* is not always one of those. A velocità a
+        # squadre or an inseguimento ridden as «Finale diretta», il chilometro,
+        # a scratch: `core.rounds` calls the one race of the event *Finale*,
+        # but nothing qualified into it and it is ridden against the clock,
+        # batteria by batteria, like the qualification it replaces. Only a
+        # round another round composed is headed «Finale» (`race.is_seeded_round`).
+        final = bool(finals) or (R.is_finals(state.round_key)
+                                 and R.is_seeded_round(comp, state.cat,
+                                                       state.event,
+                                                       state.round_key, kind))
         cols.append(Column("group",
                            label("final") if final
                            else label("start_no") if solo
@@ -504,17 +547,24 @@ def race_startlist(state: RaceState, el: EntryList, comp: Competition, *,
     cols += [Column("last_name", label("last_name"), "l", 20),
              Column("first_name", label("first_name"), "l", 15)]
     # a batteria di qualificazione carries it too, whatever it is ridden in:
-    # that sheet is where the riders are admitted to the specialità, and it is
+    # that sheet is where the riders are admitted to the event, and it is
     # read against the licences like every other qualification.
     # So does every prova of an omnium: the elenco partenti of the scratch is
     # where the event is entered, and the classifiche parziali that start the
     # three prove after it carry the UCI ID as well - one sheet of the four
     # cannot be the one that drops it.
+    # An eliminazione ridden as its own event is the same sheet as the
+    # prova of an omnium, run direttamente: its ordine di partenza is where the
+    # event is entered, so it carries the UCI ID for the same reason.
+    # A derny is ridden direttamente as well - one race, no qualification - and
+    # its lista partenti is the only sheet the riders are admitted on: it
+    # carries the UCI ID like the eliminazione next to it on the programme.
     omnium = comp.event(state.event).fmt == "omnium"
-    default_uci = (grouped or rider_timed or omnium
-                   or R.is_qualifying(state.round_key))
+    default_uci = (grouped or rider_timed or omnium or kind == R.ELIMINATION
+                   or kind == R.DERNY or R.is_qualifying(state.round_key))
     if default_uci if show_uci is None else show_uci:
-        cols.append(Column("uci_id", label("uci_id"), "c", 20))
+        cols.append(Column("uci_id", label("uci_id"), "c", 20,
+                           min_mm=MIN_UCI_MM))
     cols.append(Column("team", label("team_en"), "l", 17))
 
     rows = (_heat_rows(heats, el, state.entrants, finals, state.cat) if heats
@@ -570,7 +620,6 @@ def race_classification(state: RaceState, result: Result, el: EntryList,
                         show_carried: bool = False,
                         lane_col: bool = False,
                         warned=(), decisions=(),
-                        hide_dns: bool | None = None,
                         points_cols: list[tuple[str, str]] = ()) -> Document:
     """Risultati / classifica for one round_key, with the format's own columns.
 
@@ -597,28 +646,21 @@ def race_classification(state: RaceState, result: Result, el: EntryList,
     `warned` are the dorsali carrying an ammonizione: a W next to the number,
     as on the ordine di partenza (`race_startlist`).
 
-    `hide_dns` drops the riders who never took the start from the table and
-    names their numbers in a line under it instead: a classifica ranks who
-    rode, and a column of DNS down its foot is a list of absences, not a
-    result. Left to None it is what a prova di gruppo does - the standings of
-    an omnium keep them, where the sigla is what says the rider is out of the
-    event.
+    A rider who did not start is printed like any other sigla - `DNS` in the
+    Ris. column, at the foot of the table with the DNF and the DSQ. The
+    classifica of a fase says what became of everybody who was called to it,
+    and a number that simply vanishes from the sheet is the one nobody can
+    account for afterwards - in an omnium above all, where the rider stays in
+    the event and rides the next prova.
 
     `doc_kind` is what the sheet is filed as. A *risultati* belongs to the fase
     that was ridden and is named after it, like the ordine di partenza it
     answers (`AL_ins_squadre_qualificazioni_risultati`); a *classifica* covers
-    the whole specialità and carries no fase.
+    the whole event and carries no fase.
     """
     title, round_key = _race_titles(comp, state)
     kind = state.fmt or R.round_format(comp, state.cat, state.event,
                                        state.round_key)
-    if hide_dns is None:
-        hide_dns = kind in R.BUNCH
-    absent = [p.key for p in result.placings
-              if hide_dns and p.status is Status.DNS]
-    if absent:
-        result = replace(result, placings=[p for p in result.placings
-                                           if p.status is not Status.DNS])
     grouped = R.is_team_format(kind)
     # a team time trial is read like its own start order - number, rider, team -
     # with the result in front and the time at the end
@@ -628,7 +670,8 @@ def race_classification(state: RaceState, result: Result, el: EntryList,
     pairs = kind == R.MADISON
     show_bib = not pairs if show_bib is None else show_bib
 
-    cols = [Column("rank", label("rank"), "c", W_RANK)] if show_rank else []
+    cols = ([Column("rank", label("rank"), "c", W_RANK,
+                    min_mm=MIN_RANK_MM)] if show_rank else [])
     if lane_col:
         # no heading: it is not a result, it is where each of them lines up for
         # the prova that follows. Grey, and never bold - the sheet is read for
@@ -710,8 +753,21 @@ def race_classification(state: RaceState, result: Result, el: EntryList,
         # read for the time, not for anything beside it, so it prints bold
         sprint_qual = (kind == R.TIMED
                        and comp.event(state.event).fmt in ("sprint", "keirin"))
-        cols.append(Column("time", label("time"), "r", W_TIME,
-                           bold=sprint_qual))
+        # so is the mark of a prova against the clock ridden for itself - the
+        # velocità e l'inseguimento a squadre, il chilometro, i 500 m: there
+        # the time *is* the result, and it is read down the column rather than
+        # against the name beside it. Centred and bold, on the risultati and on
+        # the classifica alike.
+        clock = (kind == R.TIMED_TEAM
+                 or comp.event(state.event).fmt == "time_trial")
+        cols.append(Column("time", label("time"), "c" if clock else "r",
+                           W_TIME, bold=sprint_qual or clock))
+    # a derny is ranked on laps and nothing else: how many were ridden, and
+    # how many were lost to the head (one asterisk each, as on the chart)
+    if "laps_done" in result.columns:
+        cols.append(Column("laps_done", label("laps"), "c", W_LAPS))
+    if "laps_down" in result.columns:
+        cols.append(Column("laps_down", label("laps_down"), "c", W_LAPS))
     if "total" in result.columns and not points_cols:
         if show_laps:
             cols.append(Column("laps", label("laps"), "c", W_LAPS))
@@ -774,8 +830,19 @@ def race_classification(state: RaceState, result: Result, el: EntryList,
         rows = []
         shown = _final_order(state, result.placings) if by_final \
             else result.placings
+        # whoever has no result yet goes to the head of the sheet, with a blank
+        # line between them and the classification: a sheet being filled in
+        # says at a glance who is still missing from it, instead of hiding the
+        # riders nobody has typed in among the placings. Not where the order of
+        # the sheet is itself the answer - the finals, and a batteria with a cut
+        # ruled across it at a fixed place
+        shown, waiting = _waiting_first(shown, not (by_final or qualify))
         heat = final = None
         for n, p in enumerate(shown):
+            if waiting and n == waiting:
+                # the blank line, once: above it the riders still to be typed,
+                # under it the race as it has been filed
+                rows.append({"_class": "spacer"})
             entrant = key_of.get(p.key, p.key)
             riders = R.entrant_riders(entrant, el, state.cat)
             extra = cells(p)
@@ -845,11 +912,7 @@ def race_classification(state: RaceState, result: Result, el: EntryList,
         title=title,
         subtitle=subtitle or (f"{round_key} - {label('risultati')}" if round_key
                               else label("classification")),
-        # who did not take the start, where the table no longer says it: one
-        # line under it, which is all a classifica owes an absence
-        legend=msg("dns_note", bibs=", ".join(str(k) for k in absent))
-        if absent else "",
-        # A classifica carries no distance line at all: it closes the specialità,
+        # A classifica carries no distance line at all: it closes the event,
         # and how long one fase of it was belongs on the risultati of that fase.
         # A finals sheet counts nothing either - the two finals and who rode
         # them are the table itself, not a head count above it.
@@ -893,11 +956,30 @@ def _final_band(final) -> str:
     return ui("final_band", name=T.final_label(final))
 
 
+def _waiting_first(placings: list, movable: bool) -> tuple[list, int]:
+    """The entrants with no result yet at the head, and how many they are.
+
+    A rider with no placing and no sigla is not last: she is *not on the sheet
+    yet*, and printed under the classification she reads as a result. She goes
+    on top, where the jury is looking for her, and the count says where the
+    blank line goes.
+    """
+    def waiting(p) -> bool:
+        return p.status is Status.OK and not p.position
+
+    out = list(placings)
+    n = sum(1 for p in out if waiting(p))
+    if not movable or not n or n == len(out):
+        return out, 0
+    return ([p for p in out if waiting(p)]
+            + [p for p in out if not waiting(p)], n)
+
+
 def _final_order(state: RaceState, placings: list) -> list:
     """The finalists in the order the finals were ridden, 3/4 first.
 
     The sheet follows the track, not the ranking: whoever did not reach the
-    finals is not on it at all - the classification of the specialità is where
+    finals is not on it at all - the classification of the event is where
     they are, on their qualifying time.
     """
     order = [T.final_place(h, (state.payload or {}).get("qual_ranking") or [])
@@ -990,6 +1072,12 @@ def _result_cells(p, n_sprint: int, sprint_cols: bool, result: Result, *,
         # withdrawn - it just never prints.
         out["time"] = ("" if p.status is Status.DSQ
                        else format_time(d.get("time")))
+    if "laps_done" in result.columns:
+        out["laps_done"] = str(d.get("laps_done") or "")
+    if "laps_down" in result.columns:
+        # the recap reads them as asterisks, and so does the sheet: "**" is
+        # two laps down, and an empty cell is a rider on the leader's lap
+        out["laps_down"] = "*" * int(d.get("laps_down") or 0)
     if "total" in result.columns:
         laps = d.get("laps") or 0
         out["laps"] = f"{laps:+d}" if laps else ""
@@ -1074,7 +1162,7 @@ def comunicati_register(rows: list[dict], comp: Competition, *,
 
 # ── how many ride what ──────────────────────────────────────────────────────
 
-#: What a specialità column is worth when it is headed by the short name
+#: What an event column is worth when it is headed by the short name
 #: ("Ins. Individuale") instead of the UCI sigla ("IP"). The cells below it are
 #: still one or two characters: the width goes to the header, which is the only
 #: thing that has to fit, and the legend under the table is dropped - the head
@@ -1084,13 +1172,13 @@ EVENT_COL_W_SHORT = 13
 
 def speciality_table(el: EntryList, comp: Competition, *, communique: str = "",
                      font_size: int = 9, short_headers: bool = False) -> Document:
-    """The tabella specialità: each categoria across the programme.
+    """The tabella event: each categoria across the programme.
 
     The sheet the jury reads out at the briefing - how far the verifica has
-    got, and how many riders each categoria fields in each specialità. The
+    got, and how many riders each categoria fields in each event. The
     numbers are `core.recap`'s, the same ones the Verifica page shows.
 
-    A categoria that does not contest a specialità prints blank: a zero there
+    A categoria that does not contest an event prints blank: a zero there
     would read as "nobody entered", which is a different thing entirely.
     """
     rows, total = RC.speciality_table(el, comp)
@@ -1137,12 +1225,14 @@ def speciality_table(el: EntryList, comp: Competition, *, communique: str = "",
 
 def team_recap(el: EntryList, comp: Competition, team: str, *,
                group: str = RC.DEFAULT_GROUP, heats: dict | None = None,
-               include_np: bool = True, font_size: int = 9,
-               communique: str = "", short_headers: bool = False) -> Document:
+               include_ns: bool = True, font_size: int = 9,
+               communique: str = "", short_headers: bool = False,
+               all_events: bool = True, show_tail: bool = False,
+               uci_id: bool = True, rule_categories: bool = True) -> Document:
     """One squadra's riders and what each of them rides, on one grid.
 
     The sheet a team manager asks for and the jury used to answer by hand:
-    every rider of the rappresentativa, with a column per specialità and a
+    every rider of the rappresentativa, with a column per event and a
     mark where they are entered - `X`, or the letter of the coppia / squadra
     where there are accoppiamenti, `R` for a riserva. Where the jury has
     already composed the batteria, its number follows the mark.
@@ -1150,29 +1240,59 @@ def team_recap(el: EntryList, comp: Competition, team: str, *,
     One table, every categoria in it, in the order the competition lists them:
     a manager reads their whole squadra down one page instead of hunting the
     same rider through four tables.
+
+    Four switches, because the same grid is read - and *written on* - two ways.
+    The sheet goes out before the verifica as often as after it, and then it is
+    what the colleagues collect the event on:
+
+    * `all_events` - a column for every event the categorie of this
+      squadra contest, entered or not. On is the blank grid to fill in by hand;
+      off keeps only the columns somebody here already rides, which is the
+      tighter sheet once the entries are in.
+    * `show_tail` - the column that names the *other* grouping (the società of
+      a rappresentativa, the regione of a società). Off by default: the squadra
+      is the title, and the width goes to the event.
+    * `uci_id` - the UCI ID beside the name. It is what the federation files
+      the rider under, and the one thing a manager checking a list is asked to
+      confirm.
+    * `rule_categories` - a rule where the categoria changes, so a grid with
+      four of them on it reads as four blocks and not as one long list.
     """
     heats = heats or {}
     order = {c: i for i, c in enumerate(comp.cat_order())}
     riders = [r for cat in comp.cat_order()
               for r in RC.riders_of(el, team, cat, group,
-                                    include_np=include_np)]
+                                    include_ns=include_ns)]
     riders.sort(key=lambda r: (order.get(r.cat, 99), r.bib is None,
                                r.bib or 0, r.last_name))
 
-    # only what this squadra actually rides: the columns of a specialità
-    # nobody here is entered in would print empty the whole way down
+    # with `all_events`, every event the categorie here contest, so the
+    # sheet can be handed over before the verifica and filled in on paper;
+    # without it, only what this squadra already rides - the column of a
+    # event nobody is entered in would print empty the whole way down
+    contested = {s for r in riders for s in comp.events_for(r.cat)}
     events = [s for s in comp.event_order()
-              if s != EVENT_ENTRY_LIST and any(s in r.events for r in riders)]
+              if s != EVENT_ENTRY_LIST
+              and (any(s in r.events for r in riders)
+                   or (all_events and s in contested))]
     heads = comp.event_headers(events, abbr=not short_headers)
 
     rows = []
+    last_cat = None
     for r in riders:
         marks = {f"ev_{s}": _entry_mark(r, s, heats) for s in events}
-        rows.append(rider_row(r, **marks))
+        row = rider_row(r, **marks)
+        # the categoria changes: a rule to read the grid in blocks, lighter
+        # than the cut of a qualifying sheet - nothing is decided here
+        if rule_categories and last_cat is not None and r.cat != last_cat:
+            row = section_start(row)
+        last_cat = r.cat
+        rows.append(row)
     entries = sum(1 for r in riders for s in events if s in r.events)
 
     tables = [Table(columns=_recap_cols(group, events, heads,
-                                        short_headers=short_headers),
+                                        short_headers=short_headers,
+                                        show_tail=show_tail, uci_id=uci_id),
                     rows=zebra(rows), font_size=font_size)] if rows else []
     return Document(
         title=f"{team} - {label('team_recap')}",
@@ -1210,7 +1330,7 @@ def medal_table(found: M.Survey, comp: Competition, *, detail: bool = True,
 
     * the podiums the count is made of, as a second table, so a line can be
       checked against the comunicati without opening the app;
-    * the specialità that are not concluded, named under it - a table that
+    * the event that are not concluded, named under it - a table that
       looks short says why on its own paper.
 
     Nothing is counted here: `found` is one reading of the competition
@@ -1266,9 +1386,9 @@ def _podium_table(found: M.Survey, comp: Competition, font_size: int) -> Table:
     last = None
     for p in found.places:
         row = {"cat": p.cat,
-               # the specialità, and where it is not over yet, that it is not:
+               # the event, and where it is not over yet, that it is not:
                # the fase a place came from says nothing a medagliere is read
-               # for - a specialità is counted once, on its final
+               # for - an event is counted once, on its final
                "event": (comp.event(p.event).short if p.complete else
                          f"{comp.event(p.event).short} "
                          f"({ui('stats_provisional')})"),
@@ -1295,6 +1415,115 @@ def _open_note(found: M.Survey, comp: Competition) -> list[Note]:
                      for cat, event, _any in found.open_events)))]
 
 
+# ── la classifica del Trofeo delle Regioni ──────────────────────────────────
+
+def trofeo_table(found: TR.Standings, comp: Competition, *,
+                 detail: bool = True, communique: str = "",
+                 font_size: int = 9) -> Document:
+    """The Trofeo standings, printable: one line per squadra, the winner first.
+
+    The sheet the Trofeo is decided on, and the one read out at the
+    premiazione. It carries what the count is made of with it:
+
+    * the four numbers behind every total - punti piazzamento, punti
+      partecipazione, partenti, gare vinte - so a line can be argued with
+      rather than believed;
+    * the score of every squadra in every prova, as a second table, so a total
+      can be checked against the comunicati without opening the app;
+    * the rule it was counted under, and the prove that are not concluded,
+      under the table.
+
+    Nothing is counted here: `found` is one reading of the competition
+    (`core.trofeo.standings`), the same one the Statistiche page shows.
+    """
+    cols = [Column("rank", label("rank"), "c", 6),
+            Column("team", label("team"), "l", 34),
+            Column("placings", label("trofeo_placing_points"), "c", 9),
+            Column("participation", label("trofeo_participation"), "c", 9),
+            Column("wins", label("trofeo_wins"), "c", 9, muted=True),
+            Column("total", label("trofeo_points"), "c", 10, bold=True)]
+    rows: list[dict] = []
+    # the champion closes the first line of the sheet: art. 9 proclaims the
+    # squadra that ends the finale first in the classifica, and it is the one
+    # band a Trofeo prints at all
+    winner = TR.champion(found.rows) if not found.open_events else ""
+    for pos, row in TR.ranked(found.rows):
+        rows.append({"rank": position_label(pos), "team": row.team,
+                     "placings": row.points or "",
+                     "participation": row.participation or "",
+                     "wins": row.wins or "", "total": row.total})
+        if winner and row.team == winner:
+            rows.append(_band(label("champion_region"), rows, cls="champion",
+                              at="team"))
+
+    tables = [Table(columns=cols, rows=zebra(rows), font_size=font_size)]
+    if detail and found.scores:
+        tables.append(_trofeo_detail(found, comp, font_size))
+
+    notes = [Note(text=msg("trofeo_rule", table=_points_line(found.scale)))]
+    if found.open_events:
+        notes.append(Note(text=msg("trofeo_open_events", list="  ·  ".join(
+            f"{cat} {comp.event(event).short}"
+            for cat, event, _any in found.open_events))))
+
+    return Document(
+        title=label("trofeo_table_title"),
+        subtitle=comp.name,
+        info=msg("count_trofeo", events=found.counted,
+                 concluded=msg(plural(found.counted, "medals_concluded_one",
+                                      "medals_concluded_many")),
+                 teams=len(found.rows),
+                 team=msg(plural(len(found.rows), "medals_team_one",
+                                 "medals_team_many")),
+                 points=sum(r.total for r in found.rows)),
+        legend=msg("trofeo_provisional_note") if any(
+            not s.complete for s in found.scores) else "",
+        communique=communique,
+        tables=tables,
+        notes=notes,
+        slug=label("trofeo_table_slug"),
+    )
+
+
+def _points_line(scale: str) -> str:
+    """`14-12-10-8-6-5-4-3-2-1` - the table the meeting was scored on."""
+    table = TR.SCALES.get(scale, TR.FINAL_POINTS)
+    return "-".join(str(table[p]) for p in sorted(table))
+
+
+def _trofeo_detail(found: TR.Standings, comp: Competition,
+                   font_size: int) -> Table:
+    """Every squadra's score in every prova, in programme order."""
+    cols = [Column("cat", label("cat"), "c", 6),
+            Column("event", label("event"), "l", 18),
+            Column("team", label("team"), "l", 20),
+            Column("placings", label("trofeo_placings"), "l", 22, wrap=True),
+            Column("points", label("trofeo_placing_points"), "c", 8),
+            Column("participation", label("trofeo_participation"), "c", 8),
+            Column("total", label("trofeo_points"), "c", 8, bold=True)]
+    rows = []
+    last = None
+    for s in found.scores:
+        row = {"cat": s.cat,
+               "event": (comp.event(s.event).short if s.complete else
+                         f"{comp.event(s.event).short} "
+                         f"({ui('stats_provisional')})"),
+               "team": s.team,
+               # what scored, and what it rode under: the line of the
+               # comunicato a total is checked against
+               "placings": ", ".join(f"{position_label(pos)} {who}"
+                                     for pos, who in s.places),
+               "points": s.points or "",
+               "participation": s.participation or "",
+               "total": s.total}
+        if last is not None and (s.cat, s.event) != last:
+            row = group_start(row)
+        last = (s.cat, s.event)
+        rows.append(row)
+    return Table(columns=cols, rows=zebra(rows), font_size=font_size,
+                 title=label("trofeo_detail_title"))
+
+
 #: What a rider is identified by on their squadra's own sheet, per grouping:
 #: the squadra is the title, so the column that names it would repeat it on
 #: every line - each grouping prints the *other* one instead.
@@ -1302,27 +1531,46 @@ _RECAP_TAIL = {RC.BY_REGION: "club", RC.BY_CLUB: "region",
                RC.BY_PROVINCE: "club", RC.BY_NATION: "club"}
 
 
+def recap_tail(group: str) -> str:
+    """The field a recap names a rider by besides the squadra in the title."""
+    return _RECAP_TAIL.get(group, "club")
+
+
 def _recap_cols(group: str, events: list[str], heads: dict[str, str], *,
-                short_headers: bool = False) -> list[Column]:
-    tail = _RECAP_TAIL.get(group, "club")
-    # the marks are two characters wide at most, so the specialità columns take
-    # the least the header needs and leave the width to the società, which is
-    # the one value that stops being readable the moment it is cut
-    return [Column("bib", label("bib"), "c", 6),
+                short_headers: bool = False, show_tail: bool = False,
+                uci_id: bool = True) -> list[Column]:
+    # the marks are two characters wide at most, so the event columns take
+    # the least the header needs and leave the width to the società and the UCI
+    # ID, which are the values that stop being readable the moment they are cut
+    cols = [Column("bib", label("bib"), "c", 6),
             Column("last_name", label("last_name"), "l", 18),
             Column("first_name", label("first_name"), "l", 14),
-            Column("cat", label("cat"), "c", 5),
-            Column(tail, label(tail), "l", 24),
-            *[Column(f"ev_{s}", heads[s], "c",
-                     EVENT_COL_W_SHORT if short_headers else 4.5)
-              for s in events]]
+            Column("cat", label("cat"), "c", 5)]
+    if uci_id:
+        cols.append(Column("uci_id", label("uci_id"), "c", 20,
+                           min_mm=MIN_UCI_MM))
+    if show_tail:
+        tail = recap_tail(group)
+        cols.append(Column(tail, label(tail), "l", 24))
+    return cols + [Column(f"ev_{s}", heads[s], "c",
+                          EVENT_COL_W_SHORT if short_headers else 4.5)
+                   for s in events]
 
 
 # ── the programme, and the numbers beside it ────────────────────────────────
 
+#: The green a comunicato already on paper is laid on, unless the jury picks
+#: another one in Programma. Pale on purpose: the sheet is read for its
+#: numbers, and the tint only says which of them have gone out.
+ISSUED_TINT = "#d9f2de"
+
+
 def programme_sheet(comp: Competition, *, times: bool = True,
+                    durations: bool = True,
                     merge_round: bool = False, merge_results: bool = False,
                     numbers: bool = True, race: bool = True,
+                    bold_final: bool = True,
+                    issued=(), issued_tint: str = ISSUED_TINT,
                     communique: str = "", font_size: int = 9) -> Document:
     """The running order with the comunicato number of every sheet beside it.
 
@@ -1336,22 +1584,41 @@ def programme_sheet(comp: Competition, *, times: bool = True,
     planned wants the times and the columns apart; a day being run wants it
     short enough to take in at a glance:
 
-    * `times` - the *Ora* column at all. Off when the programme has none.
-    * `merge_round` - specialità and fase in one column instead of two.
-    * `merge_results` - risultati and classifica in one, the classifica in
-      **bold**, because it is the sheet that closes the specialità and it is
-      the one people look for.
+    * `times` - the *Ora* column at all. Off when the programme has none. The
+      hour is not read off the fase: it is the start of the giornata plus the
+      durate of everything above it (`config.Competition.schedule`).
+    * `durations` - the *Durata* column: how long each fase takes, which is
+      what the orari are built out of and what a jury planning a day reads
+      down. Off is the sheet as it goes on a noticeboard.
+    * `merge_round` - event and fase in one column instead of two.
+    * `merge_results` - risultati and classifica in one column instead of two.
+    * `bold_final` - the **classifica finale** in bold: it is the sheet that
+      closes the event and it is the one people look for. A classifica
+      parziale is printed plain - it closes nothing - which is what tells the
+      two apart in a column that carries both.
     * `numbers` - the comunicato numbers at all. Off is the programme as it
       goes on a noticeboard, before there is a register to quote.
-    * `race` - what each fase is ridden over, in brackets after the specialità:
+    * `race` - what each fase is ridden over, in brackets after the event:
       *(8 km · 25 giri · 5 volate)*. It is what a rider asks and what a jury
       checks the distances against.
 
-    A fase that files no sheet of a kind leaves that cell empty; a sheet the
-    register carries no number for prints what `number_for` answers, which is
-    what the jury would see on the sheet itself.
+    `issued` are the comunicati the register says are already on paper
+    (`communiques.load`): their cells are laid on `issued_tint`, so that the
+    jury reads down the sheet and sees what has gone out without holding the
+    register beside it. An empty `issued` - or a tint the caller blanks - is
+    the plain sheet.
+
+    A fase that files no sheet of a kind leaves that cell empty, and so does a
+    sheet with no number of its own - one the register does not carry, and the
+    risultati of a comunicato whose number is printed on the classifica
+    (`communiques.number_for`). Every cell reads what the jury would see on
+    the sheet itself: a classifica parziale that also goes out as the ordine
+    di partenza of the next prova is one comunicato read in two places, and it
+    prints its number under the classifica as well as under that start order.
     """
     cols = ([Column("start", label("programme_start"), "c", 7)] if times else [])
+    if durations:
+        cols.append(Column("duration", ui("round_duration"), "c", 7))
     if numbers:
         cols.append(Column("startlist", label("programme_startlist"), "c", 6))
     cols.append(Column("cat", label("cat"), "c", 6))
@@ -1368,16 +1635,25 @@ def programme_sheet(comp: Competition, *, times: bool = True,
                  Column("classification", label("programme_classification"),
                         "c", 7)]
 
+    # a number typed anywhere is read as the digits in it ("41 RET" is 41),
+    # which is how the register itself stores it (`communiques.Issued`)
+    out = {int(n) for n in issued}
+    tint = hex_color(issued_tint) if numbers else ""
     rows: list[dict] = []
     last_day = None
-    # giornata by giornata and fase by fase: a specialità split over two days
+    # giornata by giornata and fase by fase: an event split over two days
     # prints under each of them, which is the only order this sheet is read in
     for day in comp.days():
-        for item, rnd in comp.rounds_on(day):
-            if not (rnd.docs or []):
+        for item, rnd, at in comp.schedule(day):
+            if is_pause(item):
+                row = _pause_row(comp, item, rnd, at)
+            elif not (rnd.docs or []):
                 continue        # a fase that is composed and not ridden
-            row = _programme_row(comp, item, rnd, comp.event(item.event),
-                                 merge_round, merge_results, race)
+            else:
+                row = _programme_row(comp, item, rnd, comp.event(item.event),
+                                     merge_round, merge_results, race, at,
+                                     issued=out, tint=tint,
+                                     bold_final=bold_final)
             if last_day is not None and day != last_day:
                 row = group_start(row, strong=True)
             last_day = day
@@ -1391,6 +1667,24 @@ def programme_sheet(comp: Competition, *, times: bool = True,
         tables=[Table(columns=cols, rows=zebra(rows), font_size=font_size)],
         slug=label("programme_slug"),
     )
+
+
+def _pause_row(comp: Competition, item, rnd, at: str) -> dict:
+    """A pause, on the line of the programme where it falls.
+
+    When it starts, how long it lasts, and what it is called - written in the
+    column of the event, because that is the column the sheet is read
+    down, and in italic, because it is the one line of the running order that
+    is not a race. Every other cell is empty: a pause has no categoria, no
+    fase, and no comunicato to go out under.
+    """
+    minutes = comp.duration_of(item, rnd)
+    row = {"start": at, "cat": "",
+           "duration": ui("n_minutes", n=minutes) if minutes else "",
+           "event": rnd.label, "round": "",
+           "startlist": "", "results": "", "classification": ""}
+    row["_class"] = "pause"
+    return row
 
 
 def _race_line(comp: Competition, item, rnd) -> str:
@@ -1410,30 +1704,91 @@ def _race_line(comp: Competition, item, rnd) -> str:
 
 
 def _programme_row(comp: Competition, item, rnd, ev, merge_round: bool,
-                   merge_results: bool, race: bool = False) -> dict:
-    """One fase: when it runs, what it is, and the numbers it goes out under."""
-    def number(doc: str, round_key: str) -> str:
-        if doc not in (rnd.docs or []):
+                   merge_results: bool, race: bool = False,
+                   at: str = "", issued=(), tint: str = "",
+                   bold_final: bool = True) -> dict:
+    """One fase: when it runs, what it is, and the numbers it goes out under.
+
+    The column of the classifica carries **both classifiche**: the parziale of
+    a prova, filed against the prova, and the classifica finale of the
+    event, filed against no fase (see `config.Sheet`). A parziale that
+    also goes out as the ordine di partenza of the next prova is still a
+    classifica and prints its number here - the same comunicato read in the
+    two places the jury looks for it.
+
+    The classifica finale is the one in bold (`bold_final`): it closes the
+    event and it is what anybody scans the column for. A parziale closes
+    nothing and stays plain, which is what tells the two apart.
+
+    A cell whose comunicati are all in `issued` is laid on `tint`: half a cell
+    green would say the sheet is half issued, which is not a state anything
+    is in - the merged column carries the risultati and the classifica of the
+    same fase, and it goes green when both have gone out.
+    """
+    def number(doc: str, round_key: str, *, filed: bool = True) -> str:
+        if filed and doc not in (rnd.docs or []):
             return ""
-        n = C.number_for(comp, item.cat, item.event, round_key, doc)
-        return "" if n == C.UNNUMBERED else n
+        return C.number_for(comp, item.cat, item.event, round_key, doc)
 
     start = number(DOC_STARTLIST, rnd.key)
     results = number(DOC_RESULTS, rnd.key)
-    # the classifica belongs to the specialità and to no fase (see config.Sheet)
+    # the parziale is asked of the register and not of the fase: a prova of an
+    # omnium files `partenti, risultati` and the standings after it are a sheet
+    # the format adds (`rounds.docs_for`), so a fase that never names it still
+    # has one in the register
+    partial = number(DOC_PARTIAL, rnd.key, filed=False)
+    # the classifica finale belongs to the event and to no fase
     classification = number(DOC_CLASSIFICATION, "")
+    standings = _one_cell(partial, classification)
 
     name = ev.short + (_race_line(comp, item, rnd) if race else "")
-    row = {"start": rnd.start or item.time, "startlist": start,
-           "cat": item.cat,
+    minutes = comp.duration_of(item, rnd)
+    row = {"start": at,
+           "duration": ui("n_minutes", n=minutes) if minutes else "",
+           "startlist": start, "cat": item.cat,
            "event": f"{name} · {rnd.label}" if merge_round else name,
            "round": "" if merge_round else rnd.label}
     if merge_results:
-        # both in one cell, and the classifica in bold: it is the sheet that
-        # closes the specialità, and it is the one anybody scans the column for
-        row["results"] = " · ".join(n for n in (results, classification) if n)
-        if classification:
-            row["_bold"] = {"results"}
+        row["results"] = _one_cell(results, standings)
     else:
-        row["results"], row["classification"] = results, classification
+        row["results"], row["classification"] = results, standings
+    if bold_final and classification:
+        row["_bold"] = {"results" if merge_results else "classification"}
+    if tint:
+        cells = ({"startlist": [start],
+                  "results": [results, partial, classification]}
+                 if merge_results else
+                 {"startlist": [start], "results": [results],
+                  "classification": [partial, classification]})
+        row["_tint"] = {key: tint for key, numbers in cells.items()
+                        if _all_issued(numbers, issued)}
     return row
+
+
+def _one_cell(*numbers: str) -> str:
+    """The comunicati printed in one cell, each said once.
+
+    A parziale that is also the classifica the event closes on is one
+    number, and a cell reading `18 · 18` is the same sheet counted twice.
+    """
+    out: list[str] = []
+    for n in numbers:
+        if n and n not in out:
+            out.append(n)
+    return " · ".join(out)
+
+
+def _all_issued(numbers, issued) -> bool:
+    """Whether every comunicato printed in one cell is already on paper.
+
+    Read as the register reads a number: the digits in it, so that the `RET`
+    of a rettifica is the same comunicato it corrects.
+    """
+    got = [_digits(n) for n in numbers if _digits(n)]
+    return bool(got) and all(n in issued for n in got)
+
+
+def _digits(value) -> int:
+    """`92 RET` -> 92; nothing printable -> 0 (see `models.number_text`)."""
+    txt = "".join(ch for ch in number_text(value) if ch.isdigit())
+    return int(txt) if txt else 0

@@ -2,7 +2,7 @@
 
 Everything a panel decides that is not a result: a penalty, a reclamo, a
 derogation, a start refused. Each one is a row of a register - categoria,
-specialità, fase, dorsale, the compact UCI code (`A1`, `C3`) - with the
+event, fase, dorsale, the compact UCI code (`A1`, `C3`) - with the
 sentence that goes out to the teams under it.
 
 It is normally written **in the race it was taken in**, from the Decisioni
@@ -10,11 +10,11 @@ panel in the sidebar of Gare, and lands here already knowing which race it
 belongs to. It can also be written here, from the same form: the fase is picked
 instead of being the one on screen. What must not happen is a decision composed
 from memory with no race attached - that is one that has lost the categoria,
-the specialità and the fase that make it findable.
+the event and the fase that make it findable.
 
 The page is the register read three ways:
 
-* **per specialità** - what was decided in each fase of a categoria's evento,
+* **per event** - what was decided in each fase of a categoria's evento,
   which is the recap the panel signs off;
 * **in the order taken** - the log itself, numbered, corrected in place;
 * **on paper** - the sheet the federation asks for afterwards.
@@ -49,7 +49,7 @@ from ui import notify
 from ui.download import save_button
 from ui.state import sticky_select
 
-ALL = ""  # every categoria / every specialità: the register as it stands
+ALL = ""  # every categoria / every event: the register as it stands
 
 
 def render(competition: str, comp: Competition, store: Store) -> None:
@@ -134,15 +134,15 @@ def _new(comp: Competition, store: Store, cat: str, event: str) -> None:
     DF.insert(comp, store, el, key="dec_new", cat=cat, event=event)
 
 
-# ── the recap, per specialità ───────────────────────────────────────────────
+# ── the recap, per event ───────────────────────────────────────────────
 
 def _by_round(comp: Competition, store: Store, taken: list[D.Decision],
               cat: str, event: str) -> None:
-    """What was decided in each fase of one specialità.
+    """What was decided in each fase of one event.
 
-    Only with a categoria and a specialità chosen: across the whole
+    Only with a categoria and an event chosen: across the whole
     competition, "fase per fase" is the register itself in a worse order. It is
-    the summary the panel reads before signing the sheet of the specialità off.
+    the summary the panel reads before signing the sheet of the event off.
     """
     if not cat or not event:
         return

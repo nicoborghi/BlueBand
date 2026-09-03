@@ -16,7 +16,7 @@ from core import communiques as C
 from core import programme as P
 from conftest import programme_path
 from core.checks import ERROR
-from core.config import Round, Sheet, load_competition
+from core.config import Round, Sheet, load_competition, validate
 
 
 @pytest.fixture
@@ -104,6 +104,32 @@ def test_a_derived_value_is_not_frozen_into_the_file(prog, tmp_path):
         item.cat, item.event, "Prova").laps is None
 
 
+def test_a_meeting_says_whether_it_assigns_titles(prog, tmp_path):
+    """Campionato or ordinaria: the one thing that decides CAMPIONE D'ITALIA.
+
+    Written both ways round - a programme silent about it is one the next jury
+    would have to guess at - and a file from before the question existed reads
+    as a championship, which is what every one of them was.
+    """
+    from core.config import KIND_CHAMPIONSHIP, KIND_ORDINARY
+
+    assert prog.kind == KIND_CHAMPIONSHIP and prog.assigns_titles is True
+    assert "kind: championship" in P.dump(prog)
+
+    prog.kind = KIND_ORDINARY
+    again = _round_trip(prog, tmp_path)
+    assert again.kind == KIND_ORDINARY and again.assigns_titles is False
+
+
+def test_a_programme_that_says_nothing_is_a_championship(tmp_path):
+    from core.config import KIND_CHAMPIONSHIP, load_competition
+
+    path = tmp_path / "programme.yaml"
+    path.write_text("name: Trofeo\ntrack_len: 0.25\nkind: qualunque cosa\n",
+                    encoding="utf-8")
+    assert load_competition(path).kind == KIND_CHAMPIONSHIP
+
+
 def test_what_the_format_runs_is_written_down_and_read_back(prog, tmp_path):
     """The builder states it; before it existed the app had to guess.
 
@@ -116,13 +142,13 @@ def test_what_the_format_runs_is_written_down_and_read_back(prog, tmp_path):
     """
     item = next(i for i in prog.programme if i.event == "velocita")
     item.scheme, item.final_5_8, item.final_b = "8", False, True
-    item.rounds[0] = dataclasses.replace(item.rounds[0], start="14:30")
+    item.rounds[0] = dataclasses.replace(item.rounds[0], duration=25)
 
     back = _round_trip(prog, tmp_path)
     got = next(i for i in back.programme
                if (i.cat, i.event) == (item.cat, item.event))
     assert (got.scheme, got.final_5_8, got.final_b) == ("8", False, True)
-    assert got.rounds[0].start == "14:30"
+    assert got.rounds[0].duration == 25
 
 
 def test_a_format_option_nobody_stated_stays_unstated(prog, tmp_path):
@@ -141,16 +167,30 @@ def test_a_format_option_nobody_stated_stays_unstated(prog, tmp_path):
                for i in back.programme)
 
 
-def test_the_freeze_and_the_pinned_numbers_survive_a_save(prog, tmp_path):
-    """Both say *do not move this*, and a save that lost them would move it."""
-    prog.numbering_frozen = True
-    prog.communiques[0].pinned = True
+def test_a_pinned_number_survives_a_save(prog, tmp_path):
+    """`pinned` says *do not move this*, and a save that lost it would move it.
 
+    It is the only thing that holds a number still now: the freeze that used to
+    stop the whole register from renumbering itself is gone, together with the
+    renumbering it was there to stop.
+    """
+    prog.communiques[0].pinned = True
+    assert _round_trip(prog, tmp_path).communiques[0].pinned is True
+
+    # and the old key is not written back by a file that still carries it
+    prog.numbering_frozen = True          # what an old programme.yaml says
+    assert "numbering_frozen" not in P.dump(prog)
+
+
+def test_numbering_the_classification_alone_is_written_only_when_off(prog,
+                                                                    tmp_path):
+    """On is the default and not a statement; off is one, and goes on paper."""
+    assert prog.number_on_classification is True
+    assert "number_on_classification" not in P.dump(prog)
+
+    prog.number_on_classification = False
     back = _round_trip(prog, tmp_path)
-    assert back.numbering_frozen is True
-    assert back.communiques[0].pinned is True
-    # and neither is written by a competition that never asked for them
-    assert "numbering_frozen" not in P.dump(load_competition(programme_path()))
+    assert back.number_on_classification is False
 
 
 # ── a comunicato that carries more than one document ────────────────────────
@@ -246,14 +286,12 @@ def test_a_blank_programme_round_trips(tmp_path):
     assert _same(small, _round_trip(small, tmp_path))
 
 
-def test_renumbering_follows_the_order_of_the_list(comp):
-    """The order the comunicati are in *is* the order they go out in."""
+def test_moving_a_line_of_the_register_moves_only_that_line(comp):
+    """`moved` is the list operation; the numbers are `communiques.autonumber`."""
     day1 = [c for c in comp.communiques if c.day == 1]
     moved = P.moved(day1, 0, 1)
     assert [c.title for c in moved][:2] == [day1[1].title, day1[0].title]
-    numbered = P.renumber(moved, start=1)
-    assert [c.n for c in numbered] == list(range(1, len(day1) + 1))
-    assert numbered[0].title == day1[1].title
+    assert sorted(c.n for c in moved) == sorted(c.n for c in day1)
 
 
 def test_a_typed_number_takes_the_place_it_asks_for():
@@ -323,29 +361,21 @@ def test_the_register_comes_back_in_the_order_of_its_numbers(comp):
     assert [r["n"] for r in moved] == sorted(r["n"] for r in moved)
 
 
-def test_a_proposed_register_leaves_nothing_out(comp):
-    """`plan_day` is a proposal: what it gets right is that nothing is missing."""
-    planned = P.plan_day(comp, 1, start=1)
-    scheduled = {(i.cat, i.event, r.key, doc)
-                 for i in comp.programme if i.day == 1
-                 for r in i.rounds for doc in r.docs}
-    # the elenchi iscritti open the day and are not a fase of it
-    proposed = {(c.cat, c.event, c.round_key, c.doc) for c in planned
-                if c.event != "entry_list"}
-    planned = [c for c in planned if c.event != "entry_list"]
-    # the classifica of a specialità is filed with no fase, so it is compared
-    # on the other three
-    assert {s[:2] for s in scheduled} == {p[:2] for p in proposed}
-    # every sheet is proposed except the ones the format publishes another way
-    # (`_docs_planned`): a madison finale files no risultati under its
-    # classifica, and an omnium prova is started from the one before it
-    skipped = {s for s in scheduled
-               if s[3] not in [d for d in P._docs_planned(
-                   comp, next(i for i in comp.programme
-                              if (i.cat, i.event) == s[:2]),
-                   comp.round_of(s[0], s[1], s[2]))]}
-    assert len(planned) == len(scheduled) - len(skipped)
-    assert skipped, "the formats that publish another way propose everything"
+
+def test_the_register_carries_every_sheet_the_programme_produces(comp):
+    """The tedious half: nothing is missing, and nothing is numbered twice.
+
+    What `plan_day` used to promise as a proposal, `autonumber` guarantees as
+    the register itself - every document of every fase is on exactly one
+    comunicato, and the accorpamenti are which of them share a number.
+    """
+    specs = C.autonumber(comp, [], rebuild=True)
+    carried = [s.key for c in specs for s in c.sheets]
+    produced = {s.key for s in C.sheet_order(comp)}
+
+    assert produced <= set(carried), "a sheet the register does not carry"
+    assert len(carried) == len(set(carried)), "a sheet on two comunicati"
+    assert [c.n for c in specs] == sorted({c.n for c in specs})
 
 
 def test_the_register_is_a_table_of_documents(prog):
@@ -416,6 +446,22 @@ def test_moving_a_number_that_is_already_on_paper_is_an_error(prog):
     assert moved and moved[0].level == ERROR
 
 
+def test_a_classifica_registered_from_its_fase_has_not_moved(prog):
+    """The classifica closes the specialità: the register may still name the
+    fase it was printed from, and that is the same sheet the plan carries."""
+    from core.communiques import Issued
+
+    spec = next(c for c in prog.communiques
+                if any(s.doc == "classifica" for s in c.sheets))
+    sheet = next(s for s in spec.sheets if s.doc == "classifica")
+    assert sheet.round_key == "", "a classifica is planned against no fase"
+
+    issued = [Issued(n=spec.n, title=spec.title, cat=sheet.cat,
+                     event=sheet.event, round_key="Finale", doc="classifica")]
+    assert not [i for i in P.issues(prog, issued)
+                if i.code == "communique_moved"]
+
+
 def test_a_gap_in_the_numbering_is_worth_saying(prog):
     """Numbers run continuously: a hole is usually a row deleted by mistake."""
     prog.communiques = [c for c in prog.communiques if c.n != 50]
@@ -464,13 +510,22 @@ def test_the_day_opens_with_its_start_lists(comp):
 def test_a_start_list_never_overtakes_the_results_that_compose_it(comp):
     """The finali cannot be published before the semifinali they come out of.
 
-    This is the whole reason the sort counts how deep a fase is instead of
-    simply putting every startlist first.
+    This is the whole reason the order is built from what each sheet *waits
+    for* instead of simply putting every start list first.
+
+    Between *stages*, not between fasi: two batterie di qualificazione are
+    ridden by different riders and neither composes the other, so both start
+    orders go out with the rest of the morning.
     """
+    from core.models import split_heat
+
     order = C.sheet_order(comp)
     at = {(s.cat, s.event, s.round_key, s.doc): i for i, s in enumerate(order)}
     for item in comp.programme:
         for before, after in zip(item.rounds, item.rounds[1:]):
+            if split_heat(after.key)[1] and \
+                    split_heat(before.key)[0] == split_heat(after.key)[0]:
+                continue                  # two batterie of the same fase
             r = at.get((item.cat, item.event, before.key, "risultati"))
             p = at.get((item.cat, item.event, after.key, "partenti"))
             if r is not None and p is not None:
@@ -579,10 +634,15 @@ def test_two_documents_on_one_sheet_take_one_number(prog):
 
 
 def test_the_register_of_a_programme_being_built_gains_what_it_lacks(prog):
-    """Building a new competition: every sheet wants a number, and gets one."""
+    """Building a new competition: every comunicato wants a number, and gets one.
+
+    One per *comunicato* and not per sheet: two documents that go out together
+    share a number, which is what `bundles` decides.
+    """
     prog.communiques = []
     out = C.autonumber(prog)
-    assert len(out) == len(C.sheet_order(prog))
+    assert len(out) == len(C.bundles(prog))
+    assert sum(len(c.sheets) for c in out) == len(C.sheet_order(prog))
     assert [c.n for c in out] == list(range(1, len(out) + 1))
     assert all(c.title for c in out), "a proposed comunicato with no title"
 
@@ -655,16 +715,15 @@ def test_a_programme_that_splits_nothing_says_nothing_about_days(prog):
     assert rounds and not [line for line in rounds if "day:" in line]
 
 
+
 def test_the_register_follows_the_fase_and_not_the_race(prog):
     """A fase ridden on the Sunday is numbered among the Sunday's comunicati."""
     item, later = _split(prog)
     moved = {r.key for r in item.rounds if r.day == later}
 
-    day_of = {}
-    for spec in P.plan_day(prog, later, start=1):
-        if (spec.cat, spec.event) == (item.cat, item.event):
-            day_of[spec.round_key] = later
-    assert moved <= set(day_of) | {""}, "a moved fase is not planned on its day"
+    specs = C.autonumber(prog, [], rebuild=True)
+    mine = [c for c in specs if (c.cat, c.event) == (item.cat, item.event)]
+    assert {c.round_key for c in mine if c.day == later} >= moved
 
     order = [s for s in C.sheet_order(prog)
              if (s.cat, s.event) == (item.cat, item.event)]
@@ -782,6 +841,7 @@ def test_the_composizione_is_not_in_the_running_order(prog):
     assert setup not in [r for _i, r in prog.rounds_on(item.day)]
 
 
+
 def test_the_risultati_follow_the_scaletta(prog):
     """A fase moved up the giornata brings its comunicati with it.
 
@@ -789,11 +849,12 @@ def test_the_risultati_follow_the_scaletta(prog):
     ridden, or at the head of the day if nothing does.
     """
     day = 2
-    planned = P.plan_day(prog, day, start=1)
+    specs = C.autonumber(prog, [], rebuild=True)
     scaletta = [(i.cat, i.event, r.key) for i, r in prog.rounds_on(day)]
-    filed = [(c.cat, c.event, c.round_key) for c in planned
-             if c.doc == "risultati"]
+    filed = [(c.cat, c.event, c.round_key) for c in specs
+             if c.day == day and c.doc == "risultati"]
     assert filed == [k for k in scaletta if k in filed]
+
 
 
 def test_the_register_opens_on_the_elenchi_and_then_on_start_orders(prog):
@@ -801,77 +862,346 @@ def test_the_register_opens_on_the_elenchi_and_then_on_start_orders(prog):
 
     An elenco iscritti per categoria racing that day, then the ordini di
     partenza of the fasi that open it - nothing has been ridden, so nothing
-    composes them - and only then the risultati.
+    composes them - and only then the risultati. Nobody asks for it and nobody
+    sets a number: it falls out of `communiques.bundles`, which reads the day
+    as the order things can be *published* in.
     """
-    planned = P.plan_day(prog, 1, start=1, ahead=5)
-    assert [c.doc for c in planned[:9]] == ["partenti"] * 9
-    assert {c.event for c in planned[:4]} == {"entry_list"}
-    assert [c.cat for c in planned[:4]] == [c for c in prog.cat_order()
-                                            if any(i.cat == c for i, _r
-                                                   in prog.rounds_on(1))]
-    assert planned[9].doc == "risultati"
+    day1 = [c for c in C.autonumber(prog, [], rebuild=True) if c.day == 1]
+    assert [c.doc for c in day1[:11]] == ["partenti"] * 11
+    assert {c.event for c in day1[:4]} == {"entry_list"}
+    assert [c.cat for c in day1[:4]] == [c for c in prog.cat_order()
+                                         if any(i.cat == c for i, _r
+                                                in prog.rounds_on(1))]
+    assert day1[11].doc == "risultati"
+
 
 
 def test_a_start_order_follows_the_risultati_that_compose_it(prog):
     """*risultati batterie, partenti finale*: the second cannot be written first."""
-    planned = P.plan_day(prog, 1, start=1, ahead=5)
-    keys = [(c.cat, c.event, c.round_key, c.doc) for c in planned]
+    specs = C.autonumber(prog, [], rebuild=True)
+    keys = [(c.cat, c.event, c.round_key, c.doc) for c in specs]
+    # the batterie compose the finale; the risultati of the finale itself go
+    # out after its partenti and are not what anybody waits for
     heats = max(i for i, k in enumerate(keys)
-                if k[:2] == ("ES", "madison") and k[3] == "risultati")
+                if k[:2] == ("ES", "madison") and k[3] == "risultati"
+                and "Batteria" in k[2])
     final = keys.index(("ES", "madison", "Finale", "partenti"))
     assert final == heats + 1
 
 
-def test_what_the_register_proposes_can_be_turned_off(prog):
-    """Three answers, and each of them takes sheets out of the proposal."""
-    whole = P.plan_day(prog, 1, start=1)
-    assert len(P.plan_day(prog, 1, start=1, entry_lists=False)) < len(whole)
-    assert not [c for c in P.plan_day(prog, 1, start=1, classification=False)
-                if c.doc == "classifica"]
-    # every sheet is still numbered once and only once
-    assert [c.n for c in whole] == list(range(1, len(whole) + 1))
 
+def test_the_numbers_run_from_one_with_no_holes(prog):
+    """Whatever else it does, a register is 1..N and says every number once.
 
-def test_a_madison_publishes_its_classifica_and_not_its_risultati(prog):
-    """The sheet that says who won a madison *is* the classifica.
-
-    Its batterie still file theirs: they are what decides who rides the finale.
+    The three switches that used to trim the proposal - elenchi iscritti, how
+    many ordini di partenza go out ahead, whether the classifica travels with
+    the fase that closes the specialità - are gone: they were questions about
+    what the numbering can work out for itself.
     """
-    planned = P.plan_day(prog, 1, start=1)
-    madison = [(c.round_key, c.doc) for c in planned
-               if (c.cat, c.event) == ("ES", "madison")]
-    assert ("", "classifica") in madison
-    assert not [d for k, d in madison if d == "risultati" and "Batteria" not in k]
-    assert [d for k, d in madison if "Batteria" in k and d == "risultati"]
+    specs = C.autonumber(prog, [], rebuild=True)
+    assert [c.n for c in specs] == list(range(1, len(specs) + 1))
+    assert [c for c in specs if c.doc == "classifica" or "classifica"
+            in [s.doc for s in c.sheets]]
 
 
-def test_an_omnium_prova_after_the_first_needs_no_start_order(prog):
-    """It is started from the classifica provvisoria of the one before it."""
-    planned = P.plan_day(prog, 2, start=1)
-    prove = [(c.round_key, c.doc) for c in planned
-             if (c.cat, c.event) == ("ES", "omnium")]
-    started = [k for k, d in prove if d == "partenti"]
-    assert started, "no omnium on this day"
-    # the batterie compose the omnium and are not prove of it: they line up
-    # like any other race, and so does the first prova after them
-    assert started == ["Qualificazioni Batteria 1", "Qualificazioni Batteria 2",
-                       "Scratch"]
-    assert [k for k, d in prove if d == "risultati"] == [
-        "Qualificazioni Batteria 1", "Qualificazioni Batteria 2", "Scratch",
-        "Tempo Race", "Eliminazione", "Corsa a Punti"]
+
+def test_a_madison_publishes_its_classifica_on_the_risultati(prog):
+    """The sheet that says who won a madison *is* the ordine d'arrivo.
+
+    One race decides it, so the risultati of the finale and the classifica are
+    one comunicato - and the number is printed on the classifica
+    (`communiques.number_for`). Its batterie still file their own risultati:
+    they are what decides who rides the finale.
+    """
+    specs = C.autonumber(prog, [], rebuild=True)
+    mine = [c for c in specs if (c.cat, c.event) == ("ES", "madison")]
+    closing = next(c for c in mine
+                   if "classifica" in [s.doc for s in c.sheets])
+    assert [(s.round_key, s.doc) for s in closing.sheets] == [
+        ("Finale", "risultati"), ("", "classifica")]
+    assert [c.round_key for c in mine if c.doc == "risultati"
+            and c is not closing] == ["Qualificazioni Batteria 1",
+                                      "Qualificazioni Batteria 2"]
 
 
-def test_proposing_a_giornata_leaves_the_register_without_holes(prog):
+
+def test_an_omnium_prova_is_started_by_the_standings_before_it(proposed):
+    """The classifica parziale after a prova *is* the next prova's start order.
+
+    One number, two titles: the sheet exists and does not need a comunicato of
+    its own. It used to be expressed by proposing no start order at all, which
+    is the same thing said by leaving a document out of the register - and a
+    sheet nobody could find in it.
+    """
+    specs = C.autonumber(proposed, [], rebuild=True)
+    mine = [c for c in specs if (c.cat, c.event) == ("ES", "omnium")]
+    carried = {(s.round_key, s.doc): c.n for c in mine for s in c.sheets}
+
+    # every prova after the first is started by the parziale of the one before
+    for before, after in (("Scratch", "Tempo Race"),
+                          ("Tempo Race", "Eliminazione"),
+                          ("Eliminazione", "Corsa a Punti")):
+        assert carried[(after, "partenti")] == \
+            carried[(before, "classifica_parziale")]
+    # and the first prova opens on a start order of its own, like any race
+    assert carried[("Scratch", "partenti")] not in [
+        n for (k, d), n in carried.items() if d == "classifica_parziale"]
+
+
+
+def test_a_recount_leaves_the_register_without_holes(prog):
     """A day that gains sheets pushes the days after it, and nothing collides."""
-    day = 2
-    before = [c for c in prog.communiques if c.day < day]
-    after = sorted([c for c in prog.communiques if c.day > day],
-                   key=lambda c: (c.day, c.n))
-    start = max([c.n for c in before] or [0]) + 1
-    planned = P.plan_day(prog, day, start)
-    prog.communiques = (before + planned
-                        + P.renumber(after, start=start + len(planned)))
+    prog.communiques = C.autonumber(prog, [], rebuild=True)
 
     numbers = sorted(c.n for c in prog.communiques)
     assert numbers == list(range(1, len(numbers) + 1))
     assert not [i for i in P.issues(prog) if i.level == ERROR]
+
+
+# ── which documents share a comunicato ──────────────────────────────────────
+#
+# A fase says which sheets it files; which of them go out on the same number is
+# a handful of generic rules (`regulations/communiques.json`). These are about
+# the four that matter, on the shapes they were written for.
+
+@pytest.fixture
+def proposed(comp):
+    """CITA26 with the documents the regulation proposes, not the ones typed.
+
+    The file predates the classifica parziale being a sheet of a fase: it
+    declares those in the register instead, which is the same document said in
+    the other of the two places. The rules work on what a fase *files*, so the
+    fixture asks for the proposal first - which is what the Assegna documenti
+    button does.
+    """
+    import copy
+    import dataclasses
+
+    from core import rounds as RD
+    from core.config import ROUND_SETUP
+
+    # a deep copy of the programme, not a shallow replace: the fixture rewrites
+    # `docs` on every fase, and the competition is session-scoped - doing that
+    # in place would hand the next test a file nobody wrote
+    fresh = dataclasses.replace(comp, merge={},
+                                programme=copy.deepcopy(comp.programme),
+                                communiques=copy.deepcopy(comp.communiques))
+    for item in fresh.programme:
+        if item.event == "entry_list":
+            continue
+        opts = RD.options_of(fresh, item.cat, item.event)
+        for rnd in item.rounds:
+            rnd.docs = ([] if rnd.kind == ROUND_SETUP
+                        else list(RD.docs_for(fresh, item.cat, item.event,
+                                              rnd.key, opts) or []))
+    return fresh
+
+
+def _bundle_of(comp, cat, event, round_key, doc):
+    """The comunicato that publishes one sheet, as the rules group them."""
+    want = (cat, event, round_key, doc)
+    return next(b for b in C.bundles(comp)
+                if any(s.key == want for s in b.sheets))
+
+
+def test_an_omnium_partial_is_the_start_order_of_the_next_prova(proposed):
+    """The rule the jury asked for by name, and the exception in it.
+
+    The standings after a prova *are* the ordine di partenza of the one after
+    it - one number, two titles. The first prova is the exception: nothing is
+    partial before it, so there its risultati and the standings are the same
+    table and the next start order rides with both.
+    """
+    after = _bundle_of(proposed, "ES", "omnium", "Tempo Race",
+                       "classifica_parziale")
+    assert [s.doc for s in after.sheets] == ["classifica_parziale", "partenti"]
+    assert after.sheets[1].round_key == "Eliminazione"
+
+    first = _bundle_of(proposed, "ES", "omnium", "Scratch", "risultati")
+    assert [s.doc for s in first.sheets] == ["risultati", "classifica_parziale",
+                                             "partenti"]
+    assert first.sheets[2].round_key == "Tempo Race"
+
+
+def test_switching_the_omnium_rule_off_gives_every_sheet_its_own_number(
+        proposed):
+    """It is a rule of this meeting, not a law: `merge:` in the programme."""
+    import dataclasses
+
+    on = len(C.bundles(proposed))
+    off = dataclasses.replace(proposed, merge={
+        "partial_is_next_startlist": False,
+        "partial_is_results_of_first": False})
+    assert len(C.bundles(off)) > on
+
+
+def test_a_sprint_publishes_the_next_start_order_with_the_results(proposed):
+    """«Quarti - Risultati, Semifinali - Partenti»: one sheet, one number."""
+    b = _bundle_of(proposed, "ES", "velocita", "Quarti", "risultati")
+    assert [(s.round_key, s.doc) for s in b.sheets] == [
+        ("Quarti", "risultati"), ("Semifinali", "partenti")]
+
+
+def test_a_timed_race_keeps_its_qualifying_and_its_finals_apart(proposed):
+    """Half a giornata passes between them: they are two comunicati."""
+    b = _bundle_of(proposed, "AL", "ins_squadre", "Qualificazioni", "risultati")
+    assert len(b.sheets) == 1
+
+
+def test_a_race_decided_by_one_run_files_results_and_classification_together(
+        proposed):
+    """A madison finale *is* its own classifica - one table, one number.
+
+    A velocità a squadre is not: it rides a qualification and two finals, and
+    its classifica is a third table that goes out on its own.
+    """
+    one = _bundle_of(proposed, "ED", "madison", "Finale", "risultati")
+    assert [s.doc for s in one.sheets] == ["risultati", "classifica"]
+
+    two = _bundle_of(proposed, "AL", "vel_squadre", "Finali", "risultati")
+    assert [s.doc for s in two.sheets] == ["risultati"]
+
+
+def test_the_titles_name_everything_the_comunicato_carries(proposed):
+    """A comunicato that publishes two things and names one is why nobody
+    could find the second."""
+    b = _bundle_of(proposed, "ES", "velocita", "Quarti", "risultati")
+    title = C.title_of(proposed, b)
+    assert title.startswith("ES Velocità")
+    assert "Quarti" in title and "Semifinali" in title
+    # said once: the categoria and the specialità are the same for every sheet
+    assert title.count("Velocità") == 1
+
+
+def test_rebuilding_the_register_drops_what_the_programme_lost(proposed):
+    """The button TR26 needs: a register full of fasi that no longer exist.
+
+    Rebuilding is the one operation allowed to throw a line away - and only a
+    line nobody has issued, pinned or annulled.
+    """
+    from core.config import CommuniqueSpec
+
+    proposed.communiques = [
+        CommuniqueSpec(n=1, day=1, cat="ES", event="omnium",
+                       round_key="Una fase che non esiste", doc="partenti"),
+        CommuniqueSpec(n=2, day=1, cat="ES", event="omnium",
+                       round_key="Nemmeno questa", doc="partenti", pinned=True),
+    ]
+    out = C.autonumber(proposed, [], rebuild=True)
+    keys = {c.sheets[0].key for c in out}
+    assert ("ES", "omnium", "Una fase che non esiste", "partenti") not in keys
+    assert ("ES", "omnium", "Nemmeno questa", "partenti") in keys, \
+        "a number pinned by hand is somebody's expectation"
+
+
+def test_a_register_that_already_numbers_a_sheet_is_not_regrouped(proposed):
+    """Without a rebuild, what the jury numbered stays numbered.
+
+    The rules would put the start order of the semifinali under the results of
+    the quarti; a register that already carries it on a number of its own is
+    the jury's record, and renumbering must not swallow it.
+    """
+    numbered = C.autonumber(proposed, add_missing=False)
+    assert len(numbered) == len(proposed.communiques)
+    assert {c.sheets[0].key for c in numbered} \
+        == {c.sheets[0].key for c in proposed.communiques}
+
+
+# ── pause: the giornata is not only races ───────────────────────────────────
+
+def test_a_pause_takes_its_minutes_off_the_clock(prog):
+    """The orari under a pausa are the hours the giuria will actually call.
+
+    A pausa is a programme item like any other (`programme.add_pause`), so it
+    sits in the running order, is re-timed by the same clock and moves with the
+    same buttons - it simply is not ridden.
+    """
+    day = prog.days()[0]
+    prog.day_start[day] = "14:30"
+    was = prog.day_end(day)
+
+    item = P.add_pause(prog, day, 30)
+    assert (item, item.rounds[0]) in prog.rounds_on(day)
+    assert prog.duration_of(item, item.rounds[0]) == 30
+    # it goes in at the bottom of the scaletta, so the giornata ends half an
+    # hour later and nothing above it has moved
+    end = prog.day_end(day)
+    assert int(end[:2]) * 60 + int(end[3:]) \
+        == int(was[:2]) * 60 + int(was[3:]) + 30
+
+
+def test_a_pause_files_nothing_and_carries_no_communique(prog):
+    """No comunicato hangs off a pausa: it publishes no sheet to number."""
+    day = prog.days()[0]
+    item = P.add_pause(prog, day, 20, "Premiazioni")
+    assert item.rounds[0].docs == []
+
+    planned = C.plan_from_programme(prog)
+    assert not [c for c in planned if c.event == "pause"]
+    # and it is not a race with two empty fields: the checks say nothing at all
+    keys = {(i.key, i.text) for i in P.issues(prog)}
+    assert not [k for k in keys if "pause" in str(k)]
+
+
+def test_a_pause_survives_being_written_and_read_again(prog, tmp_path):
+    """The round trip the whole file rests on, for a line that is not a race."""
+    P.add_pause(prog, prog.days()[0], 30, "Intervallo")
+    path = tmp_path / "programme.yaml"
+    path.write_text(P.dump(prog), encoding="utf-8")
+
+    back = load_competition(path)
+    pause = [i for i in back.programme if i.event == "pause"]
+    assert len(pause) == 1
+    rnd = pause[0].rounds[0]
+    assert (rnd.label, rnd.duration, rnd.docs) == ("Intervallo", 30, [])
+    assert not [m for m in validate(back) if "pause" in m]
+
+
+def test_two_pauses_on_one_giornata_are_told_apart(prog):
+    """Both are called *Pausa*: the running order still has to know which is which."""
+    day = prog.days()[0]
+    a = P.add_pause(prog, day, 15)
+    b = P.add_pause(prog, day, 30)
+    assert a.rounds[0].key != b.rounds[0].key
+
+
+def test_taking_a_pause_off_the_giornata_deletes_it(prog):
+    """A pausa belongs to the giornata and to no race.
+
+    Left in the programme on no day it would be a line nothing shows and
+    nobody could get back to - which is not what *Togli* means anywhere else,
+    and is the only sensible thing it can mean here.
+    """
+    from ui.pages.programme import _off_day
+
+    day = prog.days()[0]
+    item = P.add_pause(prog, day, 30)
+    _off_day(prog, item, item.rounds[0])
+    assert item not in prog.programme
+    assert not [i for i in prog.programme if i.event == "pause"]
+
+
+def test_the_documents_of_a_fase_survive_leaving_it_and_coming_back(monkeypatch):
+    """Streamlit drops the state of a widget a run does not draw.
+
+    Only one fase is drawn at a time, so switching to another one and back
+    used to bring the multiselect up empty - its `_model` signature had not
+    moved, nothing reseeded it, and the box wrote *no documents* onto a fase
+    nobody had touched. It cost an ED Omnium Tempo Race its comunicati 7 and
+    24 in the middle of a competition.
+    """
+    from ui.pages import programme as PG
+
+    session = {}
+    monkeypatch.setattr(PG.st, "session_state", session, raising=False)
+    options = ["partenti", "risultati", "classifica_parziale"]
+    docs = ["partenti", "risultati", "classifica_parziale"]
+
+    PG._pick_sync("prog_docs_ED_omnium_Tempo Race", options, docs)
+    assert session["prog_docs_ED_omnium_Tempo Race"] == docs
+
+    # the jury edits another fase: Streamlit forgets the widget, not the model
+    del session["prog_docs_ED_omnium_Tempo Race"]
+
+    PG._pick_sync("prog_docs_ED_omnium_Tempo Race", options, docs)
+    assert session["prog_docs_ED_omnium_Tempo Race"] == docs

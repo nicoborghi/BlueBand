@@ -22,13 +22,16 @@
         <td class="l" colspan="{{ t.columns|length - off }}">{{ row._banner }}</td>
         {% else %}
         {# a row may bold single cells of its own (`_bold`: the qualified teams
-           on a qualifying sheet), or print them red (`_red`: the second rider
-           of a madison coppia, who wears the red number), on top of the
-           columns that are always bold #}
+           on a qualifying sheet), print them red (`_red`: the second rider of
+           a madison coppia, who wears the red number) or lay a tint behind one
+           (`_tint`: the comunicati already issued, on the programme), on top
+           of the columns that are always bold #}
+        {% set tint = row._tint|default({}) %}
         {% for c in t.columns %}<td class="{{ c.align }}{% if c.bold or c.key in row._bold|default([]) %} b{% endif %}
           {%- if c.key in row._red|default([]) %} red{% endif %}
           {%- if c.wrap %} wrap{% endif %}{% if c.muted %} mut{% endif %}
-          {%- if c.tight %} tight{% endif %}">{{ row[c.key]|default('') }}</td>
+          {%- if c.tight %} tight{% endif %}"
+          {%- if tint.get(c.key) %} style="background: {{ tint[c.key] }}"{% endif %}>{{ row[c.key]|default('') }}</td>
         {% endfor %}
         {% endif %}
       </tr>
@@ -38,13 +41,39 @@
 </table>
 {%- endmacro %}
 
-{# The foot of the sheet says only what the letterhead does not: when the sheet
-   came off the printer. Competition, venue and comunicato number are all in
-   the block above - repeating them was noise. #}
+{# One item of a line of slots: whatever Impostazioni sent to that side of the
+   sheet, or an empty cell holding the space open. A slot the sheet has nothing
+   to put in - a bozza has no number, a reprint no timestamp - prints empty
+   too: the two items beside it must not slide across the paper. #}
+{% macro slot(item) -%}
+{%- if item == "communique" -%}
+  {%- if doc.draft %}<span class="bozza">NON DEFINITIVO</span>
+  {%- elif doc.communique %}<span class="comunicato">Comunicato n. {{ doc.communique }}
+    {%- if doc.pages %} pag. {{ doc.pages }}{% endif %}</span>{% endif -%}
+{%- elif item == "printed_at" and printed_at -%}
+  <span class="printed-at">{{ printed_at }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{# The three slots of one line, left to centre to right - always three cells,
+   so the centre one is the centre of the paper and not of what is beside it. #}
+{% macro slot_row(items, cls) -%}
+<div class="slot-row {{ cls }}">
+  {%- for item in items %}<div class="slot">{{ slot(item) }}</div>{% endfor -%}
+</div>
+{%- endmacro %}
+
+{# The foot of the sheet says only what the letterhead does not - by default
+   when the sheet came off the printer, and whatever else the slots were given.
+   Competition, venue and title are all in the block above. #}
 {% macro footer_block() -%}
 <div class="doc-footer">
-  {% if printed_at %}<div class="footline">{{ printed_at }}</div>{% endif %}
-  {% if footer_img %}<div class="footer-strip"><img src="{{ footer_img }}"></div>
+  {% if foot_line %}<div class="footline"
+       {%- if foot_gap %} style="padding-bottom: {{ '%g'|format(foot_gap) }}mm"{% endif %}>
+    {{- slot_row(foot_slots, "foot-slots") -}}
+  </div>{% endif %}
+  {% if footer_img %}<div class="footer-strip"><img src="{{ footer_img }}"
+       style="{{ footer_style }}"></div>
   {% endif %}
 </div>
 {%- endmacro %}
@@ -62,19 +91,17 @@
     <tr><td>
       {% if head %}
       <div class="sheet-head">
-        {% if banner %}<div class="banner"><img src="{{ banner }}"></div>{% endif %}
-        <div class="head-body">
-          {# A provisional sheet carries no comunicato number: it is not one
-             yet, and a number on paper is a promise the jury has not made. #}
-          {% if doc.draft %}
-          <div class="comunicato-row">
-            <span class="bozza">NON DEFINITIVO</span>
-          </div>
-          {% elif doc.communique %}
-          <div class="comunicato-row">
-            <span class="comunicato">Comunicato n. {{ doc.communique }}
-              {%- if doc.pages %} pag. {{ doc.pages }}{% endif %}</span>
-          </div>
+        {% if banner %}<div class="banner"><img src="{{ banner }}"
+             style="{{ banner_style }}"></div>{% endif %}
+        <div class="head-body"
+             {%- if head_gap %} style="padding-top: {{ '%g'|format(5 + head_gap) }}mm"{% endif %}>
+          {# The line under the testata: the comunicato number where the jury
+             put it, and whatever else it sent up here. A provisional sheet
+             carries no number - it is not one yet, and a number on paper is a
+             promise the jury has not made - so the slot prints NON DEFINITIVO
+             in its place. #}
+          {% if head_line %}
+          <div class="comunicato-row">{{ slot_row(head_slots, "head-slots") }}</div>
           {% endif %}
           <div class="title">{{ doc.title }}</div>
           {% if doc.subtitle %}<div class="subtitle">{{ doc.subtitle }}</div>{% endif %}
@@ -97,6 +124,10 @@
   <tbody>
     <tr><td>
       <div class="doc">
+        {# What the jury wrote, where a composed sheet has its table. Already
+           HTML and already escaped: `render.markup` is the only thing that
+           builds it, and it reads the box as text before it reads a mark. #}
+        {% if doc.body %}<div class="doc-body">{{ doc.body|safe }}</div>{% endif %}
         {% for t in doc.tables %}{{ data_table(t) }}{% endfor %}
 
         {# the key to the column headings belongs under the table it explains #}

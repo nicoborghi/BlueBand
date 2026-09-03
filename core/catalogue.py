@@ -1,4 +1,4 @@
-"""The specialità of track cycling, ready to be added to a programme.
+"""The events of track cycling, ready to be added to a programme.
 
 Declaring an event used to mean typing seven fields into a grid - the code, the
 name, the short name, the UCI abbreviation, the format, how many ride a squadra,
@@ -13,12 +13,12 @@ they live in a table:
                    "short": {"it": "Chilometro", "en": "Kilometre"}}
 
 The jury picks one and gets an `Event`; everything about it stays editable in
-the Specialità grid afterwards, and an event the table does not know is still
+the event grid afterwards, and an event the table does not know is still
 declared there by hand.
 
 The **name is per language**, because it is not a label: it is written into
 `programme.yaml` and printed on the sheets exactly as it stands there (see
-`core.i18n`). Adding a specialità to an English competition writes the English
+`core.i18n`). Adding an event to an English competition writes the English
 name, and it prints in English next year too, whoever opens the file.
 
 Seeded from CITA 26 and extended with the events its programme did not contest.
@@ -63,12 +63,12 @@ def _table(path: Path) -> dict[str, Any]:
 
 
 def load() -> dict[str, Any]:
-    """The catalogue of specialità."""
+    """The catalogue of events."""
     return _table(FILE)
 
 
 def codes() -> list[str]:
-    """Every specialità the table knows, in the order it is written in.
+    """Every event the table knows, in the order it is written in.
 
     The file's own order and not alphabetical: it runs from the velocità to the
     corse di gruppo, which is how a programme is read and roughly how a
@@ -78,7 +78,7 @@ def codes() -> list[str]:
 
 
 def name(code: str, *, short: bool = False) -> str:
-    """What a specialità is called, in the language the competition is run in."""
+    """What an event is called, in the language the competition is run in."""
     entry = load().get(code) or {}
     names = entry.get("short" if short else "name") or {}
     if not isinstance(names, dict):
@@ -86,16 +86,17 @@ def name(code: str, *, short: bool = False) -> str:
     return str(names.get(language()) or names.get(DEFAULT) or code)
 
 
-#: What the table states about a specialità, as opposed to what a programme
+#: What the table states about an event, as opposed to what a programme
 #: does. The *name* is not in it: a name is printed on every sheet and belongs
 #: to the meeting that wrote it (see the module docstring). These are the
 #: technical facts - the ones that are the same at every championship and have
 #: no business being retyped into every file.
-FIELDS = ("abbr", "fmt", "team_size", "teams_per_start", "entry_columns")
+FIELDS = ("abbr", "fmt", "team_size", "teams_per_start", "minutes",
+          "entry_columns")
 
 
 def event_fields(code: str) -> dict[str, Any]:
-    """What the table says about a specialità, ready to be merged under a file.
+    """What the table says about an event, ready to be merged under a file.
 
     Only what it actually states: a key the table is silent about is left to
     the dataclass default, so adding a field to `Event` does not turn every
@@ -130,9 +131,9 @@ def save(table: dict[str, Any]) -> Path:
 
 
 def event(code: str, order: int = 0) -> Event:
-    """The specialità as a programme entry, ready to be scheduled.
+    """The event as a programme entry, ready to be scheduled.
 
-    Unknown to the table - a specialità somebody invented, or one this file has
+    Unknown to the table - an event somebody invented, or one this file has
     not caught up with - comes back as a bare `Event` under that code, which is
     exactly what the grid would have made of a code typed into it.
     """
@@ -158,9 +159,14 @@ def event(code: str, order: int = 0) -> Event:
 #     regulations/categories.json
 #
 #     "AL": {"sex": "M", "name": {"it": "ALLIEVI MASCHI", "en": "U17 MEN"}}
+#     "OM": {"sex": "M", "name": {...}, "accepts": ["EL", "UN", "M*"]}
 #
 # The sigle are the ones the FCI programmes are written in - ES/ED, AL/DA,
-# JU/DJ, UN/DU - and they are what the jury types anyway; ticking them beats
+# JU/DJ, UN/DU - and they are what the jury types anyway. Two of them are not
+# licence categories at all: **OM** and **OF**, the open, ridden by whoever is
+# licensed EL or UN (DE or DU for the women) and by every master - the entry
+# list arrives with those sigle in it and `accepts` is what maps them onto the
+# categoria the race is run under (`config.Category.takes`); ticking them beats
 # keying four fields eight times. A meeting with categorie of its own still
 # declares them by hand in the grid, and anything added from here stays
 # editable there.
@@ -194,4 +200,5 @@ def category(code: str, order: int = 0) -> Category:
     if entry is None:
         return Category(code=code, order=order)
     return Category(code=code, name=category_name(code),
-                    sex=str(entry.get("sex") or ""), order=order)
+                    sex=str(entry.get("sex") or ""), order=order,
+                    accepts=[str(x) for x in (entry.get("accepts") or [])])

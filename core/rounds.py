@@ -1,7 +1,7 @@
-"""What a specialità runs, proposed - the fasi a format has, before anybody edits.
+"""What an event runs, proposed - the fasi a format has, before anybody edits.
 
 `plan_day` proposes a comunicato per document; this proposes a *fase per race*.
-The jury says which categoria contests which specialità and answers the two or
+The jury says which categoria contests which event and answers the two or
 three questions the format actually asks - a velocità qualifies 12 or 8, a
 keirin does or does not ride its second final, a madison eliminates so many
 coppie per batteria - and gets back the whole list of fasi, each with a
@@ -35,10 +35,10 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from . import distances as DIST
-from .config import (DOC_CLASSIFICATION, DOC_RESULTS, DOC_RESULTS_58,
-                     DOC_RESULTS_B, DOC_RESULTS_REP, DOC_STARTLIST,
-                     DOC_STARTLIST_REP, MIN_ELIMINATED, ROUND_SETUP,
-                     Competition, Round, laps_from_distance)
+from .config import (DOC_CLASSIFICATION, DOC_PARTIAL, DOC_RESULTS,
+                     DOC_RESULTS_58, DOC_RESULTS_B, DOC_RESULTS_REP,
+                     DOC_STARTLIST, DOC_STARTLIST_REP, MIN_ELIMINATED,
+                     ROUND_SETUP, Competition, Round, laps_from_distance)
 from .formats import keirin as K
 from .formats import omnium as O
 from .formats import sprint as S
@@ -83,8 +83,13 @@ class Options:
     # how many start together in a round against the clock: two, one per
     # straight, or one at a time. It differs by categoria - thirty entered ride
     # a chilometro two at a time, eight ride it one at a time - which is why it
-    # is asked here, per race, and not once per specialità
-    per_start: int = 0              # 0 = whatever the specialità says
+    # is asked here, per race, and not once per event
+    per_start: int = 0              # 0 = whatever the event says
+    #: velocità / inseguimento a squadre: how many atleti a squadra fields.
+    #: The regulation states it per event (`Event.team_size`) and that is
+    #: what this is seeded with; a categoria authorised to ride with one fewer
+    #: says so here, per race, the same way `per_start` is said.
+    team_size: int = 0              # 0 = whatever the event says
 
 
 #: Which question each format asks. The order is the order the form shows them.
@@ -94,7 +99,7 @@ OPTIONS = {
     "madison": ("heats", "eliminate"),
     "omnium": ("heats", "eliminate"),
     "timed": ("direct_final", "qualify", "per_start"),
-    "timed_team": ("direct_final", "qualify", "per_start"),
+    "timed_team": ("direct_final", "qualify", "per_start", "team_size"),
     "time_trial": ("per_start",),
 }
 
@@ -301,8 +306,15 @@ def docs_for(comp: Competition, cat: str, event: str, key: str,
         docs.append(DOC_RESULTS)
 
     if key == last:
-        # the classification of the specialità hangs off its last fase
+        # the classification of the event hangs off its last fase
         docs.append(DOC_CLASSIFICATION)
+    elif fmt == "omnium" and key in O.ROUNDS:
+        # every prova of an omnium but the last is followed by the standings so
+        # far. It is a sheet of its own and not a way of saying "risultati": in
+        # the tempo race the two are different tables, and from the second
+        # prova on it is also the ordine di partenza of the next one, which is
+        # what the register does with it (`communiques.bundles`).
+        docs.append(DOC_PARTIAL)
     return docs
 
 
@@ -353,6 +365,10 @@ def options_of(comp: Competition, cat: str, event: str) -> Options:
         eliminate=(setup.eliminate or 0) if setup else 0,
         qualify=(qualifying.qualify or FINALISTS) if qualifying else FINALISTS,
         per_start=getattr(item, "teams_per_start", 0) or 0,
+        # the *effective* number and not the override: the form shows what the
+        # squadre are actually built to, which on nearly every programme is the
+        # regulation's own number and nowhere in the file
+        team_size=comp.team_size(cat, event),
     )
 
 
@@ -361,17 +377,18 @@ def apply(comp: Competition, cat: str, event: str,
     """Re-propose a whole race, keeping what only the jury can know.
 
     The ↩ of a whole race: the fasi and their numbers come back from the
-    regulation, and the three fields the proposal has no opinion about - when
-    the fase is ridden, what it is called, and the jury's own note - stay where
-    they were. Losing a timetable to a button that says *riproponi* is not what
-    anybody means by it.
+    regulation, and the four fields the proposal has no opinion about - when
+    the fase is ridden, how long it takes, what it is called, and the jury's
+    own note - stay where they were. Losing a timetable to a button that says
+    *riproponi* is not what anybody means by it.
     """
     before = {r.key: r for r in (comp.scheduled(cat, event) or
                                  _empty()).rounds}
     out = []
     for rnd in propose(comp, cat, event, opts):
         was = before.get(rnd.key)
-        out.append(replace(rnd, note=was.note, label=was.label, start=was.start)
+        out.append(replace(rnd, note=was.note, label=was.label,
+                           duration=was.duration)
                    if was else rnd)
     return out
 

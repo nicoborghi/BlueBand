@@ -54,7 +54,7 @@ jobs:
           Write-Host "bundle: $mb MB"
           # pandas, numpy and pyarrow are in here on purpose and they are most
           # of it. The budget is a tripwire for something *new* arriving, not a
-          # target - read docs/BUILD.md before raising it.
+          # target - read docs/reference/build.md before raising it.
           if ($mb -gt 600) { throw "bundle is $mb MB, budget is 600 MB" }
 
       - name: The bundle is whole

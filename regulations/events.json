@@ -1,7 +1,8 @@
 {
-  "_last_updated_": "10 August 2026",
+  "_last_updated_": "29 August 2026",
   "velocita": {
     "fmt": "sprint",
+    "minutes": 20,
     "abbr": "SP",
     "teams_per_start": 1,
     "name": {
@@ -19,6 +20,7 @@
   },
   "keirin": {
     "fmt": "keirin",
+    "minutes": 20,
     "abbr": "KE",
     "name": {
       "it": "KEIRIN",
@@ -35,6 +37,7 @@
   },
   "ins_individuale": {
     "fmt": "timed",
+    "minutes": 20,
     "abbr": "IP",
     "name": {
       "it": "INSEGUIMENTO INDIVIDUALE",
@@ -51,6 +54,7 @@
   },
   "ins_squadre": {
     "fmt": "timed_team",
+    "minutes": 25,
     "abbr": "TP",
     "team_size": 4,
     "name": {
@@ -68,6 +72,7 @@
   },
   "vel_squadre": {
     "fmt": "timed_team",
+    "minutes": 15,
     "abbr": "TS",
     "team_size": 3,
     "teams_per_start": 1,
@@ -86,6 +91,7 @@
   },
   "chilometro": {
     "fmt": "time_trial",
+    "minutes": 20,
     "abbr": "TT",
     "name": {
       "it": "CHILOMETRO DA FERMO",
@@ -98,6 +104,7 @@
   },
   "500": {
     "fmt": "time_trial",
+    "minutes": 15,
     "abbr": "TT",
     "name": {
       "it": "500 METRI",
@@ -110,6 +117,7 @@
   },
   "omnium": {
     "fmt": "omnium",
+    "minutes": 20,
     "abbr": "OM",
     "name": {
       "it": "OMNIUM",
@@ -126,6 +134,7 @@
   },
   "madison": {
     "fmt": "madison",
+    "minutes": 30,
     "abbr": "MD",
     "name": {
       "it": "MADISON",
@@ -141,6 +150,7 @@
   },
   "scratch": {
     "fmt": "group",
+    "minutes": 15,
     "abbr": "SC",
     "name": {
       "it": "SCRATCH",
@@ -153,6 +163,7 @@
   },
   "corsa_punti": {
     "fmt": "group",
+    "minutes": 30,
     "abbr": "PR",
     "name": {
       "it": "CORSA A PUNTI",
@@ -165,6 +176,7 @@
   },
   "eliminazione": {
     "fmt": "elimination",
+    "minutes": 20,
     "abbr": "EL",
     "name": {
       "it": "ELIMINAZIONE",
@@ -173,6 +185,19 @@
     "short": {
       "it": "Eliminazione",
       "en": "Elimination"
+    }
+  },
+  "derny": {
+    "fmt": "derny",
+    "minutes": 30,
+    "abbr": "DE",
+    "name": {
+      "it": "DERNY",
+      "en": "DERNY"
+    },
+    "short": {
+      "it": "Derny",
+      "en": "Derny"
     }
   }
 }

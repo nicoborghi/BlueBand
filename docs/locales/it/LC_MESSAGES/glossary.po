@@ -1,0 +1,508 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:07+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: it <LL@li.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../glossary.rst:4 e63850e4b1e14f4bbe3df45990288e22
+msgid "Glossary"
+msgstr "Glossario"
+
+#: ../../glossary.rst:6 026c9ba3ba4f4fd2af96cfd6195ab42e
+msgid ""
+"The one place the vocabulary is fixed. Every term below is the name used in "
+"the code, in the file names and throughout this documentation; what reaches "
+"a screen or a printed sheet is a catalogue lookup in :ref:`core/i18n "
+"<i18n>`, never a literal, so the interface may say it in another language "
+"while the code says it here."
+msgstr ""
+"L'unico posto in cui il lessico è fissato. Ogni termine qui sotto è il nome "
+"usato nel codice, nei nomi dei file e in tutta questa documentazione; quello"
+" che arriva a schermo o su un foglio stampato è una voce di catalogo in "
+":ref:`core/i18n <i18n>`, mai una stringa letterale — perciò l'interfaccia "
+"può dirlo in un'altra lingua mentre il codice lo dice così."
+
+#: ../../glossary.rst:14 c604c36d1ea54b908b3f150f45320439
+msgid ""
+"Two renamings are worth calling out, because older stored files still carry "
+"the previous spelling and the app reads both:"
+msgstr ""
+"Vale la pena segnalare due rinomine, perché i file salvati in passato "
+"portano ancora la grafia precedente e il programma legge entrambe:"
+
+#: ../../glossary.rst:17 23c19f34667943a6bb8a4278b7a8b03b
+msgid "a non-starter declared at the licence check is **NS**, not ``NP``;"
+msgstr ""
+"chi è dichiarato non partente alla verifica delle licenze è **NS** (*not "
+"starting*), non ``NP``;"
+
+#: ../../glossary.rst:18 3481d85496ef496494a5082111ad3211
+msgid ""
+"what a title is awarded in is an **event**, never a *race*. A race is one "
+"start on the track; an event is the whole thing, over however many rounds it"
+" takes."
+msgstr ""
+"ciò in cui si assegna un titolo è un **event** (specialità), mai una *race*."
+" Una race è una singola partenza in pista; un event è tutta la specialità, "
+"per quante fasi le occorrano."
+
+#: ../../glossary.rst:24 7cf9ffb32da54a30bcc71fb69a6f2609
+msgid "The structure of a meeting"
+msgstr "La struttura di una manifestazione"
+
+#: ../../glossary.rst:27 bc72b656195141feb9cf1d739a75882b
+msgid "competition"
+msgstr "competition (manifestazione)"
+
+#: ../../glossary.rst:29 d23331d815134c03ba0aee11922bec72
+msgid ""
+"The meeting itself — one championship, one trophy, one open. It is one "
+"folder on disk and one ``programme.yaml``. Everything else in this glossary "
+"belongs to exactly one competition."
+msgstr ""
+"La manifestazione stessa — un campionato, un trofeo, un open. È una cartella"
+" su disco e un ``programme.yaml``. Tutto il resto di questo glossario "
+"appartiene a esattamente una competition."
+
+#: ../../glossary.rst:32 8d97763ad402457ebd48818b50d94f68
+msgid "category"
+msgstr "category (categoria)"
+
+#: ../../glossary.rst:34 3c4eb73687884840971203905176786a
+msgid ""
+"A field of riders that ranks among itself, by age and sex. A competition "
+"contests its events separately per category, and the medal table counts them"
+" separately too."
+msgstr ""
+"Un gruppo di atleti che si classifica al proprio interno, per età e sesso. "
+"Una competition mette in palio le sue specialità separatamente per "
+"categoria, e anche il medagliere le conta separatamente."
+
+#: ../../glossary.rst:37 f37b17bf6d4c4d77ac5a00168befe4fe
+msgid "event"
+msgstr "event (specialità)"
+
+#: ../../glossary.rst:39 4e7b533e3f0b452281082e47db39675c
+msgid ""
+"What a title is awarded in: madison, omnium, sprint, team pursuit, points "
+"race. One event per category is one title. An event is **not** a block of "
+"time — a sprint that qualifies on Saturday and rides its finals on Sunday is"
+" one event across two days."
+msgstr ""
+"Ciò in cui si assegna un titolo: madison, omnium, velocità, inseguimento a "
+"squadre, corsa a punti. Un event per categoria è un titolo. Un event **non**"
+" è un blocco di tempo — una velocità che qualifica il sabato e corre le "
+"finali la domenica è un solo event su due giornate."
+
+#: ../../glossary.rst:43 dac199b589454a02bb8406567bfb0451
+msgid "round"
+msgstr "round (fase)"
+
+#: ../../glossary.rst:45 6e26d21ec18b4920bb241cbfe4c32763
+msgid ""
+"One stage of an event: qualifying, repechages, quarter-finals, final. An "
+"event runs a list of rounds, and the day belongs to the round, not to the "
+"event."
+msgstr ""
+"Una fase di un event: qualificazioni, recuperi, quarti, finale. Un event "
+"corre un elenco di round, e la giornata appartiene al round, non all'event."
+
+#: ../../glossary.rst:48 2d01c7bf6856431992e950df930dbf2a
+msgid "heat"
+msgstr "heat (batteria)"
+
+#: ../../glossary.rst:50 112b6732f4c54db29dca084e8778cd2a
+msgid ""
+"One start inside a round, when the round does not fit on the track at once: "
+"heat 1, heat 2. A round with a single start has one heat."
+msgstr ""
+"Una partenza dentro un round, quando il round non sta in pista tutto "
+"insieme: batteria 1, batteria 2. Un round con una sola partenza ha una "
+"batteria."
+
+#: ../../glossary.rst:52 1b261d07ff194df2a16183c3f33ac136
+msgid "race"
+msgstr "race (gara)"
+
+#: ../../glossary.rst:54 3f314e9134214b3b8489ddbc03143188
+msgid ""
+"One start on the track — a single heat of a single round. Used in the code "
+"for the stored state of a ``(category, event, round)`` triple, which is the "
+"unit the app saves and reloads."
+msgstr ""
+"Una singola partenza in pista — una batteria di un round. Nel codice indica "
+"lo stato salvato della terna ``(category, event, round)``, che è l'unità che"
+" il programma salva e ricarica."
+
+#: ../../glossary.rst:57 39e08141c7a84519a77680432aa448d2
+msgid "day"
+msgstr "day (giornata)"
+
+#: ../../glossary.rst:59 a8835771271e415a80426d0ea9760bb1
+msgid ""
+"A day of the running order, numbered from 1. Derived from the competition's "
+"dates."
+msgstr ""
+"Una giornata del programma orario, numerata da 1. Deriva dalle date della "
+"competition."
+
+#: ../../glossary.rst:61 18c2d422dd734a478519f6347d4059ba
+msgid "running order"
+msgstr "running order (programma orario)"
+
+#: ../../glossary.rst:63 ccdef8e4624a4f7da77c531c159de4ef
+msgid ""
+"The sequence the rounds are ridden in across the days, with start times. It "
+"is what the communiqué register is planned from."
+msgstr ""
+"La sequenza in cui i round si corrono nelle giornate, con gli orari di "
+"partenza. È da qui che si pianifica il registro dei comunicati."
+
+#: ../../glossary.rst:68 b806c8619e214b47bbceb56538cf6e0e
+msgid "The people"
+msgstr "Le persone"
+
+#: ../../glossary.rst:71 537654c21088404bb08b7b5dc6a664a7
+msgid "rider"
+msgstr "rider (atleta)"
+
+#: ../../glossary.rst:73 185e4e57a30b4de685fe2e067033fd80
+msgid ""
+"One entrant, identified by UCI ID. The identity that survives a corrected "
+"entry list, a changed bib and a re-import."
+msgstr ""
+"Un iscritto, identificato dall'UCI ID. L'identità che sopravvive a un elenco"
+" iscritti corretto, a un dorsale cambiato e a una reimportazione."
+
+#: ../../glossary.rst:75 dea2b548748547cb9eaeaa8869d346c9
+msgid "bib"
+msgstr "bib (dorsale)"
+
+#: ../../glossary.rst:77 6491daf703e14b02b69ff1cb50f57fef
+msgid ""
+"The number pinned on a rider, unique within a category. Dealt out at import "
+"where the entry file does not carry them."
+msgstr ""
+"Il numero appuntato sull'atleta, unico dentro la categoria. Assegnato "
+"all'importazione quando il file degli iscritti non lo porta."
+
+#: ../../glossary.rst:79 9cd7497192374f868c599465022d4ec5
+msgid "club"
+msgstr "club (società)"
+
+#: ../../glossary.rst:81 debc9717420b46168a23ee22f48a7b35
+msgid "The club that holds the rider's licence."
+msgstr "La società che tiene la licenza dell'atleta."
+
+#: ../../glossary.rst:82 ba89cd3d2eab4d5dbfb1cc2301d68b9a
+msgid "region"
+msgstr "region (regione)"
+
+#: ../../glossary.rst:84 f862983835e7489d8cb10a3045825de4
+msgid ""
+"The regional selection that entered the rider, where the competition is "
+"contested between selections rather than clubs."
+msgstr ""
+"La rappresentativa regionale che ha iscritto l'atleta, dove la competition "
+"si corre tra rappresentative anziché tra società."
+
+#: ../../glossary.rst:86 39c847b2575943d081eb0780cdd0df2c
+msgid "team"
+msgstr "team (squadra)"
+
+#: ../../glossary.rst:88 8e7165e2bd3b4a7baf620eb7745fe41b
+msgid ""
+"Whichever grouping the competition is scored on — region, club, province or "
+"nation. Declared by the programme, overridable in the settings, and it "
+"decides the medal table, the per-team recap sheets and the quota checks "
+"alike."
+msgstr ""
+"Il raggruppamento su cui la competition è classificata — regione, società, "
+"provincia o nazione. Dichiarato dal programma, sovrascrivibile nelle "
+"impostazioni, e decide allo stesso modo il medagliere, i riepiloghi per "
+"squadra e i controlli sulle quote."
+
+#: ../../glossary.rst:93 30e19fd939ae4dbfa97ed88af4950b65
+msgid ""
+"Distinct from a *team in a race* — the four of a team pursuit, the pair of a"
+" madison — which is a single entrant made of several riders."
+msgstr ""
+"Da non confondere con una *squadra in gara* — il quartetto di un "
+"inseguimento a squadre, la coppia di una madison — che è un singolo iscritto"
+" composto da più atleti."
+
+#: ../../glossary.rst:95 b2b2bf33e9b24ec9a58627a2a8a1a048
+msgid "jury"
+msgstr "jury (giuria)"
+
+#: ../../glossary.rst:97 100c83043762444babd39289a61bb6e3
+msgid ""
+"The panel of commissaires running the competition. The app is theirs: "
+"everything it proposes stays editable, and nothing it proposes is more true "
+"than what the jury types over it."
+msgstr ""
+"Il collegio di giuria che dirige la competition. Il programma è suo: tutto "
+"ciò che propone resta modificabile, e niente di ciò che propone è più vero "
+"di quello che la giuria ci scrive sopra."
+
+#: ../../glossary.rst:103 de0e8498f0f947f4a572ee228382bd6b
+msgid "Result codes"
+msgstr "Sigle di risultato"
+
+#: ../../glossary.rst:105 4ec36572bed342039dcb141c56f12829
+msgid ""
+"The status of one rider in one round. ``OK`` is the absence of a code and is"
+" never printed."
+msgstr ""
+"Lo stato di un atleta in un round. ``OK`` è l'assenza di sigla e non si "
+"stampa mai."
+
+#: ../../glossary.rst:112 fbf70891e5524216a2afca2bf130dc6a
+msgid "Code"
+msgstr "Sigla"
+
+#: ../../glossary.rst:113 0279414a995544bdb1ed29fe1423f13d
+msgid "Meaning"
+msgstr "Significato"
+
+#: ../../glossary.rst:114 f27bcff0eb0c447bae1660eb97a636ba
+msgid "In the classification"
+msgstr "In classifica"
+
+#: ../../glossary.rst:115 44a9954b6f204db28b3543311efade72
+msgid "``OK``"
+msgstr "``OK``"
+
+#: ../../glossary.rst:116 e59f8281e59845bdbcc96683be306727
+msgid "Classified"
+msgstr "Classificato"
+
+#: ../../glossary.rst:117 b009794486da43359a22f5f988b0117b
+msgid "Placed on the result."
+msgstr "Piazzato nel risultato."
+
+#: ../../glossary.rst:118 0a54af950335466db02f0377244a4434
+msgid "``REL``"
+msgstr "``REL``"
+
+#: ../../glossary.rst:119 f78ebb04ec7846e6b2656fc9399af822
+msgid "Relegated"
+msgstr "Declassato"
+
+#: ../../glossary.rst:120 ce7023d6910b490886577223ffe9d2fb
+msgid "**Stays classified**, at the back: prints as ``8° REL``."
+msgstr "**Resta classificato**, in coda: stampa ``8° REL``."
+
+#: ../../glossary.rst:121 3458c26fdc0d4d77b597bf47e5f677b5
+msgid "``DNF``"
+msgstr "``DNF``"
+
+#: ../../glossary.rst:122 ef5eb637c56543db88a6319d1949cc84
+msgid "Did not finish — started, did not reach the line"
+msgstr "Ritirato — partito, non arrivato"
+
+#: ../../glossary.rst:123 9cf64099473d4f8c9872eb4ed93cf1be
+msgid "Not placed. **Keeps the points** already scored."
+msgstr "Fuori classifica. **Tiene i punti** già conquistati."
+
+#: ../../glossary.rst:124 2eee8d1994dd4328b4690d9eb0697ca5
+msgid "``ABD``"
+msgstr "``ABD``"
+
+#: ../../glossary.rst:125 44b7b99f5a334bae937d0435849f8dd8
+msgid "Abandoned — left the track of their own accord (bunch races only)"
+msgstr "Sceso dalla pista di sua volontà (solo prove di gruppo)"
+
+#: ../../glossary.rst:126 d201fb5fd5ea4e8395b9c20917d6b0a8
+msgid "Not placed, **and scores nothing**."
+msgstr "Fuori classifica, **e senza punti**."
+
+#: ../../glossary.rst:127 a6e0ae230cac4e6ab6d4951cad405ad4
+msgid "``DNS``"
+msgstr "``DNS``"
+
+#: ../../glossary.rst:128 48eacb1b26d0458cba15b4ef1fe1a898
+msgid "Did not start — entered the round, did not take the start"
+msgstr "Non partito — iscritto al round, non ha preso il via"
+
+#: ../../glossary.rst:129 21e47dc7adcc4bc188dd15ad0acffd0a
+msgid "Not placed; the code is printed."
+msgstr "Fuori classifica; la sigla si stampa."
+
+#: ../../glossary.rst:130 dacbecd1bc0f4e0aa682d9de49e38bd5
+msgid "``DSQ``"
+msgstr "``DSQ``"
+
+#: ../../glossary.rst:131 7e1e1709a5f048f1bd5148a7ebcf7415
+msgid "Disqualified"
+msgstr "Squalificato"
+
+#: ../../glossary.rst:132 b111b7b22d334a7fa299399d6c6c0aa7
+msgid "Not placed, behind everyone."
+msgstr "Fuori classifica, in fondo a tutti."
+
+#: ../../glossary.rst:133 0cfe5aa4d0d74fd5afd376c8980d87c7
+msgid "``NS``"
+msgstr "``NS``"
+
+#: ../../glossary.rst:134 4013285a2eb04a57903abcfad1d03556
+msgid "Not starting — declared before the competition, at the licence check"
+msgstr ""
+"Non partente — dichiarato prima della manifestazione, alla verifica delle "
+"licenze"
+
+#: ../../glossary.rst:135 2c3b63bfc6ff4df09c802b9fc1d9022c
+msgid "Never appears on a start list at all."
+msgstr "Non compare affatto tra i partenti."
+
+#: ../../glossary.rst:136 ee04281ba4834042800111541590fdd8
+msgid "``W``"
+msgstr "``W``"
+
+#: ../../glossary.rst:137 134749ebea6847719004fd679ce50271
+msgid "Warned"
+msgstr "Ammonito"
+
+#: ../../glossary.rst:138 58af598fbcc54f37838450fbad146482
+msgid ""
+"Not a status: it comes from the decisions register, and prints as a **W** "
+"beside the bib (``1 W``) until the end of the event."
+msgstr ""
+"Non è uno stato: viene dal registro delle decisioni, e si stampa come una "
+"**W** accanto al dorsale (``1 W``) fino alla fine dell'event."
+
+#: ../../glossary.rst:141 23cc80beedd14cdd91be98e9699d3ce4
+msgid "Two rules follow from the table and are worth stating separately."
+msgstr ""
+"Dalla tabella discendono due regole che vale la pena enunciare a parte."
+
+#: ../../glossary.rst:143 446f0da77d114e4499c4867a380d48b7
+msgid ""
+"**Order of leaving.** In bunch races the riders who left are written *in the"
+" order they left the race*: the last to leave is the first of them, because "
+"that is the one who got furthest. It holds for ``DNF`` and for ``ABD``, each"
+" in its own field."
+msgstr ""
+"**L'ordine di uscita.** Nelle prove di gruppo i ritirati si scrivono "
+"*nell'ordine in cui lasciano la gara*: l'ultimo che lascia è il primo dei "
+"ritirati, perché è quello che è andato più avanti. Vale per ``DNF`` e per "
+"``ABD``, ciascuno nel suo campo."
+
+#: ../../glossary.rst:148 56090c6e32014c468fb10cf4d3507db6
+msgid ""
+"**Whoever is out, is out.** The four codes that close an event for a rider —"
+" ``DNS``, ``DNF``, ``ABD``, ``DSQ`` — close it for real: the rider is on no "
+"later round's start list, and the app asks for no result. They stay in the "
+"event's classification with their code, which is what a classification is "
+"for. Removing the code from the round it was written in puts the rider back."
+msgstr ""
+"**Chi esce, esce.** Le quattro sigle che chiudono un event per un atleta — "
+"``DNS``, ``DNF``, ``ABD``, ``DSQ`` — lo chiudono davvero: l'atleta non è "
+"nell'ordine di partenza di nessun round successivo, e il programma non "
+"chiede alcun risultato per lui. Resta nella classifica dell'event con la sua"
+" sigla, che è a questo che serve una classifica. Basta togliere la sigla dal"
+" round in cui è stata scritta e l'atleta rientra."
+
+#: ../../glossary.rst:156 7f4b61b73b324f928f39dc479d0cf8b7
+msgid ""
+"In an omnium they disappear from the standings too. A partial standing *is* "
+"the start order of the next race, and a name there is a rider who starts. A "
+"rider who takes one of the four codes in one race drops out of the standings"
+" that follow and out of the final classification, staying only on the sheet "
+"of the race the decision was written in — which is where it is published."
+msgstr ""
+"Nell'omnium spariscono anche dalle classifiche. Una classifica parziale *è* "
+"l'ordine di partenza della prova dopo, e un nome lì sopra è un atleta che "
+"parte. Chi prende una delle quattro sigle in una prova esce dalle parziali "
+"che seguono e dalla classifica finale, e resta soltanto sul foglio della "
+"prova in cui la decisione è stata scritta — che è dove si pubblica."
+
+#: ../../glossary.rst:162 a0f9d579d10f4e37a77c0eec2918e361
+msgid ""
+"``REL`` does not travel: it decides who won *that* heat and ends there; in "
+"the event's classification the rider is placed where they finished. A "
+"``DNS`` in an intermediate sprint round does not travel either — the 200 m "
+"is the one race everybody rides, so a rider with a time took a start, and a "
+"later no-show loses that round but is still placed on the 200 m time. A "
+"``DSQ`` travels all the way."
+msgstr ""
+"``REL`` non viaggia: decide chi ha vinto *quella* batteria e finisce lì; "
+"nella classifica dell'event l'atleta è classificato per dove è arrivato. "
+"Nemmeno un ``DNS`` in un turno intermedio della velocità viaggia — il 200 m "
+"è l'unica gara che corrono tutti, quindi chi ha un tempo ha preso il via, e "
+"chi poi non si presenta perde quel turno ma in classifica finale è piazzato "
+"col tempo del 200 m. Il ``DSQ`` invece arriva fino in fondo."
+
+#: ../../glossary.rst:171 b5f6067b280845c4be003ecf78dcf354
+msgid "What is published"
+msgstr "Che cosa si pubblica"
+
+#: ../../glossary.rst:174 6177930408e7458aa84d0bab2b0f5d35
+msgid "sheet"
+msgstr "sheet (foglio)"
+
+#: ../../glossary.rst:176 e75b712af6534551a279308f495179c0
+msgid ""
+"One printed table: the start order of a round, its results, the "
+"classification of an event. Which sheets a round files comes from its "
+"format."
+msgstr ""
+"Una tabella stampata: l'ordine di partenza di un round, i suoi risultati, la"
+" classifica di un event. Quali fogli produce un round viene dal suo formato."
+
+#: ../../glossary.rst:179 fd3379fc821b4fada3faf8c283c8ab9b
+msgid "communiqué"
+msgstr "communiqué (comunicato)"
+
+#: ../../glossary.rst:181 2e4d7a4bde854523b94381f9a66d820e
+msgid ""
+"A **number**, not a sheet. More than one sheet can go out under one number —"
+" as the sprint and the keirin have always done. Numbers run continuously "
+"across the whole competition and are never reused; an annulled document "
+"keeps its number and prints ``NN RET``. A sheet riding under another's "
+"number prints no number at all."
+msgstr ""
+"Un **numero**, non un foglio. Sotto un numero possono uscire più fogli — "
+"come hanno sempre fatto la velocità e il keirin. I numeri corrono senza "
+"interruzione per tutta la competition e non si riusano mai; un documento "
+"annullato tiene il suo numero e stampa ``NN RET``. Un foglio che viaggia "
+"sotto il numero di un altro non stampa alcun numero."
+
+#: ../../glossary.rst:186 45ecb7ab748448e38ff4308d833e864f
+msgid "decision"
+msgstr "decision (decisione)"
+
+#: ../../glossary.rst:188 f2f1a14447404c0bad119e6a8a0ff69e
+msgid ""
+"One ruling of the jury: a UCI code, the riders concerned, and the sentence "
+"published under it."
+msgstr ""
+"Una decisione della giuria: un codice UCI, gli atleti coinvolti e la frase "
+"pubblicata sotto di esso."
+
+#: ../../glossary.rst:190 7d277da5a76b479abb1a055050795482
+msgid "classification"
+msgstr "classification (classifica)"
+
+#: ../../glossary.rst:192 f5cd5539bad640afb4a7bb44fe617470
+msgid ""
+"The ranking of an event, across all its rounds. Distinct from a *result*, "
+"which is the finishing order of one round."
+msgstr ""
+"L'ordine di un event, su tutti i suoi round. Da distinguere da un "
+"*risultato*, che è l'ordine d'arrivo di un solo round."

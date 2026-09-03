@@ -10,7 +10,7 @@ a dorsale or a regione corrected in the app survives any number of reloads.
 `import_entries` reads either shape, told apart by what the workbook holds:
 
 * **the ksport export** (`Iscritti_NNNNNN_KSPORT.xlsx`) - one flat sheet, one
-  row per rider, no event columns at all. Which specialità a rider contests is
+  row per rider, no event columns at all. Which event a rider contests is
   not in this file: the programme says which columns a categoria has, and the
   jury ticks them at the verifica (they live in the overlay).
 * **the master workbook** (`Iscritti_26_generale.xlsx`) - a `KSPORT` sheet plus one
@@ -37,7 +37,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
-from .config import Competition, EVENT_ENTRY_LIST, EntrySheet
+from .config import (ANY, Check, Competition, EVENT_ENTRY_LIST,
+                     EntrySheet, PER_CAT, PER_CLUB, PER_CLUB_IN_REGION,
+                     PER_REGION, UNIT_EVENTS, UNIT_PAIRS, UNIT_RIDERS,
+                     UNIT_TEAMS)
 from .checks import ERROR, WARN, Issue
 from .i18n import fix_accents, label, msg
 from .models import (EntryList, EventEntry, FLAG_RESERVE, LEGACY_KEYS,
@@ -215,6 +218,25 @@ def sheet_names(path: str | Path) -> list[str]:
         return [str(n) for n in xls.sheet_names]
 
 
+#: The sheet the federal export is archived on, and the name it carried before
+#: it had its underscore. Written by `entry_book.build`; read here.
+ARCHIVE_SHEET = "_KSPORT"
+ARCHIVE_SHEET_LEGACY = "KSPORT"
+
+
+def archive_sheet(wb) -> str:
+    """The archive sheet of this workbook, or "" when it has none.
+
+    Two names because the sheet was renamed: a workbook built before the rename
+    carries `KSPORT`, and a read that only knew `_KSPORT` would silently lose
+    the federal data of every file already on a jury's laptop.
+    """
+    for name in (ARCHIVE_SHEET, ARCHIVE_SHEET_LEGACY):
+        if name in wb.sheetnames:
+            return name
+    return ""
+
+
 def is_flat_export(path: str | Path, comp: Competition) -> bool:
     """True when the file has no per-category sheets to read.
 
@@ -251,8 +273,9 @@ def import_master(path: str | Path, comp: Competition) -> EntryList:
             continue
         _read_category_sheet(wb[cat], cat, el, headers, sheet)
 
-    if "KSPORT" in wb.sheetnames:
-        _enrich_from_ksport(wb["KSPORT"], el, sheet, prov2reg)
+    archive = archive_sheet(wb)
+    if archive:
+        _enrich_from_ksport(wb[archive], el, sheet, prov2reg)
     else:
         el.warnings.append(msg("xls_no_ksport"))
 
@@ -270,6 +293,13 @@ def _read_province(wb) -> dict[str, str]:
         if row and _s(row[0]) and len(row) > 2:
             out[_s(row[0]).upper()] = norm_region(row[2])
     return out
+
+
+#: The columns the giuria adds by hand, wherever there is room on the sheet:
+#: they are read where they are found, and bound neither end of the run of
+#: event columns. `Verificato` is only read back - the app derives it now
+#: (`Rider.checked_in`) and never writes it.
+FLOATING_COLUMNS = ("checked_in", "not_starting")
 
 
 def _read_category_sheet(ws, cat: str, el: EntryList, headers: dict[str, str],
@@ -292,9 +322,9 @@ def _read_category_sheet(ws, cat: str, el: EntryList, headers: dict[str, str],
     # Event columns run from the first column after the last fixed one until the
     # first blank header; anything past that is a hidden helper column. The
     # check-in columns are added by the giuria wherever there is room - before
-    # the specialità or after them - so they count as neither boundary.
+    # the event or after them - so they count as neither boundary.
     event_cols: dict[int, str] = {}
-    fixed = [c for f, c in at.items() if f not in CHECK_IN_FIELDS]
+    fixed = [c for f, c in at.items() if f not in FLOATING_COLUMNS]
     for c in range(max(fixed, default=len(sheet.fields)) + 1,
                    ws.max_column + 1):
         h = hdr.get(c, "")
@@ -334,7 +364,6 @@ def _read_category_sheet(ws, cat: str, el: EntryList, headers: dict[str, str],
             nation=_s(cell(r, "nation")) or "ITA",
             club=_s(cell(r, "club")), club_code=_s(cell(r, "club_code")),
             region=norm_region(cell(r, "region")), source=f"{ws.title}!{r}",
-            checked_in=_yes(cell(r, "checked_in")),
             not_starting=_yes(cell(r, "not_starting")),
         )
         for c, code in event_cols.items():
@@ -385,11 +414,10 @@ def _enrich_from_ksport(ws, el: EntryList, sheet: EntrySheet,
             in ("SI", "S", "YES")
         rider.certificate_date = _date(col(row, "certificate_date"))
         rider.ksport_source = f"{ws.title}!{r}"
-        # The licence check lives in both places when the giuria added the
-        # columns to both: a tick anywhere counts, so a rider verified by hand
-        # in the foglio di categoria is not undone by a blank KSPORT cell (and
-        # the other way round). Untick from the app clears both at once.
-        rider.checked_in = rider.checked_in or _yes(col(row, "checked_in"))
+        # NP lives in both sheets when the giuria added the column to both:
+        # a flag anywhere counts, so a rider marked by hand in the foglio di
+        # categoria is not undone by a blank KSPORT cell (and the other way
+        # round). Clearing it from the app clears both at once.
         rider.not_starting = rider.not_starting or _yes(col(row, "not_starting"))
         if not rider.region:
             rider.region = (norm_region(col(row, "region"))
@@ -411,6 +439,17 @@ def _resolve_region_from_note(note: str) -> str:
     if marker in s:
         return norm_region(s.split(marker, 1)[1])
     return ""
+
+
+def _region_of(value) -> str:
+    """A regione, however the column says it.
+
+    `VENETO` and `Iscrizione CR. VENETO` are the same statement: the second is
+    how the export writes it when it has no column of its own, and the mapping
+    dialog lets that column *be* the regione. Reading it verbatim would put
+    "ISCRIZIONE CR. VENETO" on every start list.
+    """
+    return _resolve_region_from_note(value) or norm_region(value)
 
 
 # ── import: alternative sources ─────────────────────────────────────────────
@@ -448,7 +487,8 @@ def import_regional_form(path: str | Path, comp: Competition,
         last_name = _s(cell(r, "last_name"))
         if not uci and not last_name:
             continue
-        cat = norm_cat(cell(r, "cat"))
+        licence = norm_cat(cell(r, "cat"))
+        cat = comp.category_of(licence)
         key = rider_key(uci, cat, None)
         rider = el.riders.get(key) or Rider(key=key, cat=cat, uci_id=uci,
                                             source=f"{path.name}!{r}")
@@ -458,6 +498,8 @@ def import_regional_form(path: str | Path, comp: Competition,
         rider.club = rider.club or _s(cell(r, "club"))
         rider.club_code = rider.club_code or _s(cell(r, "club_code"))
         rider.region = rider.region or norm_region(cell(r, "region"))
+        rider.licence_cat = rider.licence_cat or (licence if licence != cat
+                                                  else "")
         if not rider.cat:
             el.warnings.append(msg("xls_unknown_cat", file=path.name, row=r,
                                    value=repr(_s(cell(r, "cat")))))
@@ -471,10 +513,10 @@ def import_regional_form(path: str | Path, comp: Competition,
 
 
 def import_ksport_export(path: str | Path, comp: Competition) -> EntryList:
-    """Read a flat ksport `Iscritti_NNNNNN_KSPORT.xlsx` export.
+    """Read the flat federal export (`Iscritti_NNNNNN.xls`, Fattore K / ksport).
 
     One row per rider and no event columns: this file says who is entered in
-    the *competition*, not in which specialità. Those are the programme's
+    the *competition*, not in which event. Those are the programme's
     (`comp.events_for(cat)`) and the jury's, ticked at the verifica and kept in
     the overlay - which is why re-importing this file never disturbs them.
 
@@ -482,11 +524,16 @@ def import_ksport_export(path: str | Path, comp: Competition) -> EntryList:
     its own column, not from the sheet a rider sits on, and the squadra from
     the column that names it (`Regione` / `NomeSocieta`), falling back to the
     "Iscrizione CR. ..." note only when there is no column at all.
+
+    **The header row is found, not declared** (`_header_row`): the same export
+    arrives with the headings on the first row and, from some systems, under a
+    letterhead of empty ones. A number in the programme could only be right for
+    one of the two, and getting it wrong reads a file of nothing.
     """
     import pandas as pd
 
     path = Path(path)
-    df = pd.read_excel(path, dtype=str)
+    df = pd.read_excel(path, dtype=str, header=_header_row(path, comp))
     el = EntryList(source_file=str(path), source_hash=file_hash(path),
                    imported_at=datetime.now().isoformat(timespec="seconds"))
     sheet = comp.entry_sheet
@@ -504,7 +551,11 @@ def import_ksport_export(path: str | Path, comp: Competition) -> EntryList:
 
     for i, row in df.iterrows():
         uci = _uci(val(row, "uci_id"))
-        cat = norm_cat(val(row, "cat"))
+        licence = norm_cat(val(row, "cat"))
+        # an open is ridden by licences that do not carry its sigla - EL, UN
+        # and every master - so the categoria the rider *races* in is asked of
+        # the programme, and the licence is kept beside it
+        cat = comp.category_of(licence, _s(val(row, "sex")))
         bib = _int(val(row, "bib"))
         last_name, first_name = _names(val(row, "last_name"),
                                        val(row, "first_name"),
@@ -523,15 +574,16 @@ def import_ksport_export(path: str | Path, comp: Competition) -> EntryList:
             nation=_s(val(row, "nation")) or "ITA",
             birth_date=_date(val(row, "birth_date")), club=_s(val(row, "club")),
             club_code=_s(val(row, "club_code")), sex=_s(val(row, "sex")),
+            licence_cat=licence if licence != cat else "",
             province=_s(val(row, "province")).upper(), note=note,
-            # the note spells the regione short ("Iscrizione CR. EMILIA ROM"):
-            # it answers only where the export has no column of its own
-            region=(norm_region(val(row, "region"))
-                    or _resolve_region_from_note(note)),
+            # the note spells the regione ("Iscrizione CR. EMILIA ROM"), and
+            # the column may *be* the note: an export with no `Regione` of its
+            # own is read by mapping the field onto `Note` (the mapping dialog
+            # on the Programma page), so both are read the same way
+            region=(_region_of(val(row, "region")) or _region_of(note)),
             reserve_entry=_s(val(row, "reserve_entry")).upper()
             in ("SI", "S", "YES"),
             certificate_date=_date(val(row, "certificate_date")),
-            checked_in=_yes(val(row, "checked_in")),
             not_starting=_yes(val(row, "not_starting")),
             source=f"{path.name}!{i + 2}",
         )
@@ -545,18 +597,92 @@ def import_ksport_export(path: str | Path, comp: Competition) -> EntryList:
     return el
 
 
+def _header_row(path: Path, comp: Competition) -> int:
+    """Which row of a flat export carries the headings.
+
+    The first one that names at least two columns we know - which is the
+    heading row and cannot be a row of riders, since a rider is not called
+    `CodiceUci`. Nothing found, it is row 0: the ordinary case, and letting
+    pandas say what is wrong with the file beats guessing further.
+    """
+    import pandas as pd
+
+    sheet = comp.entry_sheet
+    head = pd.read_excel(path, dtype=str, header=None, nrows=12)
+    for i, row in head.iterrows():
+        known = sum(1 for value in row
+                    if sheet.field_of(value, ksport=True)
+                    or sheet.field_of(value))
+        if known >= 2:
+            return int(i)
+    return 0
+
+
 #: What the flat export has to name for the app to work with it at all.
 FLAT_REQUIRED = ("uci_id", "last_name", "cat", "bib")
 
+#: Every field a flat export can fill, in the order the mapping dialog asks
+#: for them: who the rider is, then who they ride for, then what the federation
+#: adds. `full_name` is the one alternative to the pair above it - some exports
+#: carry `NomeTesserato` and nothing else - and `note` earns its place because
+#: it is where an export without a `Regione` column says the regione.
+FLAT_FIELDS = ("bib", "last_name", "first_name", "full_name", "cat", "uci_id",
+               "fci_code", "birth_date", "sex", "nation",
+               "club", "club_code", "region", "province",
+               "note", "reserve_entry", "certificate_date")
+
+
+def flat_columns(path: str | Path, comp: Competition) -> list[str]:
+    """The headings of a flat export, as they are written in it.
+
+    What the mapping dialog offers: the columns the file actually has, read off
+    the row the headings are on (`_header_row`) rather than guessed from a
+    number in the programme.
+    """
+    import pandas as pd
+
+    path = Path(path)
+    df = pd.read_excel(path, dtype=str, header=_header_row(path, comp),
+                       nrows=1)
+    return [str(c) for c in df.columns if str(c) and not str(c).startswith(
+        "Unnamed:")]
+
 
 def _report_missing_columns(el: EntryList, found: dict, comp: Competition) -> None:
-    """Say which of the columns we need this export does not have."""
+    """Say which of the columns we need this export does not have.
+
+    Only what the app cannot work without - and, on a file nobody has mapped
+    yet, the column the squadra is read from. Once the giuria *has* mapped it
+    (`EntrySheet.mapped`) the question is answered, including by answering
+    "nessuna": an export that carries no regione at a meeting scored by regione
+    is a decision to take on the Programma page, not a line to be told again on
+    Verifica after every import.
+
+    And nothing is reported about a field the riders *have*: the regione is
+    read from its own column or, failing that, off the "Iscrizione CR. ..."
+    note, and a list where every atleta carries one is imported, whatever the
+    file called the column. The warning is about missing data, not about a
+    heading we did not recognise.
+    """
     sheet = comp.entry_sheet
-    for name in [*FLAT_REQUIRED, comp.team_group]:
-        if name not in found:
-            el.warnings.append(msg(
-                "flat_column_missing", field=label(name),
-                header=sheet.header_of(name, ksport=True)))
+    wanted = list(FLAT_REQUIRED)
+    if not sheet.mapped:
+        wanted.append(comp.team_group)
+    for name in dict.fromkeys(wanted):
+        if name in found or _filled(el, name):
+            continue
+        header = sheet.header_of(name, ksport=True)
+        # `header_of` answers with the field name when nothing maps to it: that
+        # is not a column of anybody's file and must not be quoted as one
+        el.warnings.append(
+            msg("flat_column_missing", field=label(name), header=header)
+            if header != name else
+            msg("flat_field_unmapped", field=label(name)))
+
+
+def _filled(el: EntryList, name: str) -> bool:
+    """Whether the import actually got that field, however it got it."""
+    return any(getattr(r, name, None) for r in el.riders.values())
 
 
 def _names(last: Any, first: Any, full: Any) -> tuple[str, str]:
@@ -578,7 +704,7 @@ def build_teams_and_pairs(el: EntryList, comp: Competition) -> None:
     el.errors.clear()  # they are re-stated below, from the flags as they are now
     for code, sp in comp.events.items():
         if sp.fmt == "timed_team":
-            _build_teams(el, comp, code, sp.team_size or 4)
+            _build_teams(el, comp, code)
         elif sp.fmt == "madison":
             _build_pairs(el, comp, code)
 
@@ -599,7 +725,7 @@ def _by_region(riders: Iterable[Rider],
     return out
 
 
-def _build_teams(el: EntryList, comp: Competition, event: str, size: int) -> None:
+def _build_teams(el: EntryList, comp: Competition, event: str) -> None:
     """The teams of each region, as the jury wrote them at the check-in.
 
     A letter (`A`, `B`, `C`, ...) pins a rider to that squadra, and the same
@@ -614,8 +740,13 @@ def _build_teams(el: EntryList, comp: Competition, event: str, size: int) -> Non
 
     Two rappresentative authorised to ride together (`entries.team_merge`) are
     one region here, under the name of the joint squadra.
+
+    How many `size` is is asked per categoria and not once per event
+    (`Competition.team_size`): the regulation's number is the usual answer, and
+    a categoria authorised to ride with one fewer says so in the programme.
     """
     for cat in comp.cat_order():
+        size = comp.team_size(cat, event) or 4
         pool = [r for r in el.riders.values()
                 if r.cat == cat and event in r.events and not r.not_starting]
         for region, riders in _by_region(pool, comp.team_merge(event)).items():
@@ -735,27 +866,33 @@ def _unknown_flag() -> str:
     """
     return msg("xls_unknown_flag", value="").rstrip("'\" ")
 
-OPS = ("set_field", "set_checked_in", "set_not_starting", "set_event",
-       "clear_event", "set_pair")
+OPS = ("set_field", "set_not_starting", "set_event", "clear_event", "set_pair")
 
-# Ticking a rider in at the licence desk needs no written reason; every other
-# edit does. See ui/pages/verifica.py.
-CHECK_IN_OPS = ("set_checked_in", "set_not_starting")
+# Declaring a rider non partente at the licence desk needs no written reason;
+# every other edit does. See ui/pages/check_in.py.
+CHECK_IN_OPS = ("set_not_starting",)
 
-#: The same two, as rider fields. The federation's file has no column for them:
-#: they are written back only where the giuria added one (`entries.check_in`).
-CHECK_IN_FIELDS = ("checked_in", "not_starting")
+#: The same, as a rider field. The federation's file has no column for it:
+#: it is written back only where the giuria added one (`entries.check_in`).
+#: Verification is derived from the event (`Rider.checked_in`), so there
+#: is nothing to write back for it.
+CHECK_IN_FIELDS = ("not_starting",)
 
 
 def check_in_columns(comp: Competition) -> tuple[str, ...]:
-    """Which of the two the entry file is declared to have a column for."""
+    """Which of them the entry file is declared to have a column for."""
     declared = set(comp.entry_sheet.check_in.values())
     return tuple(f for f in CHECK_IN_FIELDS if f in declared)
 
 # Names used before the code moved to English, still readable from an overlay
 # written by an earlier version.
-LEGACY_OPS = {"set_np": "set_not_starting", "set_verificato": "set_checked_in",
-              "set_spec": "set_event", "clear_spec": "clear_event"}
+LEGACY_OPS = {"set_np": "set_not_starting", "set_spec": "set_event",
+              "clear_spec": "clear_event"}
+
+#: Ops an older overlay may carry that mean nothing now: verification stopped
+#: being a flag of its own (`Rider.checked_in`). Read and dropped in silence -
+#: an overlay written last season is not a stale patch, it is an old law.
+DEAD_OPS = {"set_checked_in", "set_verificato"}
 
 
 def apply_overlay(el: EntryList, patches: list[Patch], comp: Competition
@@ -770,6 +907,8 @@ def apply_overlay(el: EntryList, patches: list[Patch], comp: Competition
             continue
         op = LEGACY_OPS.get(p.op, p.op)
         field = LEGACY_KEYS.get(p.field, p.field)
+        if p.op in DEAD_OPS or (op == "set_field" and field == "checked_in"):
+            continue
         if op == "set_field":
             if not hasattr(rider, field):
                 stale.append(msg("patch_unknown_field", field=p.field,
@@ -778,8 +917,6 @@ def apply_overlay(el: EntryList, patches: list[Patch], comp: Competition
             setattr(rider, field, p.value)
         elif op == "set_not_starting":
             rider.not_starting = bool(p.value)
-        elif op == "set_checked_in":
-            rider.checked_in = bool(p.value)
         elif op == "set_event":
             e = parse_flag(p.value) if not isinstance(
                 p.value, dict) else EventEntry(**p.value)
@@ -965,11 +1102,33 @@ def guessed_pairings(el: EntryList, comp: Competition
     return out
 
 
+def _answered_warnings(el: EntryList, comp: Competition) -> set[str]:
+    """Import warnings the data itself has since answered.
+
+    The warnings are written once, at import, and read on Verifica from the
+    snapshot: a "colonna assente" recorded before the giuria mapped the columns
+    would go on being shown over a list where every atleta *has* the field. It
+    is the data that decides - the line is about a datum that is missing, and a
+    datum that is there cannot be missing.
+    """
+    sheet = comp.entry_sheet
+    out = set()
+    for name in dict.fromkeys((*FLAT_REQUIRED, comp.team_group)):
+        if not _filled(el, name):
+            continue
+        out.add(msg("flat_field_unmapped", field=label(name)))
+        for header in {sheet.header_of(name, ksport=True), name}:
+            out.add(msg("flat_column_missing", field=label(name),
+                        header=header))
+    return out
+
+
 def validate_entries(el: EntryList, comp: Competition) -> list[Issue]:
     """Quota and consistency checks. Warnings only - nothing here blocks work."""
     issues: list[Issue] = [Issue(ERROR, "teams", e) for e in el.errors]
-    issues += [Issue(WARN, "import", w) for w in el.warnings]
-    q = comp.quotas
+    answered = _answered_warnings(el, comp)
+    issues += [Issue(WARN, "import", w) for w in el.warnings
+               if w not in answered]
 
     for cat, event, region, riders in guessed_pairings(el, comp):
         issues.append(Issue(WARN, "pairs", msg(
@@ -992,7 +1151,7 @@ def validate_entries(el: EntryList, comp: Competition) -> list[Issue]:
             issues.append(Issue(ERROR, "bib",
                                 msg("rider_no_bib", name=r.full_name), r.key))
         # an entry the programme does not run: with the flat export the
-        # specialità are ticked by hand, and a tick in the wrong column would
+        # events are ticked by hand, and a tick in the wrong column would
         # otherwise be found only when the sheet comes out empty
         run = comp.events_for(r.cat)
         for s in r.events:
@@ -1000,16 +1159,6 @@ def validate_entries(el: EntryList, comp: Competition) -> list[Issue]:
                 issues.append(Issue(WARN, "event_not_run", msg(
                     "rider_event_not_run", cat=r.cat, bib=r.bib,
                     name=r.full_name, event=comp.event(s).short), r.key))
-        lim = q.max_events_per_rider.get(r.cat)
-        if lim and q.max_events_level != "off":
-            n = r.n_events(include_reserves=q.max_events_count_reserves)
-            if n > lim:
-                events = ", ".join(comp.event(s).short
-                                   for s in comp.event_order()
-                                   if s in r.events and s != EVENT_ENTRY_LIST)
-                issues.append(Issue(q.max_events_level, "quota_rider", msg(
-                    "rider_over_events", cat=r.cat, bib=r.bib,
-                    name=r.full_name, n=n, max=lim, events=events), r.key))
         # The ksport column is the certificate's *issue* date, not its expiry:
         # in the 2026 export not one of the 227 dates falls after the competition.
         # A medical certificate lasts one year, so flag anything older than that.
@@ -1032,59 +1181,152 @@ def validate_entries(el: EntryList, comp: Competition) -> list[Issue]:
                     a=seen[r.bib].full_name, b=r.full_name)))
             seen[r.bib] = r
 
-    # per-region and per-club quotas
+    return issues + check_issues(el, comp)
+
+
+# ── what the regolamento limits ─────────────────────────────────────────────
+#
+# One sentence of an articolo, counted: *max N of this, per that*. The five
+# quota tables that used to be written out here one after another are the same
+# loop with a different `unit` and a different `per` (`config.Check`), and the
+# regulation they were written for is not the only one there is - so the loop
+# is here once and what it counts comes off the programme.
+
+#: Which wording a broken rule is reported in, by what it counts and for whom.
+#: The codes are the ones `ui.notify.issues` has always grouped by.
+_QUOTA_MSG = {
+    (UNIT_RIDERS, PER_REGION): ("quota_region", "quota_region"),
+    (UNIT_RIDERS, PER_CLUB): ("quota_club", "quota_club"),
+    (UNIT_RIDERS, PER_CLUB_IN_REGION): ("quota_club_region", "quota_club_region"),
+    (UNIT_RIDERS, PER_CAT): ("quota_cat", "quota_cat"),
+    (UNIT_TEAMS, PER_REGION): ("quota_teams", "quota_teams"),
+    (UNIT_TEAMS, PER_CAT): ("quota_teams_cat", "quota_teams"),
+}
+
+
+def _noted(text: str, chk: Check) -> str:
+    """The finding, and the articolo it comes from where the rule names one."""
+    return f"{text} ({chk.note})" if chk.note else text
+
+
+def check_issues(el: EntryList, comp: Competition) -> list[Issue]:
+    """Every entry rule of this competition, counted over this elenco."""
+    out: list[Issue] = []
+    for chk in comp.entry_checks():
+        if not chk.on:
+            continue
+        if chk.unit == UNIT_EVENTS:
+            out += _events_per_rider(el, comp, chk)
+        else:
+            out += _entrant_quota(el, comp, chk)
+    return out
+
+
+def _events_per_rider(el: EntryList, comp: Competition,
+                      chk: Check) -> list[Issue]:
+    """*Massimo N event per atleta* - the STP limit, generalised.
+
+    The one rule counted per atleta rather than per squadra, and the only one
+    whose `event` says nothing: it is about how many, not about which.
+    """
+    out = []
+    for r in el.riders.values():
+        if r.not_starting or not chk.applies(r.cat, ANY):
+            continue
+        n = r.n_events(include_reserves=chk.count_reserves)
+        if n <= chk.max:
+            continue
+        events = ", ".join(comp.event(s).short for s in comp.event_order()
+                           if s in r.events and s != EVENT_ENTRY_LIST)
+        out.append(Issue(chk.level, "quota_rider", _noted(msg(
+            "rider_over_events", cat=r.cat, bib=r.bib, name=r.full_name,
+            n=n, max=chk.max, events=events), chk), r.key))
+    return out
+
+
+def _entrant_quota(el: EntryList, comp: Competition,
+                   chk: Check) -> list[Issue]:
+    """*Massimo N atleti / squadre / coppie per regione* - over one event.
+
+    Walked over the programme and not over the rule: `cat: "*"` is every
+    categoria that rides the event, and a categoria that does not ride it
+    is not counted at all.
+    """
+    out = []
     for cat in comp.cat_order():
         for event in comp.events_for(cat):
-            entered = el.entered(cat, event)
-            lim = q.max_per_region.get(event)
-            if lim:
-                for region, riders in _by_region(entered).items():
-                    if len(riders) > lim:
-                        issues.append(Issue(WARN, "quota_region", msg(
-                            "quota_region", cat=cat,
-                            event=comp.event(event).short, region=region,
-                            n=len(riders), max=lim)))
-            lim = q.max_same_club_per_region.get(event)
-            if lim:
-                per: dict[tuple[str, str], list[Rider]] = {}
-                for r in entered:
-                    per.setdefault((r.region, r.club), []).append(r)
-                for (region, club), riders in per.items():
-                    if len(riders) > lim and club:
-                        issues.append(Issue(WARN, "quota_club_region", msg(
-                            "quota_club_region", cat=cat,
-                            event=comp.event(event).short, region=region or "?",
-                            club=club, n=len(riders), max=lim,
-                            bibs=_bibs(riders))))
-            lim = q.max_same_club.get(event)
-            if lim:
-                clubs: dict[str, int] = {}
-                for r in entered:
-                    clubs[r.club] = clubs.get(r.club, 0) + 1
-                for club, n in clubs.items():
-                    if n > lim and club:
-                        issues.append(Issue(WARN, "quota_club", msg(
-                            "quota_club", cat=cat,
-                            event=comp.event(event).short, club=club,
-                            n=n, max=lim)))
+            if event == EVENT_ENTRY_LIST or not chk.applies(cat, event):
+                continue
+            groups = (_team_groups(el, comp, cat, event, chk)
+                      if chk.unit in (UNIT_TEAMS, UNIT_PAIRS)
+                      else _rider_groups(el, cat, event, chk))
+            unit = (UNIT_TEAMS if chk.unit in (UNIT_TEAMS, UNIT_PAIRS)
+                    else UNIT_RIDERS)
+            key, code = _QUOTA_MSG.get((unit, chk.per), ("quota_region",
+                                                         "quota_region"))
+            for (region, club), n in groups.items():
+                if n <= chk.max or (chk.per in (PER_CLUB, PER_CLUB_IN_REGION)
+                                    and not club):
+                    continue
+                out.append(Issue(chk.level, code, _noted(msg(
+                    key, cat=cat, event=comp.event(event).short,
+                    region=region or "?", club=club, n=n, max=chk.max,
+                    bibs=_bibs(_entered_of(el, cat, event, chk, region, club))),
+                    chk)))
+    return out
 
-    # teams and pairs per region
-    for event, lim in q.max_teams_per_region.items():
-        groups: dict[tuple[str, str], int] = {}
-        if comp.event(event).fmt == "madison":
-            for p in el.pairs.values():
-                groups[(p.cat, p.region)] = groups.get((p.cat, p.region), 0) + 1
-        else:
-            for t in el.teams.values():
-                if t.event == event and t.riders:
-                    groups[(t.cat, t.region)] = groups.get(
-                        (t.cat, t.region), 0) + 1
-        for (cat, region), n in groups.items():
-            if n > lim:
-                issues.append(Issue(WARN, "quota_teams", msg(
-                    "quota_teams", cat=cat, event=comp.event(event).short,
-                    region=region, n=n, max=lim)))
-    return issues
+
+def _rider_groups(el: EntryList, cat: str, event: str,
+                  chk: Check) -> dict[tuple[str, str], int]:
+    """How many atleti fall in each bucket the rule counts by."""
+    out: dict[tuple[str, str], int] = {}
+    for r in el.entered(cat, event, include_reserves=chk.count_reserves):
+        out[_bucket(r.region, r.club, chk)] = out.get(
+            _bucket(r.region, r.club, chk), 0) + 1
+    return out
+
+
+def _entered_of(el: EntryList, cat: str, event: str, chk: Check,
+                region: str, club: str) -> list[Rider]:
+    """The atleti behind one count - their dorsali go on the finding."""
+    if chk.unit in (UNIT_TEAMS, UNIT_PAIRS):
+        return []
+    return [r for r in el.entered(cat, event,
+                                  include_reserves=chk.count_reserves)
+            if _bucket(r.region, r.club, chk) == (region, club)]
+
+
+def _bucket(region: str, club: str, chk: Check) -> tuple[str, str]:
+    """(what is named in the finding, the società it names, where it has one)."""
+    if chk.per == PER_CLUB:
+        return ("", club)
+    if chk.per == PER_CLUB_IN_REGION:
+        return (region, club)
+    if chk.per == PER_CAT:
+        return ("", "")
+    return (region, "")
+
+
+def _team_groups(el: EntryList, comp: Competition, cat: str, event: str,
+                 chk: Check) -> dict[tuple[str, str], int]:
+    """Squadre or coppie per bucket - which of the two the formato decides.
+
+    A regolamento writes "1 Team per regione" for the madison as readily as for
+    the inseguimento; what a *team* is there is a coppia, and the elenco holds
+    those in another place.
+    """
+    out: dict[tuple[str, str], int] = {}
+    if comp.event(event).fmt == "madison":
+        entities = [(p.cat, p.region) for p in el.pairs.values()]
+    else:
+        entities = [(t.cat, t.region) for t in el.teams.values()
+                    if t.event == event and t.riders]
+    for owner, region in entities:
+        if owner != cat:
+            continue
+        key = ("", "") if chk.per == PER_CAT else (region, "")
+        out[key] = out.get(key, 0) + 1
+    return out
 
 
 # ── writing the entries back into the workbook ──────────────────────────────
@@ -1211,13 +1453,12 @@ def write_back(path: str | Path, comp: Competition, el: EntryList,
 
 def _op_field(op: str) -> str:
     """The field name behind an op that does not carry one."""
-    return {"set_checked_in": "checked_in",
-            "set_not_starting": "not_starting"}.get(op, op)
+    return {"set_not_starting": "not_starting"}.get(op, op)
 
 
 def _write_check_in(wb, rider: Rider, field: str, sheet: EntrySheet, flat: bool,
                     headers: dict[str, str], maps: dict) -> tuple[int, list[str]]:
-    """Tick verificato / NP in every sheet that has a column for it.
+    """Flag NP in every sheet that has a column for it.
 
     The master workbook carries the same rider twice - on the foglio di
     categoria the giuria prints and on the KSPORT sheet the federation sent -

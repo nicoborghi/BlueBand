@@ -1,0 +1,225 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2026, Nicola Borghi — GPLv3
+# This file is distributed under the same license as the Blue Band package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Blue Band 0.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 18:07+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: it <LL@li.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../index.rst:100
+msgid "User Guide"
+msgstr "Guida"
+
+#: ../../index.rst:108
+msgid "Reference"
+msgstr "Riferimento tecnico"
+
+#: ../../index.rst:7 dd750ef4903f4929b35a3d7e421387bd
+msgid "Blue Band"
+msgstr "Blue Band"
+
+#: ../../index.rst:9 0b721aaeb8624addb0e79b0236d8a91b
+msgid "**Commissaires' console for track cycling competitions.**"
+msgstr "**La console di giuria per le manifestazioni su pista.**"
+
+#: ../../index.rst:11 2a9af2af9cde47c8849d72b869d874d3
+msgid "GitHub"
+msgstr "GitHub"
+
+#: ../../index.rst:14 37f8bc2ea7ce4050b2f8dfff9f743871
+msgid "Tests"
+msgstr "Test"
+
+#: ../../index.rst:17 4abe3b4c6bb74756bb16c30524491483
+msgid "Coverage"
+msgstr "Copertura"
+
+#: ../../index.rst:20 8ab7b7abd769469d8490fa88172b4f7a
+msgid "License"
+msgstr "Licenza"
+
+#: ../../index.rst:26 5cfa3861135f4c008edd6a4a9a9e66d8
+msgid ""
+"Experimental. Used at the Italian Youth Track Championships (2025, 2026) and"
+" nowhere else. Much of the codebase is AI-generated. Feedback and "
+"contributions are welcome — open an `issue "
+"<https://github.com/nicoborghi/BlueBand/issues>`_ or a pull request."
+msgstr ""
+"Sperimentale. Usato ai Campionati Italiani Giovanili su Pista (2025, 2026) e"
+" da nessun'altra parte. Buona parte del codice è generata da IA. "
+"Segnalazioni e contributi sono benvenuti — apri una `issue "
+"<https://github.com/nicoborghi/BlueBand/issues>`_ o una pull request."
+
+#: ../../index.rst:31 90375966e41e4045acfaf2f4b24d6919
+msgid ""
+"Blue Band is what a commissaires' panel runs a track meeting from: licence "
+"check, entry lists, results, classifications, jury decisions, and the "
+"numbered communiqués that publish all of it. It is a Streamlit app that runs"
+" on a laptop at the velodrome — often off the network — and writes "
+"everything it does to plain files in one folder per competition."
+msgstr ""
+"Blue Band è il programma da cui un collegio di giuria dirige una "
+"manifestazione su pista: verifica delle licenze, elenchi iscritti, "
+"risultati, classifiche, decisioni della giuria e i comunicati numerati che "
+"pubblicano tutto questo. È un'applicazione Streamlit che gira su un "
+"portatile al velodromo — spesso senza rete — e scrive tutto quello che fa in"
+" file semplici, una cartella per manifestazione."
+
+#: ../../index.rst:37 2353e8b6f3834a8bb070d022fe599200
+msgid ""
+"One YAML file per competition (``programme.yaml``) says what is being run: "
+"the track, the categories, which events each contests, the rounds of every "
+"event, the running order of each day, and the communiqué register. Running "
+"next year's edition means editing that file."
+msgstr ""
+"Un file YAML per manifestazione (``programme.yaml``) dice che cosa si corre:"
+" la pista, le categorie, le specialità di ciascuna, le fasi di ogni "
+"specialità, il programma orario di ogni giornata e il registro dei "
+"comunicati. Organizzare l'edizione dell'anno prossimo vuol dire modificare "
+"quel file."
+
+#: ../../index.rst:44 f4083ec069504cdbb9d3d2a040d451f3
+msgid "Quick start"
+msgstr "Per cominciare"
+
+#: ../../index.rst:46 de4ac78ad7504772a24a4e05d51b821f
+msgid ""
+"On a jury laptop, install `the latest BlueBand-setup.exe "
+"<https://github.com/nicoborghi/BlueBand/releases>`_ and start it from the "
+"desktop icon — no Python, no command line. From a checkout:"
+msgstr ""
+"Sul portatile della giuria, installa `l'ultimo BlueBand-setup.exe "
+"<https://github.com/nicoborghi/BlueBand/releases>`_ e avvialo dall'icona sul"
+" desktop — niente Python, niente riga di comando. Da un checkout:"
+
+#: ../../index.rst:57 1ff448facbea42ada3a4c6c20ad83a6d
+msgid ""
+"See :doc:`install` for both paths, the example competition, and where the "
+"data lands."
+msgstr ""
+"Vedi :doc:`install` per entrambe le strade, la manifestazione di esempio e "
+"dove finiscono i dati."
+
+#: ../../index.rst:62 f137fd26c8444ed48af99fb8fd1661cf
+msgid "What it does"
+msgstr "Che cosa fa"
+
+#: ../../index.rst:64 545e55e3bab847508a5c29cba0dbf3a9
+msgid "Licence check"
+msgstr "Verifica delle licenze"
+
+#: ../../index.rst:65 abc61679ab69497eb5ce648ed272917d
+msgid ""
+"Counters, the event-entry table, quota checks against the regulation. Jury "
+"edits are recorded as patches keyed by UCI ID; the entry workbook is never "
+"written unless you ask for it."
+msgstr ""
+"Contatori, tabella delle iscrizioni per specialità, controllo delle quote "
+"contro il regolamento. Le correzioni della giuria sono registrate come patch"
+" indicizzate sull'UCI ID; l'elenco iscritti non viene mai scritto se non lo "
+"chiedi."
+
+#: ../../index.rst:69 640d00728ff3447f8dad047b1adc42c1
+msgid "Races"
+msgstr "Gare"
+
+#: ../../index.rst:70 8e9cd2dc78cc45df864d0aa83827e80f
+msgid ""
+"Every format track cycling runs: bunch races, pursuits, sprint and keirin "
+"brackets, omnium, madison, derny — with results typed in the jury's own "
+"shorthand."
+msgstr ""
+"Tutti i formati che il ciclismo su pista corre: prove di gruppo, "
+"inseguimenti, tabelloni di velocità e keirin, omnium, madison, derny — con i"
+" risultati scritti nella grafia della giuria."
+
+#: ../../index.rst:74 fdd9c839407046728d4c9e52ad2bccf6
+msgid "Decisions"
+msgstr "Decisioni"
+
+#: ../../index.rst:75 577a9ac2da674071a885b82b1a7c10af
+msgid ""
+"One row per decision of the panel, with the UCI code and the sentence "
+"published under it. A warning follows the rider through the event."
+msgstr ""
+"Una riga per decisione del collegio, con il codice UCI e la frase pubblicata"
+" sotto di esso. Un'ammonizione segue l'atleta per tutta la specialità."
+
+#: ../../index.rst:78 d037dab7626e4329aca3b9b75a518375
+msgid "Communiqués"
+msgstr "Comunicati"
+
+#: ../../index.rst:79 b282826f51954c6abbe2244e2c99e334
+msgid ""
+"A numbered register planned from the running order, with the merge rules of "
+"the regulation applied: which sheets share a number, in what order they can "
+"be published."
+msgstr ""
+"Un registro numerato pianificato dal programma orario, con le regole di "
+"accorpamento del regolamento applicate: quali fogli condividono un numero e "
+"in che ordine possono essere pubblicati."
+
+#: ../../index.rst:83 44a685c7b4f949a8aedca54ed6bcb3f7
+msgid "Printing"
+msgstr "Stampa"
+
+#: ../../index.rst:84 9aa5dcc0643645c6956b5bb22f382aee
+msgid ""
+"Headless Chromium to PDF, with the meeting's letterhead, footer and "
+"signature on every page. With no browser available, a self-contained HTML "
+"file instead — nothing is ever lost for want of a renderer."
+msgstr ""
+"Chromium headless verso PDF, con testata, piede e firma della manifestazione"
+" su ogni pagina. Senza browser disponibile, un file HTML autoconsistente — "
+"niente si perde mai per mancanza di un motore di stampa."
+
+#: ../../index.rst:88 c850ebb5cf9b454ca3aebd52dfcd3489
+msgid "Statistics"
+msgstr "Statistiche"
+
+#: ../../index.rst:89 d2973a38047645f39f06038d22995f14
+msgid ""
+"The medal table and the podiums it is counted from, plus the team points "
+"classification where the meeting has one."
+msgstr ""
+"Il medagliere e i podi da cui è contato, più la classifica a punti per "
+"squadre dove la manifestazione ne ha una."
+
+#: ../../index.rst:92 3eccadc4b83548b3ba6684dd250ab196
+msgid ""
+"Everything under ``core/`` is plain Python — no Streamlit, no I/O beyond "
+"``core.store`` — so the scoring, the composition tables and the register are"
+" testable headless, and they are."
+msgstr ""
+"Tutto quello che sta sotto ``core/`` è Python puro — niente Streamlit, "
+"nessun I/O oltre ``core.store`` — perciò i punteggi, le tabelle di "
+"composizione e il registro sono testabili senza interfaccia, e lo sono."
+
+#: ../../index.rst:98 9d8d9e289d7a4c5897fc054233b9aa5c
+msgid "Documentation"
+msgstr "Documentazione"
+
+#: ../../index.rst:120 f864becc92b94c078d36bed5c022166a
+msgid "Licence"
+msgstr "Licenza"
+
+#: ../../index.rst:122 481aa00c30ad477a8d1b7c973f4388c2
+msgid ""
+"GPLv3 — see `LICENSE "
+"<https://github.com/nicoborghi/BlueBand/blob/main/LICENSE>`_."
+msgstr ""
+"GPLv3 — vedi `LICENSE "
+"<https://github.com/nicoborghi/BlueBand/blob/main/LICENSE>`_."
